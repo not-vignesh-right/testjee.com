@@ -1,5 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import ExamLayout from '../components/ExamLayout.vue'
+import StudentLayout from '../components/StudentLayout.vue'
 import Results from '../components/Results.vue'
 import ResultsDetails from '../components/ResultsDetails.vue'
 import ResetPassword from '../components/ResetPassword.vue'
@@ -13,11 +12,23 @@ const routes = [
   { path: '/about', name: 'About', component: () => import('../components/AboutPage.vue') },
   { path: '/contact', name: 'Contact', component: () => import('../components/ContactPage.vue') },
 
-  // Student home (results page - homepage after login)
-  { path: '/sthome', name: 'StHome', component: Results, meta: { requiresAuth: true } },
-  { path: '/sthome/details', name: 'ResultsDetails', component: ResultsDetails, meta: { requiresAuth: true } },
+  // Student Dashboard Routes (Wrapped in Layout)
+  {
+    path: '/sthome',
+    component: StudentLayout,
+    meta: { requiresAuth: true },
+    children: [
+      { path: '', redirect: 'dashboard' }, // Default redirect
+      { path: 'dashboard', name: 'Dashboard', component: Results },
+      { path: 'details', name: 'ResultsDetails', component: ResultsDetails },
+      { path: 'settings', name: 'Settings', component: () => import('../components/Settings.vue') }
+    ]
+  },
 
-  // Protected exam routes
+  // Settings alias for backward compatibility (optional, or just remove)
+  { path: '/settings', redirect: '/sthome/settings' },
+
+  // Protected exam routes (Independent of Dashboard Layout for full screen focus)
   { path: '/exam', name: 'Exam', component: ExamLayout, meta: { requiresAuth: true } },
 
   // Public routes - Login is at root since router base is /login

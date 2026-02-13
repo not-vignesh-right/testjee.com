@@ -7,26 +7,18 @@
       <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-50/30 rounded-full blur-3xl"></div>
     </div>
     
-    <div class="max-w-7xl mx-auto relative z-10">
-      <!-- Professional Header -->
-      <div class="mb-8">
-        <div class="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
-          <div class="flex items-center gap-5">
-            <div class="relative">
-              <img :src="logo" alt="TESTJEE Logo" class="w-16 h-16 object-contain" />
-              <div class="absolute inset-0 bg-blue-100/30 rounded-full blur-xl -z-10"></div>
-            </div>
-            <div>
-              <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-1">
-                Student Dashboard
-              </h1>
-              <p class="text-gray-600 text-sm font-medium">Welcome back, {{ studentName }}</p>
-            </div>
-          </div>
-          <div class="text-right">
-            <div class="text-xs text-gray-500 font-medium mb-1">Today's Date</div>
-            <div class="text-sm text-gray-700 font-semibold">{{ formattedToday }}</div>
-          </div>
+    <div class="max-w-7xl mx-auto relative z-10 w-full">
+      <!-- Title Section (Simplified) -->
+      <div class="mb-8 flex justify-between items-end">
+        <div>
+          <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
+            Student Dashboard
+          </h1>
+          <p class="text-gray-600 text-sm font-medium">Overview of your performance</p>
+        </div>
+        <div class="text-right hidden md:block">
+          <div class="text-xs text-gray-500 font-medium mb-1">Today's Date</div>
+          <div class="text-sm text-gray-700 font-semibold">{{ formattedToday }}</div>
         </div>
       </div>
 
@@ -521,5 +513,15 @@ function getTrendText(trend) {
   if (trend === 'improving') return 'Improving'
   if (trend === 'declining') return 'Declining'
   return 'Stable'
+}
+
+async function handleLogout() {
+  try {
+    await authStore.logout()
+    router.push('/')
+  } catch (error) {
+    console.error('Logout error:', error)
+    router.push('/')
+  }
 }
 </script>
