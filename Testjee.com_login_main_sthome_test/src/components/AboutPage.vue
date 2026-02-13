@@ -4,9 +4,9 @@
     <nav class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-white/20">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center h-16">
-          <router-link to="/" class="flex items-center gap-3 group cursor-pointer">
+          <router-link to="/login" class="flex items-center gap-3 group cursor-pointer">
             <div class="relative">
-              <img src="/logo.png" alt="TESTJEE Logo" class="w-10 h-10 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+              <img :src="logo" alt="TESTJEE Logo" class="w-10 h-10 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 object-contain">
             </div>
             <span class="text-xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent">TESTJEE</span>
           </router-link>
@@ -249,8 +249,8 @@
     <footer class="footer">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="footer-content">
-          <router-link to="/" class="flex items-center gap-3">
-            <img src="/logo.png" alt="TESTJEE Logo" class="w-10 h-10 rounded-xl">
+          <router-link to="/login" class="flex items-center gap-3">
+            <img :src="logo" alt="TESTJEE Logo" class="w-10 h-10 rounded-xl object-contain">
             <div>
               <div class="text-xl font-bold text-white">TESTJEE</div>
               <div class="text-sm text-gray-400">by Gyan Edge</div>
@@ -270,6 +270,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import logo from '../../assets/logo_test_jee.png'
 
 const mobileMenuOpen = ref(false)
 </script>
