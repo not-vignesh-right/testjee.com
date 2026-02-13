@@ -2,6 +2,12 @@
 
 A full-fledged mock exam UI that replicates the NTA JEE Main environment, styled with TestJEE branding. This project includes a complete student authentication system, exam session management, and result tracking.
 
+## Recent Updates (Feb 2026)
+- **Enhanced UI**: Completely redesigned Login and Student Dashboard with a professional "Light Blue & White" theme and glassmorphism effects.
+- **Animations**: Added smooth entrance animations for a better user experience.
+- **Logout Functionality**: Added prominent logout buttons and ensured session persistence.
+- **Navigation**: Added "Back to Home" button on the login page.
+
 ## 🎯 Features
 
 ### Authentication & User Management
