@@ -168,7 +168,7 @@
         <!-- Call to Action -->
         <div class="text-center">
           <router-link 
-            to="/results/details"
+            to="/sthome/details"
             class="group inline-flex items-center px-16 py-6 bg-gradient-to-r from-cyan-500 via-purple-600 to-pink-600 text-white font-bold text-xl rounded-full hover:from-cyan-600 hover:via-purple-700 hover:to-pink-700 transform hover:scale-105 transition-all duration-300 shadow-2xl hover:shadow-cyan-500/25"
           >
             <svg class="w-8 h-8 mr-4 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -193,7 +193,7 @@
           <h3 class="text-2xl font-bold text-gray-200 mb-4">No Results Found</h3>
           <p class="text-gray-400 mb-6">Complete an exam to see your performance analytics here.</p>
           <router-link 
-            to="/"
+            to="/exam"
             class="inline-flex items-center px-8 py-3 bg-cyan-600 text-white font-semibold rounded-full hover:bg-cyan-700 transition-colors"
           >
             Start Exam

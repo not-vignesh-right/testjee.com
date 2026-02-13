@@ -9,7 +9,7 @@
           Your exam session has ended. Your answers have been automatically submitted.
         </p>
         <button 
-          @click="$router.push('/results')"
+          @click="$router.push('/sthome')"
           class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
         >
           View Results

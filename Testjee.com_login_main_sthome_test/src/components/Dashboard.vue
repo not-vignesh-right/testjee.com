@@ -454,8 +454,8 @@ async function viewDetails(exam) {
     }
     examStore.isSubmitted = true
     
-    // Navigate to results
-    router.push('/results')
+    // Navigate to student home
+    router.push('/sthome')
   } catch (error) {
     console.error('Error loading exam details:', error)
     alert('Failed to load exam details: ' + error.message)

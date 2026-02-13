@@ -27,9 +27,9 @@ onMounted(async () => {
     console.log('Student profile:', auth.studentProfile)
     console.log('Student name:', auth.studentName)
     
-    // Redirect to dashboard
-    console.log('Redirecting to /dashboard')
-    router.replace('/dashboard')
+    // Redirect to student home (sthome)
+    console.log('Redirecting to /sthome')
+    router.replace('/sthome')
   } catch (error) {
     console.error('Error in auth callback:', error)
   }

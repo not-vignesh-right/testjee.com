@@ -6,7 +6,7 @@
           Question Analysis
         </h1>
         <router-link 
-          to="/results"
+          to="/sthome"
           class="inline-flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium rounded-xl transition-colors border border-gray-700"
         >
           <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,7 +144,7 @@
           <h3 class="text-2xl font-bold text-gray-200 mb-4">No Detailed Data Available</h3>
           <p class="text-gray-400 mb-6">Complete an exam to see question-wise analysis.</p>
           <router-link 
-            to="/"
+            to="/exam"
             class="inline-flex items-center px-8 py-3 bg-cyan-600 text-white font-semibold rounded-full hover:bg-cyan-700 transition-colors"
           >
             Start Exam

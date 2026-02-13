@@ -77,7 +77,7 @@ async function handleSubmit() {
   }
   const result = await examStore.submitExam()
   if (result.success) {
-    router.push("/results")
+    router.push("/sthome")
   } else {
     alert("Failed to submit exam. Please try again.")
   }

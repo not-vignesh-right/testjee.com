@@ -6,20 +6,19 @@ import { useExamStore } from '../stores/examStore'
 import { useAuthStore } from '../stores/authStore'
 
 const routes = [
-  // Landing page (public home)
-  { path: '/', name: 'Home', component: () => import('../components/LandingPage.vue') },
+  // Redirect root to login
+  { path: '/', redirect: '/login' },
   
   // Public pages
   { path: '/about', name: 'About', component: () => import('../components/AboutPage.vue') },
   { path: '/contact', name: 'Contact', component: () => import('../components/ContactPage.vue') },
 
-  // Dashboard (homepage after login)
-  { path: '/dashboard', name: 'Dashboard', component: () => import('../components/Dashboard.vue'), meta: { requiresAuth: true } },
+  // Student home (results page - homepage after login)
+  { path: '/sthome', name: 'StHome', component: Results, meta: { requiresAuth: true } },
+  { path: '/sthome/details', name: 'ResultsDetails', component: ResultsDetails, meta: { requiresAuth: true } },
 
   // Protected exam routes
   { path: '/exam', name: 'Exam', component: ExamLayout, meta: { requiresAuth: true } },
-  { path: '/results', name: 'Results', component: Results, meta: { requiresAuth: true } },
-  { path: '/results/details', name: 'ResultsDetails', component: ResultsDetails, meta: { requiresAuth: true } },
 
   // Public routes
   { path: '/login', name: 'Login', component: () => import('../components/Login.vue') },
@@ -53,12 +52,14 @@ router.beforeEach(async (to, from, next) => {
   // ========== EXAM SUBMISSION LOGIC ==========
   try {
     if (examStore.isSubmitted && to.name === 'Exam') {
-      console.log('Exam already submitted, redirecting to results')
-      return next({ name: 'Results' })
+      console.log('Exam already submitted, redirecting to sthome')
+      return next({ name: 'StHome' })
     }
 
-    if (!examStore.isSubmitted && (to.name === 'Results' || to.name === 'ResultsDetails')) {
-      return next({ name: 'Exam' })
+    // Only prevent access to results details if exam not submitted
+    // Allow access to sthome (student home) even without submitted exam
+    if (!examStore.isSubmitted && to.name === 'ResultsDetails') {
+      return next({ name: 'StHome' })
     }
   } catch (e) {
     // ignore examStore not ready
