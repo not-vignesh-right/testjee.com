@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  
+  <!-- Home Page -->
+  <url>
+    <loc>https://www.testjee.com/</loc>
+    <lastmod>2026-02-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    
+    <!-- Main Poster Image -->
+    <image:image>
+      <image:loc>https://www.testjee.com/assets/img/poster_TestJEE.png</image:loc>
+      <image:title>TestJEE NTA Style Mock Test Interface - JEE NEET NDA KCET Online Exam Practice Platform</image:title>
+      <image:caption>Real NTA exam interface for JEE Main, JEE Advanced, NEET UG, NDA, and KCET mock tests. Practice with authentic exam simulation platform.</image:caption>
+    </image:image>
+    
+    <!-- Logo Image -->
+    <image:image>
+      <image:loc>https://www.testjee.com/assets/img/logo_test_jee.png</image:loc>
+      <image:title>TestJEE Logo - Premier JEE Main NEET Mock Test Online Platform</image:title>
+      <image:caption>TestJEE - Best online mock test platform for JEE, NEET, NDA, KCET competitive exam preparation</image:caption>
+    </image:image>
+    
+    <!-- Logo Only Image -->
+    <image:image>
+      <image:loc>https://www.testjee.com/assets/img/logo_test_jee_only%20logo.png</image:loc>
+      <image:title>TestJEE Icon - JEE NEET Mock Test Platform Logo</image:title>
+      <image:caption>TestJEE platform icon for competitive exam mock tests</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- About Page -->
+  <url>
+    <loc>https://www.testjee.com/about.html</loc>
+    <lastmod>2026-02-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    
+    <!-- Founder Image -->
+    <image:image>
+      <image:loc>https://www.testjee.com/assets/img/founder-mishra.jpg</image:loc>
+      <image:title>Purnendu Mishra - Founder TestJEE JEE NEET Mock Test Platform</image:title>
+      <image:caption>Founder and CEO of TestJEE, premier online exam preparation platform for JEE, NEET, NDA, KCET</image:caption>
+    </image:image>
+    
+    <!-- Tech Lead Image -->
+    <image:image>
+      <image:loc>https://www.testjee.com/assets/img/developer-vignesh.png</image:loc>
+      <image:title>Tech Lead - TestJEE Online Exam Platform Developer</image:title>
+      <image:caption>Technology leader building NTA-style mock test interface for competitive exams</image:caption>
+    </image:image>
+    
+    <!-- Cloud Engineer Image -->
+    <image:image>
+      <image:loc>https://www.testjee.com/assets/img/chinmay.jpg</image:loc>
+      <image:title>Cloud Engineer - TestJEE Mock Test Platform Infrastructure</image:title>
+      <image:caption>Managing cloud infrastructure for TestJEE online exam platform</image:caption>
+    </image:image>
+    
+    <!-- Frontend Developer Image -->
+    <image:image>
+      <image:loc>https://www.testjee.com/assets/img/karthik.png</image:loc>
+      <image:title>Frontend Developer - TestJEE Exam Interface Designer</image:title>
+      <image:caption>Creating user-friendly exam interface for JEE NEET mock tests</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- Exams Page (Hash Route) -->
+  <url>
+    <loc>https://www.testjee.com/#/exams</loc>
+    <lastmod>2026-02-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <!-- Features Page (Hash Route) -->
+  <url>
+    <loc>https://www.testjee.com/#/features</loc>
+    <lastmod>2026-02-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <!-- Contact Page (Hash Route) -->
+  <url>
+    <loc>https://www.testjee.com/#/contact</loc>
+    <lastmod>2026-02-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <!-- Demo Page (Hash Route) -->
+  <url>
+    <loc>https://www.testjee.com/#/demo</loc>
+    <lastmod>2026-02-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+</urlset>

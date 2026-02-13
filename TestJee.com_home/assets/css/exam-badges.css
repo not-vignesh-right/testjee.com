@@ -1,0 +1,167 @@
+/* Exam Badge Boxes - Floating Animation */
+.exam-badges-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.exam-badge {
+    position: absolute;
+    background: white;
+    border: 2px solid #E5E7EB;
+    border-radius: 16px;
+    padding: 12px 20px;
+    font-weight: 700;
+    font-size: 14px;
+    color: #1F2937;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    animation: gentle-float 3s ease-in-out infinite;
+    cursor: default;
+}
+
+.exam-badge:hover {
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
+    border-color: #3B82F6;
+}
+
+/* Individual badge positions */
+.exam-badge.jee {
+    top: 10%;
+    right: -10%;
+    background: linear-gradient(135deg, #EEF2FF 0%, #DBEAFE 100%);
+    border-color: #3B82F6;
+    color: #1E40AF;
+    animation-delay: 0s;
+}
+
+.exam-badge.neet {
+    top: 35%;
+    left: -12%;
+    background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%);
+    border-color: #10B981;
+    color: #065F46;
+    animation-delay: 0.7s;
+}
+
+.exam-badge.kcet {
+    bottom: 30%;
+    right: -8%;
+    background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+    border-color: #F59E0B;
+    color: #92400E;
+    animation-delay: 1.4s;
+}
+
+.exam-badge.nda {
+    bottom: 10%;
+    left: -10%;
+    background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%);
+    border-color: #8B5CF6;
+    color: #5B21B6;
+    animation-delay: 2.1s;
+}
+
+/* Gentle floating animation */
+@keyframes gentle-float {
+
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-12px);
+    }
+}
+
+/* Responsive adjustments for tablets */
+@media (max-width: 1024px) {
+    .exam-badge {
+        font-size: 12px;
+        padding: 8px 14px;
+        border-radius: 12px;
+    }
+
+    .exam-badge.jee {
+        top: 8%;
+        right: -8%;
+    }
+
+    .exam-badge.neet {
+        top: 32%;
+        left: -10%;
+    }
+
+    .exam-badge.kcet {
+        bottom: 28%;
+        right: -6%;
+    }
+
+    .exam-badge.nda {
+        bottom: 8%;
+        left: -9%;
+    }
+}
+
+/* Mobile adjustments - show badges in better positions */
+@media (max-width: 640px) {
+    .exam-badge {
+        font-size: 10px;
+        padding: 6px 12px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Stack badges on sides instead of corners */
+    .exam-badge.jee {
+        top: 15%;
+        right: -5%;
+    }
+
+    .exam-badge.neet {
+        top: 35%;
+        left: -5%;
+    }
+
+    .exam-badge.kcet {
+        bottom: 35%;
+        right: -5%;
+    }
+
+    .exam-badge.nda {
+        bottom: 15%;
+        left: -5%;
+    }
+}
+
+/* Extra small mobile devices */
+@media (max-width: 380px) {
+    .exam-badge {
+        font-size: 9px;
+        padding: 5px 10px;
+        border-radius: 8px;
+    }
+
+    .exam-badge.jee {
+        top: 12%;
+        right: -3%;
+    }
+
+    .exam-badge.neet {
+        top: 32%;
+        left: -3%;
+    }
+
+    .exam-badge.kcet {
+        bottom: 32%;
+        right: -3%;
+    }
+
+    .exam-badge.nda {
+        bottom: 12%;
+        left: -3%;
+    }
+}

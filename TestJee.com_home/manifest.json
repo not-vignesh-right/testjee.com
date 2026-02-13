@@ -1,0 +1,52 @@
+{
+  "name": "TestJEE - JEE NEET NDA KCET Mock Test Platform",
+  "short_name": "TestJEE",
+  "description": "Best online mock test platform for JEE Main, JEE Advanced, NEET UG, NDA, KCET. Real NTA exam interface with 250+ practice tests and instant analytics.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "categories": [
+    "education",
+    "productivity"
+  ],
+  "lang": "en-IN",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/assets/img/logo_test_jee.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/img/logo_test_jee.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/assets/img/poster_TestJEE.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "label": "TestJEE NTA Style Mock Test Interface"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Mock Test",
+      "short_name": "Mock Test",
+      "description": "Start a new JEE/NEET mock test",
+      "url": "/#/demo",
+      "icons": [
+        {
+          "src": "/assets/img/logo_test_jee.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

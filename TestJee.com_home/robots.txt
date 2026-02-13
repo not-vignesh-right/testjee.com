@@ -1,0 +1,21 @@
+# robots.txt for TestJEE - Premier JEE NEET NDA KCET Mock Test Platform
+
+User-agent: *
+Allow: /
+Allow: /assets/
+Allow: /assets/img/
+Allow: /assets/css/
+Allow: /assets/js/
+
+# Allow indexing of all images for better image search visibility
+Allow: /assets/img/*.png
+Allow: /assets/img/*.jpg
+Allow: /assets/img/*.jpeg
+Allow: /assets/img/*.webp
+Allow: /assets/img/*.svg
+
+# Sitemap location
+Sitemap: https://www.testjee.com/sitemap.xml
+
+# Crawl-delay (optional, helps prevent server overload)
+Crawl-delay: 1
