@@ -258,7 +258,7 @@ import { storeToRefs } from 'pinia'
 import { useExamStore } from '../stores/examStore'
 import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
-import logo from '../../assets/logo_test_jee.png'
+import logo from '../assets/logo_test_jee.png'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
 

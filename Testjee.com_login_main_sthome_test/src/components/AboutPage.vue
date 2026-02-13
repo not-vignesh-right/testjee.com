@@ -270,7 +270,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import logo from '../../assets/logo_test_jee.png'
+import logo from '../assets/logo_test_jee.png'
 
 const mobileMenuOpen = ref(false)
 </script>

@@ -80,7 +80,7 @@
 </template>
 
 <script setup>
-import logo from '../../assets/logo_test_jee.png'
+import logo from '../assets/logo_test_jee.png'
 import { useExamStore } from '../stores/examStore'
 import { useAuthStore } from '../stores/authStore'
 import { useRouter } from 'vue-router'
