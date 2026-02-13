@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import ExamLayout from '../components/ExamLayout.vue'
 import Results from '../components/Results.vue'
 import ResultsDetails from '../components/ResultsDetails.vue'
+import ResetPassword from '../components/ResetPassword.vue'
 import { useExamStore } from '../stores/examStore'
 import { useAuthStore } from '../stores/authStore'
 
@@ -22,6 +23,7 @@ const routes = [
   // Public routes - Login is at root since router base is /login
   { path: '/', name: 'Login', component: () => import('../components/Login.vue') },
   { path: '/auth/callback', name: 'AuthCallback', component: () => import('../components/AuthCallback.vue') },
+  { path: '/auth/reset-password', name: 'ResetPassword', component: ResetPassword },
 ]
 
 
@@ -39,29 +41,44 @@ router.beforeEach(async (to, from, next) => {
   await auth.loadSession()
 
   // ========== AUTH PROTECTION ==========
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return next('/')
-  }
-
-  // Load student profile if authenticated and not already loaded
-  if (auth.isAuthenticated && !auth.studentProfile) {
-    await auth.fetchOrCreateStudent()
-  }
-
-  // ========== EXAM SUBMISSION LOGIC ==========
-  try {
-    if (examStore.isSubmitted && to.name === 'Exam') {
-      console.log('Exam already submitted, redirecting to sthome')
-      return next({ name: 'StHome' })
+  if (to.meta.requiresAuth) {
+    if (!auth.isAuthenticated) {
+      // Not logged in → Redirect to login
+      return next('/')
     }
 
-    // Only prevent access to results details if exam not submitted
-    // Allow access to sthome (student home) even without submitted exam
-    if (!examStore.isSubmitted && to.name === 'ResultsDetails') {
-      return next({ name: 'StHome' })
+    // Check if email is verified for protected routes
+    if (auth.user && !auth.user.email_confirmed_at) {
+      alert('Please verify your email before accessing this page.')
+      await auth.logout()
+      return next('/')
     }
-  } catch (e) {
-    // ignore examStore not ready
+
+    // Load student profile if authenticated and not already loaded
+    if (!auth.studentProfile) {
+      try {
+        await auth.fetchOrCreateStudent()
+      } catch (error) {
+        console.error('Error fetching student profile:', error)
+        return next('/')
+      }
+    }
+
+    // ========== EXAM SUBMISSION LOGIC ==========
+    try {
+      if (examStore.isSubmitted && to.name === 'Exam') {
+        console.log('Exam already submitted, redirecting to sthome')
+        return next({ name: 'StHome' })
+      }
+
+      // Only prevent access to results details if exam not submitted
+      // Allow access to sthome (student home) even without submitted exam
+      if (!examStore.isSubmitted && to.name === 'ResultsDetails') {
+        return next({ name: 'StHome' })
+      }
+    } catch (e) {
+      // ignore examStore not ready
+    }
   }
 
   next()

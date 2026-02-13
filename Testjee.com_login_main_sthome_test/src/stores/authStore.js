@@ -17,102 +17,168 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = false
   }
 
-  async function fetchOrCreateStudent() {
-    if (!user.value) return
-
+  // NEW: Sign Up with Password
+  async function signUpWithPassword(email, password, name, mobile) {
     try {
-      const supabaseUserId = user.value.id
-      const userEmail = user.value.email
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name,
+            mobile: mobile
+          }
+        }
+      })
+
+      if (error) throw error
+
+      // Store in localStorage as backup
+      localStorage.setItem('pendingStudentName', name)
+      if (mobile) localStorage.setItem('pendingMobileNumber', mobile)
+
+      return { success: true, data }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  // NEW: Sign In with Password
+  async function signInWithPassword(email, password) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+
+      if (error) throw error
+
+      user.value = data.user
+
+      // Fetch or create student profile
+      await fetchOrCreateStudent()
+
+      return { success: true, data }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  // NEW: Reset Password (send email)
+  async function resetPassword(email) {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`
+      })
+
+      if (error) throw error
+
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  // NEW: Update Password (after reset)
+  async function updatePassword(newPassword) {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      })
+
+      if (error) throw error
+
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  // UPDATED: fetchOrCreateStudent with mobile number support
+  async function fetchOrCreateStudent() {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+
+      if (!currentUser) throw new Error('No user found')
+
+      // Update global user ref
+      user.value = currentUser
+
+      const supabaseUserId = currentUser.id
+      const userEmail = currentUser.email
 
       console.log('Fetching student for user:', supabaseUserId)
-      console.log('User metadata:', user.value.user_metadata)
-      console.log('localStorage name:', localStorage.getItem('pendingStudentName'))
+      console.log('User metadata:', currentUser.user_metadata)
 
-      // First, try to find by supabase_user_id
-      let { data: existing, error: fetchError } = await supabase
+      // Try to find by supabase_user_id
+      let { data: student, error: fetchError } = await supabase
         .from('students')
-        .select('student_id, student_name, email_id, supabase_user_id')
+        .select('*')
         .eq('supabase_user_id', supabaseUserId)
         .maybeSingle()
 
-      if (fetchError) {
-        console.error('Error fetching student by supabase_user_id:', fetchError)
-      }
-
-      // If not found by supabase_user_id, try by email (for existing records without supabase_user_id)
-      if (!existing) {
-        const { data: existingByEmail } = await supabase
+      // Fallback: Try to find by email
+      if (!student && fetchError?.code === 'PGRST116') {
+        const { data: studentByEmail } = await supabase
           .from('students')
-          .select('student_id, student_name, email_id, supabase_user_id')
+          .select('*')
           .eq('email_id', userEmail)
           .maybeSingle()
 
-        if (existingByEmail) {
-          console.log('Found existing student by email (needs supabase_user_id update):', existingByEmail)
-          
-          // Get the name from metadata or localStorage
-          const userName = user.value.user_metadata?.name || 
-                           localStorage.getItem('pendingStudentName') || 
-                           existingByEmail.student_name
-
-          // Update the existing record with supabase_user_id and potentially new name
-          const { data: updated, error: updateError } = await supabase
+        if (studentByEmail) {
+          // Update existing student with new supabase_user_id
+          const { data: updated } = await supabase
             .from('students')
             .update({
               supabase_user_id: supabaseUserId,
-              student_name: userName,
+              student_name: currentUser.user_metadata.name || studentByEmail.student_name,
               modification_date: new Date().toISOString()
             })
-            .eq('student_id', existingByEmail.student_id)
+            .eq('student_id', studentByEmail.student_id)
             .select()
             .single()
 
-          if (updateError) {
-            console.error('Error updating student:', updateError)
-          } else {
-            console.log('Updated existing student:', updated)
-            studentProfile.value = updated
-            localStorage.removeItem('pendingStudentName')
-            return
-          }
+          student = updated
         }
       }
 
-      if (existing) {
-        console.log('Found existing student:', existing)
-        studentProfile.value = existing
-        return
+      // If still not found, create new student
+      if (!student) {
+        const name = currentUser.user_metadata.name || localStorage.getItem('pendingStudentName') || 'Student'
+        const mobile = currentUser.user_metadata.mobile || localStorage.getItem('pendingMobileNumber') || null
+
+        const { data: newStudent, error: insertError } = await supabase
+          .from('students')
+          .insert({
+            student_name: name,
+            email_id: userEmail,
+            mobile_number: mobile,
+            supabase_user_id: supabaseUserId,
+            creation_date: new Date().toISOString(),
+            modification_date: new Date().toISOString()
+          })
+          .select()
+          .single()
+
+        if (insertError) {
+          console.error('Error creating student:', insertError)
+          throw insertError
+        }
+
+        student = newStudent
+
+        // Clear localStorage
+        localStorage.removeItem('pendingStudentName')
+        localStorage.removeItem('pendingMobileNumber')
       }
 
-      // Student doesn't exist at all, create new record
-      const userName = user.value.user_metadata?.name || 
-                       localStorage.getItem('pendingStudentName') || 
-                       'Student'
+      studentProfile.value = student
+      console.log('Student profile set:', student)
+      return student
 
-      console.log('Creating new student with name:', userName)
-
-      const { data: newStudent, error: insertError } = await supabase
-        .from('students')
-        .insert({
-          supabase_user_id: supabaseUserId,
-          student_name: userName,
-          email_id: userEmail
-        })
-        .select()
-        .single()
-
-      if (insertError) {
-        console.error('Error inserting student:', insertError)
-        throw insertError
-      }
-
-      console.log('Created new student:', newStudent)
-      studentProfile.value = newStudent
-      
-      // Clear localStorage after successful creation
-      localStorage.removeItem('pendingStudentName')
     } catch (error) {
-      console.error('Failed to fetch/create student:', error)
+      console.error('Error in fetchOrCreateStudent:', error)
+      throw error
     }
   }
 
@@ -122,15 +188,19 @@ export const useAuthStore = defineStore('auth', () => {
     studentProfile.value = null
   }
 
-  return { 
-    user, 
-    isAuthenticated, 
-    loading, 
+  return {
+    user,
+    isAuthenticated,
+    loading,
     studentProfile,
     studentName,
     studentId,
-    loadSession, 
+    loadSession,
+    signUpWithPassword,
+    signInWithPassword,
+    resetPassword,
+    updatePassword,
     fetchOrCreateStudent,
-    logout 
+    logout
   }
 })
