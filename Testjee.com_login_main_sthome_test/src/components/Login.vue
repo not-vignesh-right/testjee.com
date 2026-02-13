@@ -326,7 +326,7 @@ async function handleSignUp() {
   
   loading.value = true
   
-  const result = await auth.signUpWithPassword(
+  const result = await authStore.signUpWithPassword(
     signUpData.value.email,
     signUpData.value.password,
     signUpData.value.name,
@@ -362,7 +362,7 @@ async function handleSignIn() {
   
   loading.value = true
   
-  const result = await auth.signInWithPassword(
+  const result = await authStore.signInWithPassword(
     signInData.value.email,
     signInData.value.password
   )
@@ -373,7 +373,7 @@ async function handleSignIn() {
     // Check if email is verified
     if (!result.data.user.email_confirmed_at) {
       showMessage('Please verify your email before signing in. Check your inbox for the verification link.', 'error')
-      await auth.logout()
+      await authStore.logout()
       return
     }
     
@@ -398,7 +398,7 @@ async function handlePasswordReset() {
   
   loading.value = true
   
-  const result = await auth.resetPassword(resetEmail.value)
+  const result = await authStore.resetPassword(resetEmail.value)
   
   loading.value = false
   
