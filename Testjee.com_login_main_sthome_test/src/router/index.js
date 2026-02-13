@@ -89,14 +89,14 @@ router.beforeEach(async (to, from, next) => {
     // ========== EXAM SUBMISSION LOGIC ==========
     try {
       if (examStore.isSubmitted && to.name === 'Exam') {
-        console.log('Exam already submitted, redirecting to sthome')
-        return next({ name: 'StHome' })
+        console.log('Exam already submitted, redirecting to dashboard')
+        return next({ name: 'Dashboard' })
       }
 
       // Only prevent access to results details if exam not submitted
       // Allow access to sthome (student home) even without submitted exam
       if (!examStore.isSubmitted && to.name === 'ResultsDetails') {
-        return next({ name: 'StHome' })
+        return next({ name: 'Dashboard' })
       }
     } catch (e) {
       // ignore examStore not ready

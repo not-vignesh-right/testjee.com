@@ -280,12 +280,93 @@ const formattedToday = computed(() => {
 })
 
 const recentExams = computed(() => {
-  return allResults.value.slice(0, 10) // Show last 10 exams
+  return allResults.value.slice(0, 10).map(exam => {
+    // Calculate correct answers
+    let correct = 0
+    let total = 0
+    
+    if (exam.answers && Array.isArray(exam.answers)) {
+      total = exam.answers.filter(a => a && a.question_id).length
+      // Estimate correct from score (+4 per correct, -1 per wrong)
+      const attempted = exam.answers.filter(a => a && a.answer).length
+      correct = Math.max(0, Math.round((exam.score + attempted) / 5))
+    }
+    
+    return {
+      id: exam.result_id,
+      result_id: exam.result_id,
+      name: getExamTypeName(exam.session?.exam_type || 'JEE_MAIN_FULL'),
+      date: formatDate(exam.creation_date),
+      duration: calculateDuration(exam),
+      score: exam.score || 0,
+      correct,
+      total: total || 75,
+      answers: exam.answers,
+      session: exam.session
+    }
+  })
 })
 
 const latestResult = computed(() => {
   if (allResults.value.length === 0) return null
   return allResults.value[0]
+})
+
+// Stats computed property with default values
+const stats = computed(() => {
+  if (!statistics.value || allResults.value.length === 0) {
+    return {
+      totalExams: 0,
+      averageScore: 0,
+      accuracy: 0,
+      timeSpent: 0
+    }
+  }
+  
+  // Calculate stats from allResults
+  const totalExams = allResults.value.length
+  const totalScore = allResults.value.reduce((sum, r) => sum + (r.score || 0), 0)
+  const averageScore = totalExams > 0 ? Math.round(totalScore / totalExams) : 0
+  
+  // Calculate accuracy from recent exams
+  const recentExams = allResults.value.slice(0, 5)
+  let totalCorrect = 0
+  let totalAttempted = 0
+  
+  recentExams.forEach(exam => {
+    if (exam.answers && Array.isArray(exam.answers)) {
+      const attempted = exam.answers.filter(a => a && a.answer).length
+      totalAttempted += attempted
+      // Estimate correct answers from score (+4 per correct, -1 per wrong)
+      const estimatedCorrect = Math.max(0, Math.round((exam.score + attempted) / 5))
+      totalCorrect += estimatedCorrect
+    }
+  })
+  
+  const accuracy = totalAttempted > 0 ? Math.round((totalCorrect / totalAttempted) * 100) : 0
+  
+  // Calculate average time spent
+  let totalTime = 0
+  let examCount = 0
+  allResults.value.forEach(exam => {
+    if (exam.answers && Array.isArray(exam.answers)) {
+      const examTime = exam.answers.reduce((sum, a) => sum + (a?.time_taken || 0), 0)
+      if (examTime > 0) {
+        totalTime += examTime
+        examCount++
+      }
+    }
+  })
+  
+  const avgTimeSeconds = examCount > 0 ? totalTime / examCount : 0
+  const timeSpent = Math.round(avgTimeSeconds / 60) // Convert to minutes
+  
+  return {
+    totalExams,
+    averageScore,
+    accuracy,
+    timeSpent: timeSpent || 0
+  }
 })
 
 // Chart data for score trend
