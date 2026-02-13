@@ -120,6 +120,15 @@
           <p class="text-xs text-gray-500 text-center mt-6">
             We'll send you a secure link to sign in without a password
           </p>
+
+          <a href="https://testjee.com" class="block text-center text-gray-500 hover:text-blue-600 text-sm mt-4 transition-all duration-200 font-medium group">
+            <span class="inline-flex items-center gap-1.5">
+              <svg class="w-4 h-4 transform transition-transform group-hover:-translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Home
+            </span>
+          </a>
         </div>
       </div>
     </div>

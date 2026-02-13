@@ -8,7 +8,7 @@ import { useAuthStore } from '../stores/authStore'
 const routes = [
   // Redirect root to login
   { path: '/', redirect: '/login' },
-  
+
   // Public pages
   { path: '/about', name: 'About', component: () => import('../components/AboutPage.vue') },
   { path: '/contact', name: 'Contact', component: () => import('../components/ContactPage.vue') },
@@ -27,7 +27,7 @@ const routes = [
 
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/login'),
   routes,
 })
 
@@ -38,7 +38,7 @@ router.beforeEach(async (to, from, next) => {
 
   // Load session
   await auth.loadSession()
-  
+
   // ========== AUTH PROTECTION ==========
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return next('/login')
