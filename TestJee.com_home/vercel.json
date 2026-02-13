@@ -7,10 +7,6 @@
     {
       "source": "/login",
       "destination": "https://testjee-com-xcqa.vercel.app/"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
     }
   ],
   "headers": [
