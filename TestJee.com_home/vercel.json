@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/login/:path*",
-      "destination": "https://YOUR-LOGIN-APP.vercel.app/login/:path*"
+      "destination": "https://testjee-com-xcqa.vercel.app/:path*"
     },
     {
       "source": "/login",
-      "destination": "https://YOUR-LOGIN-APP.vercel.app/login"
+      "destination": "https://testjee-com-xcqa.vercel.app/"
     },
     {
       "source": "/(.*)",
