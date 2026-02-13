@@ -1,19 +1,19 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4 relative overflow-hidden">
+  <div class="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100/50 to-white flex items-center justify-center p-4 relative overflow-hidden">
     <!-- Animated background elements -->
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
       <div class="absolute top-20 left-10 w-72 h-72 bg-blue-200/30 rounded-full blur-3xl animate-pulse"></div>
-      <div class="absolute bottom-20 right-10 w-96 h-96 bg-purple-200/30 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
-      <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-200/20 rounded-full blur-3xl"></div>
+      <div class="absolute bottom-20 right-10 w-96 h-96 bg-blue-300/20 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+      <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-100/30 rounded-full blur-3xl"></div>
     </div>
     
     <div class="max-w-md w-full bg-white/95 backdrop-blur-sm shadow-2xl rounded-3xl overflow-hidden relative z-10 border border-white/50">
       
-      <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-8 text-center relative overflow-hidden">
+      <div class="bg-gradient-to-r from-blue-600 to-blue-700 p-8 text-center relative overflow-hidden">
         <!-- Animated background decoration -->
         <div class="absolute inset-0 opacity-20">
           <div class="absolute top-0 left-0 w-32 h-32 bg-white rounded-full blur-2xl"></div>
-          <div class="absolute bottom-0 right-0 w-40 h-40 bg-cyan-300 rounded-full blur-3xl"></div>
+          <div class="absolute bottom-0 right-0 w-40 h-40 bg-blue-200 rounded-full blur-3xl"></div>
         </div>
         
         <div class="relative z-10">
@@ -32,11 +32,11 @@
             TESTJEE
           </h2>
           
-          <p class="text-lg text-indigo-100 font-medium mb-1">
+          <p class="text-lg text-blue-100 font-medium mb-1">
             Gyan Edge Testing Agency
           </p>
           
-          <p class="text-sm text-indigo-200 italic mt-2">
+          <p class="text-sm text-blue-200 italic mt-2">
             "Exam se pehle original"
           </p>
         </div>
@@ -108,7 +108,7 @@
 
           <button
             @click="login"
-            class="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white font-semibold px-6 py-4 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 hover:scale-[1.02] flex items-center justify-center gap-2 relative overflow-hidden group"
+            class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold px-6 py-4 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 hover:scale-[1.02] flex items-center justify-center gap-2 relative overflow-hidden group"
           >
             <span class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></span>
             <svg class="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
