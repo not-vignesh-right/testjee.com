@@ -119,7 +119,7 @@ export const useAuthStore = defineStore('auth', () => {
         .maybeSingle()
 
       // Fallback: Try to find by email
-      if (!student && fetchError?.code === 'PGRST116') {
+      if (!student) {
         const { data: studentByEmail } = await supabase
           .from('students')
           .select('*')
@@ -162,8 +162,8 @@ export const useAuthStore = defineStore('auth', () => {
           .single()
 
         if (insertError) {
-          console.error('Error creating student:', insertError)
-          throw insertError
+          console.error('Error creating student record:', insertError)
+          throw new Error(`Failed to create student profile: ${insertError.message}`)
         }
 
         student = newStudent
