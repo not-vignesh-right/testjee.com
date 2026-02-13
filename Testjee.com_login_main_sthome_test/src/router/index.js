@@ -39,7 +39,7 @@ const routes = [
   { path: '/auth/reset-password', name: 'ResetPassword', component: ResetPassword },
 
   // Catch-all/Redirects
-  { path: '/dashboard', redirect: '/sthome' },
+  { path: '/dashboard', redirect: '/sthome/dashboard' },
   { path: '/:pathMatch(.*)*', redirect: '/' } // Redirect unknown routes to login
 ]
 
