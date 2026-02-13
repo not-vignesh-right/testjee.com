@@ -133,7 +133,7 @@
         <div class="max-w-3xl mx-auto">
           <div class="founder-card">
             <div class="founder-image-container">
-              <img src="/assets/founder-mishra.jpg" alt="Purnendu Mishra" class="founder-image">
+              <img :src="founderImage" alt="Purnendu Mishra" class="founder-image">
             </div>
             <div class="founder-info">
               <div class="founder-badge">Founder & CEO</div>
@@ -162,7 +162,7 @@
           <!-- Tech Lead - Clickable Card -->
           <a href="https://vigneshbs.xyz" target="_blank" class="team-card team-card-clickable">
             <div class="team-image-container">
-              <img src="/assets/developer-vignesh.png" alt="Vignesh B S" class="team-image">
+              <img :src="vigneshImage" alt="Vignesh B S" class="team-image">
               <div class="team-badge team-badge-blue">Tech Lead</div>
             </div>
             <div class="team-info">
@@ -181,7 +181,7 @@
           <!-- Developer - Chinmay -->
           <div class="team-card">
             <div class="team-image-container">
-              <img src="/assets/chinmay.jpg" alt="Chinmay Panghri" class="team-image">
+              <img :src="chinmayImage" alt="Chinmay Panghri" class="team-image">
               <div class="team-badge team-badge-cyan">Cloud</div>
             </div>
             <div class="team-info">
@@ -194,7 +194,7 @@
           <!-- Developer - Karthik -->
           <div class="team-card">
             <div class="team-image-container">
-              <img src="/assets/karthik.png" alt="Karthik B V" class="team-image">
+              <img :src="karthikImage" alt="Karthik B V" class="team-image">
               <div class="team-badge team-badge-purple">Developer</div>
             </div>
             <div class="team-info">
@@ -271,6 +271,10 @@
 <script setup>
 import { ref } from 'vue'
 import logo from '../assets/logo_test_jee.png'
+import founderImage from '../assets/founder-mishra.jpg'
+import vigneshImage from '../assets/developer-vignesh.png'
+import chinmayImage from '../assets/chinmay.jpg'
+import karthikImage from '../assets/karthik.png'
 
 const mobileMenuOpen = ref(false)
 </script>
