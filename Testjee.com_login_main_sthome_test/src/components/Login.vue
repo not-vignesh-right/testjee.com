@@ -161,7 +161,7 @@ async function login() {
   const { error } = await supabase.auth.signInWithOtp({
     email: email.value,
     options: {
-      emailRedirectTo: `${window.location.origin}/login/auth/callback`,
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
       data: {
         name: name.value
       }
