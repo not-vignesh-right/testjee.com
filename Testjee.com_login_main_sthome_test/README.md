@@ -1,48 +1,39 @@
-# Gyan-Edge JEE Full Exam UI
+# TestJEE Full Exam UI
 
-A full-fledged mock exam UI that replicates the NTA JEE Main environment, styled with Gyan-Edge branding.
+A full-fledged mock exam UI that replicates the NTA JEE Main environment, styled with TestJEE branding. This project includes a complete student authentication system, exam session management, and result tracking.
 
 ## 🎯 Features
 
 ### Authentication & User Management
-- **Magic Link Login**: Passwordless authentication via email
-- **Student Profiles**: Automatic profile creation with name persistence
-- **Secure Sessions**: Supabase Auth integration with Row Level Security
-- **Data Privacy**: Students can only access their own exam results
+- **Magic Link Login**: Passwordless authentication via email (Supabase Auth).
+- **Student Profiles**: Automatic profile creation with name persistence.
+- **Secure Sessions**: Row Level Security (RLS) ensures students access only their own data.
+- **Data Privacy**: Strict separation of student data.
 
-### Core Functionality
-- **NTA-Exact Layout**: Pixel-perfect replica of the official NTA exam interface
-- **Question Navigation**: Seamless movement between questions with state preservation
-- **Answer Management**: Auto-save on selection, clear responses, mark for review
-- **Timer System**: Real-time countdown with auto-submit functionality
-- **Full-Screen Mode**: Toggle for distraction-free exam experience
+### Core Exam Functionality
+- **NTA-Exact Layout**: Pixel-perfect replica of the official NTA exam interface.
+- **Strict Mode**: Simulates real exam conditions (auto-submit on timer end, one active session).
+- **Timer System**: Server-side time calculation to prevent exploits (refresh/reset protection).
+- **Question Palette**: Real-time status tracking (Visited, Answered, Marked for Review).
+- **Offline Resilience**: Answers saved to `localStorage` for instant recovery on refresh.
 
-### Question Palette
-- **Color-Coded Status**: 
-  - 🔘 Gray = Not Visited
-  - 🔴 Red = Visited but Not Answered  
-  - 🟢 Green = Answered
-  - 🟣 Purple = Marked for Review
-  - 🟣🟢 Purple with Green Border = Answered + Marked
-- **Quick Navigation**: Click any question number to jump instantly
-- **Real-time Updates**: Live status tracking and progress indicators
+### TestJEE Branding
+- **Custom UI**: Phoenix-inspired logo and blue-based color scheme (`tailwind.config.js`).
+- **Responsive Design**: Optimized for desktop but mobile-friendly.
 
-### GTA Branding
-- **Gyan-edge Logo**: Custom phoenix-inspired logo in header
-- **Brand Colors**: Blue-based color scheme matching the logo
-- **Professional UI**: Clean, modern interface with smooth transitions
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 16+ 
-- npm or yarn
+- Node.js 16+
+- Supabase Project
 
 ### Installation
 ```bash
 # Clone the repository
-git clone https://github.com/vigneshbs33/GTA GTA-Cloned-Web-App
-cd GTA-Cloned-Web-App
+git clone https://github.com/vigneshbs33/GTA TestJEE-Web-App
+cd TestJEE-Web-App
 
 # Install dependencies
 npm install
@@ -50,8 +41,7 @@ npm install
 # Start development server
 npm run dev
 ```
-
-The app will open at `http://localhost:3000`
+The app will open at `http://localhost:3000`.
 
 ### Build for Production
 ```bash
@@ -59,185 +49,169 @@ npm run build
 npm run preview
 ```
 
-## 🏗️ Project Structure
-
-```
-src/
-├── components/           # Vue components
-│   ├── ExamLayout.vue   # Main layout orchestrator
-│   ├── HeaderBar.vue    # Logo, timer, controls
-│   ├── QuestionArea.vue # Question display & options
-│   ├── QuestionPalette.vue # Question navigation grid
-│   └── FooterNav.vue    # Action buttons & progress
-├── stores/              # Pinia state management
-│   └── examStore.js     # Exam state & logic
-├── App.vue              # Root component
-├── main.js              # App entry point
-└── style.css            # TailwindCSS + custom styles
+### Environment Configuration
+Create a `.env` file (or set in Vercel/Netlify):
+```env
+VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-## 🔧 Configuration
-
-### TailwindCSS Custom Colors
-The project uses a custom GTA color palette defined in `tailwind.config.js`:
-
-```javascript
-colors: {
-  'gta': {
-    'primary': '#3B82F6',    // Bright blue
-    'secondary': '#1E40AF',  // Darker blue
-    'accent': '#60A5FA',     // Light blue
-    'success': '#10B981',    // Green
-    'danger': '#EF4444',     // Red
-    'purple': '#8B5CF6',     // Purple
-    // ... more colors
-  }
-}
-```
-
-### Supabase Setup
-
-**Important**: Before running the app, you must set up the database schema:
-
-1. Create a Supabase project at https://supabase.com
-2. Run the migration script in SQL Editor:
-   ```bash
-   # Copy contents of supabase-migration.sql and run in Supabase SQL Editor
-   ```
-3. Configure environment variables:
-   ```bash
-   VITE_SUPABASE_URL=your-project-url
-   VITE_SUPABASE_ANON_KEY=your-anon-key
-   ```
-4. Update Auth redirect URL in Supabase Dashboard:
-   - Development: `http://localhost:3000/auth/callback`
-   - Production: `https://yourdomain.com/auth/callback`
-
-For detailed setup instructions, see `SETUP-GUIDE.md`.
-
-## 🔌 API Integration
-
-### Database Tables
-- `students` - Student profiles linked to Supabase Auth
-- `subjects` - Subject definitions (Physics, Chemistry, Mathematics)
-- `topics` - Topic classifications
-- `questions` - Question bank with content and metadata
-- `choices` - Multiple choice options and correct answers
-- `results` - Exam submissions with answers and scores
-
-### Exam Structure
-- Per subject: 20 MCQs + 5 Numericals
-- Total: 75 questions across 3 subjects
-- Scoring: +4 for correct, -1 for incorrect, 0 for unanswered
-
-## 🎨 Customization
-
-### Adding New Question Types
-Extend the question schema in `examStore.js`:
-
-```javascript
-{
-  id: 6,
-  text: "Your question text here",
-  options: [
-    { id: 'a', text: 'Option A' },
-    { id: 'b', text: 'Option B' },
-    // ... more options
-  ],
-  subject: 'Subject Name',
-  topic: 'Topic Name',
-  type: 'multiple-choice', // Add question types
-  media: 'image-url'       // Add media support
-}
-```
-
-### Styling Modifications
-- **Colors**: Update `tailwind.config.js`
-- **Layout**: Modify component templates
-- **Animations**: Adjust CSS transitions in `style.css`
-
-## 📱 Responsive Design
-
-The UI is optimized for desktop exam environments but includes responsive considerations:
-- Flexible question area
-- Scrollable palette for many questions
-- Touch-friendly button sizes
-
-## 🧪 Testing
-
-The app includes comprehensive mock functionality:
-- 5 sample JEE-level questions
-- Real-time state management
-- Simulated API delays
-- Error handling examples
-
-## 🚀 Deployment
-
-### Vercel
-```bash
-npm run build
-# Deploy dist/ folder
-```
-
-### Netlify
-```bash
-npm run build
-# Deploy dist/ folder
-```
-
-### Docker
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-RUN npm run build
-EXPOSE 3000
-CMD ["npm", "run", "preview"]
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 📚 Documentation
-
-- **QUICK-REFERENCE.md** - Quick start guide and common commands
-- **SETUP-GUIDE.md** - Detailed setup instructions with troubleshooting
-- **IMPLEMENTATION-NOTES.md** - Technical implementation details
-- **ARCHITECTURE-DIAGRAM.md** - System architecture and data flow
-- **DEPLOYMENT-CHECKLIST.md** - Production deployment checklist
-- **CHANGES-SUMMARY.md** - Recent changes and updates
-
-## 🆘 Support
-
-For questions or issues:
-- Check `SETUP-GUIDE.md` for troubleshooting
-- Review browser console for error messages
-- Verify Supabase configuration
-- Check database migration was applied
-- Ensure Node.js version compatibility
-
-## 🔄 Recent Updates
-
-### Student Authentication System (Latest)
-- Implemented passwordless magic link authentication
-- Added automatic student profile creation
-- Integrated student name persistence across sessions
-- Added Row Level Security for data privacy
-- Linked exam results to student profiles
-
-See `CHANGES-SUMMARY.md` for complete details.
+Update **Supabase Auth Redirect URL**:
+- Development: `http://localhost:3000/auth/callback`
+- Production: `https://yourdomain.com/auth/callback`
 
 ---
 
-**Built with ❤️ for Gyan-edge Testing Agency** 
+## 🗄️ Database & SQL
+
+The project uses Supabase (PostgreSQL). You must run the following SQL scripts in your Supabase SQL Editor to set up the schema, RLS policies, and triggers.
+
+### 1. Main Schema & Auth (`supabase-migration.sql`)
+Sets up the `students` table linked to Supabase Auth and the `results` table.
+
+```sql
+-- Students Table
+CREATE TABLE IF NOT EXISTS public.students (
+  student_id SERIAL PRIMARY KEY,
+  supabase_user_id UUID UNIQUE, -- Links to auth.users
+  student_name TEXT NOT NULL,
+  email_id TEXT NOT NULL UNIQUE,
+  creation_date TIMESTAMPTZ DEFAULT NOW(),
+  modification_date TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS: Students can only view/edit their own profile
+ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Students can view own profile" ON public.students 
+FOR SELECT TO authenticated USING (auth.uid() = supabase_user_id);
+
+CREATE POLICY "Students can update own profile" ON public.students 
+FOR UPDATE TO authenticated USING (auth.uid() = supabase_user_id);
+
+CREATE POLICY "Allow insert for authenticated users" ON public.students 
+FOR INSERT TO authenticated WITH CHECK (auth.uid() = supabase_user_id);
+
+-- Results Table
+ALTER TABLE public.results ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Students can view own results" ON public.results 
+FOR SELECT TO authenticated USING (
+  student_id IN (SELECT student_id FROM public.students WHERE supabase_user_id = auth.uid())
+);
+
+CREATE POLICY "Students can insert own results" ON public.results 
+FOR INSERT TO authenticated WITH CHECK (
+  student_id IN (SELECT student_id FROM public.students WHERE supabase_user_id = auth.uid())
+);
+```
+
+### 2. Exam Sessions & Timer Logic (`exam-session-migration.sql`)
+Prevents timer resets by tracking sessions on the server.
+
+```sql
+CREATE TABLE IF NOT EXISTS public.exam_sessions (
+  session_id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL REFERENCES public.students(student_id) ON DELETE CASCADE,
+  exam_type TEXT NOT NULL DEFAULT 'JEE_MAIN_FULL',
+  start_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  end_time TIMESTAMPTZ,
+  total_duration_seconds INTEGER NOT NULL DEFAULT 10800, -- 3 hours
+  is_submitted BOOLEAN DEFAULT FALSE
+);
+
+-- Index & Unique Constraint (One active session per student)
+CREATE INDEX IF NOT EXISTS idx_exam_sessions_student_id ON public.exam_sessions(student_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_session 
+ON public.exam_sessions (student_id, exam_type) WHERE is_submitted = FALSE;
+
+-- RLS for Sessions
+ALTER TABLE public.exam_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Students can view own sessions" ON public.exam_sessions 
+FOR SELECT TO authenticated USING (
+  student_id IN (SELECT student_id FROM public.students WHERE supabase_user_id = auth.uid())
+);
+
+-- Function to calculate remaining time
+CREATE OR REPLACE FUNCTION get_remaining_time(p_session_id INTEGER)
+RETURNS INTEGER AS $$
+DECLARE
+  v_start_time TIMESTAMPTZ;
+  v_total_duration INTEGER;
+  v_elapsed_seconds INTEGER;
+BEGIN
+  SELECT start_time, total_duration_seconds INTO v_start_time, v_total_duration
+  FROM exam_sessions WHERE session_id = p_session_id;
+  
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  
+  v_elapsed_seconds := EXTRACT(EPOCH FROM (NOW() - v_start_time))::INTEGER;
+  RETURN GREATEST(0, v_total_duration - v_elapsed_seconds);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+### 3. Cleanup & Fixes
+- **Stuck Sessions**: If a student is stuck (e.g., timer expired but not submitted), run:
+```sql
+UPDATE exam_sessions SET is_submitted = TRUE 
+WHERE is_submitted = FALSE AND EXTRACT(EPOCH FROM (NOW() - start_time)) > total_duration_seconds;
+```
+- **Fix RLS Blocking**: If you see "Row Level Security" errors, re-run the RLS policies above.
+
+---
+
+## 🏗️ Architecture
+
+### User Flow
+1. **Login**: User enters Name + Email → Name stored in `localStorage` → Magic Link sent.
+2. **Auth Callback**: User clicks link → `fetchOrCreateStudent()` called.
+   - Checks if `supabase_user_id` exists in `students` table.
+   - If **Yes**: Fetches profile.
+   - If **No**: Creates new student record using name from `localStorage`.
+3. **Exam Start**: `initializeSession()` checks for active session.
+   - **New**: Creates session with `start_time`.
+   - **Existing**: Resumes session, calculates legitimate remaining time.
+4. **During Exam**:
+   - Answers saved instantly to `localStorage`.
+   - Timer counts down locally but validated against server `start_time` on refresh.
+5. **Submit**: `submitExam()` sends results to DB + marks session as `is_submitted = TRUE`.
+
+### Data Store (Pinia)
+- **`authStore.js`**: Manages user session, student profile, and name persistence.
+- **`examStore.js`**: Manages questions, user answers, and timer logic.
+
+---
+
+## ❓ Troubleshooting
+
+### Name Shows "Student" Instead of Name
+- **Cause**: `localStorage` cleared or different domain usage (localhost vs 127.0.0.1).
+- **Fix**: Login again using the exact same domain. Ensure `fetchOrCreateStudent()` is called in `AuthCallback.vue`.
+
+### Timer Resets on Refresh
+- **Cause**: Database session tracking not working.
+- **Fix**: Ensure `exam-session-migration.sql` was run. Check `examStore.initializeSession()` logs.
+
+### "No API Key" or 406 Error
+- **Cause**: RLS policies blocking access.
+- **Fix**: Re-run the RLS policy SQL blocks. Ensure policies are `TO authenticated`.
+
+### Duplicate Student Records
+- **Cause**: Missing `UNIQUE` constraint on `supabase_user_id`.
+- **Fix**: Run `ALTER TABLE public.students ADD CONSTRAINT students_supabase_user_id_unique UNIQUE (supabase_user_id);`.
+
+---
+
+## 📦 Deployment Checklist
+
+- [ ] **Database**: Migration SQL executed in Supabase.
+- [ ] **Env Vars**: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
+- [ ] **Auth**: Redirect URLs configured in Supabase (Development & Production).
+- [ ] **RLS**: Policies enabled for `students`, `results`, `exam_sessions`.
+- [ ] **Build**: `npm run build` passes without errors.
+
+---
+
+**Built for Gyan-edge Testing Agency**

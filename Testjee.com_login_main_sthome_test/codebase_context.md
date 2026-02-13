@@ -1,7 +1,7 @@
 # TESTJEE Codebase Context Report
 
 ## 1. Project Overview
-**Application**: GTA Mock Exam UI - NTA JEE Main replica
+**Application**: TestJEE Mock Exam UI - NTA JEE Main replica
 **Tech Stack**:
 - **Framework**: Vue 3 (Composition API)
 - **Build Tool**: Vite
