@@ -74,6 +74,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="/assets/js/mobile-palette.js" defer></script>
   <script src="/assets/js/motivational-quotes.js" defer></script>
   <link rel="stylesheet" href="/assets/css/exam-badges.css">
@@ -707,6 +708,52 @@ Visit Gyan Edge
           const result = calculateScore();
           score.value = result;
           showResults.value = true;
+          
+          // Initialize performance chart after results are shown
+          setTimeout(() => {
+            const ctx = document.getElementById('performanceChart');
+            if (ctx) {
+              new Chart(ctx, {
+                type: 'line',
+                data: {
+                  labels: questions.value.map((_, i) => `Q${i + 1}`),
+                  datasets: [{
+                    label: 'Performance',
+                    data: questions.value.map((q, i) => {
+                      const response = responses.value[i];
+                      if (response === q.correct) return 100;
+                      if (response === undefined) return 0;
+                      return -25; // Wrong answer
+                    }),
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4
+                  }]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      display: false
+                    }
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      max: 100,
+                      ticks: {
+                        callback: function(value) {
+                          return value + '%';
+                        }
+                      }
+                    }
+                  }
+                }
+              });
+            }
+          }, 100);
+          
           setTimeout(() => {
             showUpgrade.value = true;
           }, 2000);
@@ -1033,6 +1080,69 @@ Visit Gyan Edge
                 <div class="flex gap-3">
                   <router-link to="/login" class="btn-primary flex-1 text-center">Unlock Full Access</router-link>
                   <router-link to="/" class="btn-secondary flex-1 text-center">Go Home</router-link>
+                </div>
+              </div>
+
+              <!-- Performance Graph (Teaser - Strip Mask) -->
+              <div class="relative rounded-2xl border bg-gradient-to-br from-blue-50 to-purple-50 p-6 mb-6 overflow-hidden" style="border-color: #93C5FD;">
+                <!-- Teaser Overlay with strip-style visibility -->
+                <div class="absolute inset-0 z-10 pointer-events-none">
+                  <!-- Soft white veil -->
+                  <div class="absolute inset-0 bg-white/75"></div>
+                  <!-- Horizontal transparent strips -->
+                  <div class="absolute inset-0" style="background-image: repeating-linear-gradient(
+                        to bottom,
+                        rgba(255,255,255,0) 0px,
+                        rgba(255,255,255,0) 8px,
+                        rgba(255,255,255,0.85) 8px,
+                        rgba(255,255,255,0.85) 16px
+                      ); mix-blend-mode: screen;"></div>
+                  <!-- Center call-to-action card -->
+                  <div class="absolute inset-0 flex items-center justify-center">
+                    <div class="text-center bg-white/90 rounded-2xl px-6 py-5 shadow-xl border border-blue-100 max-w-xs">
+                      <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
+                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                      </div>
+                      <h4 class="text-sm font-bold text-gray-900 mb-1">Full Performance Graph</h4>
+                      <p class="text-xs text-gray-600 mb-3">Unlock complete analytics for all questions, time and accuracy.</p>
+                      <router-link to="/login" class="inline-flex items-center justify-center px-4 py-2 rounded-full bg-blue-600 text-white text-xs font-semibold shadow hover:bg-blue-700 transition-colors">
+                        Unlock to View
+                      </router-link>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Graph Content (dimmed teaser under mask) -->
+                <div class="opacity-30">
+                  <h3 class="font-semibold text-gray-900 mb-3 flex items-center gap-2 text-sm">
+                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    Question-wise Performance (Preview)
+                  </h3>
+                  <div class="bg-white rounded-xl p-4 shadow border border-gray-100" style="height: 260px; position: relative;">
+                    <canvas id="performanceChart"></canvas>
+                  </div>
+                  <div class="grid grid-cols-4 gap-3 mt-3 text-[11px]">
+                    <div class="text-center bg-white/70 rounded-md py-2">
+                      <div class="font-semibold text-blue-600">85%</div>
+                      <div class="text-gray-600">Accuracy</div>
+                    </div>
+                    <div class="text-center bg-white/70 rounded-md py-2">
+                      <div class="font-semibold text-green-600">2:45</div>
+                      <div class="text-gray-600">Avg Time</div>
+                    </div>
+                    <div class="text-center bg-white/70 rounded-md py-2">
+                      <div class="font-semibold text-purple-600">72%</div>
+                      <div class="text-gray-600">Percentile</div>
+                    </div>
+                    <div class="text-center bg-white/70 rounded-md py-2">
+                      <div class="font-semibold text-orange-600">A+</div>
+                      <div class="text-gray-600">Grade</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
