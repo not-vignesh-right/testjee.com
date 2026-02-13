@@ -9,7 +9,7 @@
     
     <div class="max-w-7xl mx-auto relative z-10">
       <!-- Professional Header -->
-      <div class="mb-12">
+      <div class="mb-8">
         <div class="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
           <div class="flex items-center gap-5">
             <div class="relative">
@@ -18,354 +18,508 @@
             </div>
             <div>
               <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-1">
-                Exam Results
+                Student Dashboard
               </h1>
-              <p class="text-gray-600 text-sm font-medium">Performance Analytics Dashboard</p>
+              <p class="text-gray-600 text-sm font-medium">Welcome back, {{ studentName }}</p>
             </div>
           </div>
           <div class="text-right">
-            <div class="text-xs text-gray-500 font-medium mb-1">Exam Date</div>
-            <div class="text-sm text-gray-700 font-semibold">{{ new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) }}</div>
+            <div class="text-xs text-gray-500 font-medium mb-1">Today's Date</div>
+            <div class="text-sm text-gray-700 font-semibold">{{ formattedToday }}</div>
           </div>
         </div>
       </div>
 
-      <!-- If exam is submitted -->
-      <div v-if="lastResult && lastResult.perQuestion" class="space-y-8">
+      <!-- Exam Type Selection Buttons -->
+      <div class="bg-white rounded-xl p-6 shadow-lg border border-gray-200 mb-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">Select Exam Type</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- JEE Button (Active) -->
+          <button 
+            @click="startExam('JEE_MAIN_FULL')"
+            class="relative group bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-md"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-lg font-bold">JEE Main</h3>
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <p class="text-sm text-blue-100">Full Test • 3 Hours • 75 Questions</p>
+            <div v-if="hasActiveSession" class="mt-2 text-xs bg-white/20 px-2 py-1 rounded inline-block">
+              Resume Active Session
+            </div>
+          </button>
+
+          <!-- KCET Button (Coming Soon) -->
+          <button 
+            disabled
+            class="relative bg-gray-100 text-gray-400 p-6 rounded-lg cursor-not-allowed border-2 border-gray-200"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-lg font-bold">KCET</h3>
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+              </svg>
+            </div>
+            <p class="text-sm">Coming Soon</p>
+            <div class="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+              <span class="bg-gray-800 text-white text-xs px-3 py-1 rounded-full">Coming Soon</span>
+            </div>
+          </button>
+
+          <!-- NEET Button (Coming Soon) -->
+          <button 
+            disabled
+            class="relative bg-gray-100 text-gray-400 p-6 rounded-lg cursor-not-allowed border-2 border-gray-200"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-lg font-bold">NEET</h3>
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+              </svg>
+            </div>
+            <p class="text-sm">Coming Soon</p>
+            <div class="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+              <span class="bg-gray-800 text-white text-xs px-3 py-1 rounded-full">Coming Soon</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Statistics -->
+      <div v-if="statistics" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
+          <div class="text-3xl font-bold text-blue-600 mb-1">{{ statistics.totalExams }}</div>
+          <div class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Exams</div>
+        </div>
+        <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
+          <div class="text-3xl font-bold text-blue-600 mb-1">{{ statistics.avgScore }}</div>
+          <div class="text-xs text-gray-500 font-medium uppercase tracking-wide">Average Score</div>
+        </div>
+        <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
+          <div class="text-3xl font-bold text-blue-600 mb-1">{{ statistics.bestScore }}</div>
+          <div class="text-xs text-gray-500 font-medium uppercase tracking-wide">Best Score</div>
+        </div>
+        <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
+          <div class="flex items-center gap-2">
+            <svg v-if="statistics.trend === 'improving'" class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+            </svg>
+            <svg v-else-if="statistics.trend === 'declining'" class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+            </svg>
+            <svg v-else class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"></path>
+            </svg>
+            <span class="text-xl font-bold" :class="getTrendColorClass(statistics.trend)">
+              {{ getTrendText(statistics.trend) }}
+            </span>
+          </div>
+          <div class="text-xs text-gray-500 font-medium uppercase tracking-wide">Performance Trend</div>
+        </div>
+      </div>
+
+      <!-- Performance Chart -->
+      <div v-if="allResults.length > 0" class="bg-white rounded-xl p-8 shadow-lg border border-gray-200 mb-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-6">Score Trend</h2>
+        <Line :data="chartData" :options="chartOptions" />
+      </div>
+
+      <!-- Recent Exams -->
+      <div class="bg-white rounded-xl p-8 shadow-lg border border-gray-200 mb-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-6">Recent Exams</h2>
         
-        <!-- Professional Hero Score Card -->
-        <div class="relative bg-white rounded-xl p-8 md:p-10 shadow-lg border border-gray-200 overflow-hidden mb-8">
-          <div class="relative z-10">
-            <!-- Main Score Display -->
-            <div class="text-center mb-8 pb-8 border-b border-gray-200">
-              <div class="inline-block">
-                <div class="text-6xl md:text-7xl font-bold text-blue-600 mb-2 leading-none">
-                  {{ percentageScore }}%
-                </div>
-                <div class="text-lg text-gray-600 font-medium">Overall Performance Score</div>
-              </div>
-            </div>
-            
-            <!-- Stats Grid -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-              <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
-                <div class="text-2xl md:text-3xl font-bold text-blue-600 mb-1">{{ lastResult.score }}</div>
-                <div class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Total Score</div>
-                <div class="text-xs text-gray-400">out of {{ total * 4 }} marks</div>
-              </div>
-              <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
-                <div class="text-2xl md:text-3xl font-bold text-blue-600 mb-1">{{ correctCount }}</div>
-                <div class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Correct Answers</div>
-                <div class="text-xs text-gray-400">{{ total > 0 ? Math.round((correctCount/total)*100) : 0 }}% accuracy rate</div>
-              </div>
-              <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
-                <div class="text-2xl md:text-3xl font-bold text-blue-600 mb-1">{{ wrongCount }}</div>
-                <div class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Incorrect Answers</div>
-                <div class="text-xs text-gray-400">{{ total > 0 ? Math.round((wrongCount/total)*100) : 0 }}% error rate</div>
-              </div>
-              <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
-                <div class="text-2xl md:text-3xl font-bold text-blue-600 mb-1">{{ total - attempted }}</div>
-                <div class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Unattempted</div>
-                <div class="text-xs text-gray-400">{{ attempted }}/{{ total }} questions answered</div>
-              </div>
-            </div>
-          </div>
+        <div v-if="loading" class="text-center py-16">
+          <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
+          <p class="text-gray-600 text-lg">Loading your exam history...</p>
         </div>
 
-        <!-- Professional Subject Performance Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div v-for="(stats, subject) in subjectStats" :key="subject" 
-               class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
-            
-            <!-- Subject Header -->
-            <div class="px-6 py-4 bg-blue-50 border-b border-gray-200">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                  <div class="w-2 h-2 rounded-full bg-blue-600"></div>
-                  <h3 class="text-base font-semibold text-gray-900">{{ subject }}</h3>
-                </div>
-                <div class="text-xl font-bold text-blue-600">
-                  {{ Math.round((stats.correct/stats.total || 0) * 100) }}%
-                </div>
-              </div>
-            </div>
-
-            <!-- Subject Stats -->
-            <div class="p-6">
-              <div class="space-y-5">
-                <!-- Progress Bar -->
-                <div>
-                  <div class="flex justify-between items-center mb-2.5">
-                    <span class="text-xs font-medium text-gray-600 uppercase tracking-wide">Performance</span>
-                    <span class="text-xs font-semibold text-gray-700">{{ stats.correct }}/{{ stats.total }} correct</span>
-                  </div>
-                  <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                    <div class="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-1000 ease-out" 
-                         :style="{ width: `${(stats.correct/stats.total || 0) * 100}%` }">
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Quick Stats Grid -->
-                <div class="grid grid-cols-3 gap-2.5">
-                  <div class="bg-blue-50 rounded-md p-3 border border-blue-100 text-center">
-                    <div class="text-lg font-bold text-blue-600 mb-0.5">{{ stats.correct }}</div>
-                    <div class="text-[10px] text-gray-600 font-medium uppercase tracking-wide">Correct</div>
-                  </div>
-                  <div class="bg-gray-50 rounded-md p-3 border border-gray-200 text-center">
-                    <div class="text-lg font-bold text-gray-600 mb-0.5">{{ stats.wrong }}</div>
-                    <div class="text-[10px] text-gray-600 font-medium uppercase tracking-wide">Wrong</div>
-                  </div>
-                  <div class="bg-gray-50 rounded-md p-3 border border-gray-200 text-center">
-                    <div class="text-lg font-bold text-gray-600 mb-0.5">{{ stats.total - stats.correct - stats.wrong }}</div>
-                    <div class="text-[10px] text-gray-600 font-medium uppercase tracking-wide">Skipped</div>
-                  </div>
-                </div>
-
-                <!-- Time Spent -->
-                <div class="flex items-center justify-between pt-4 border-t border-gray-100">
-                  <div class="flex items-center gap-2 text-gray-600">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span class="text-xs font-medium">Time Spent</span>
-                  </div>
-                  <span class="text-gray-900 font-semibold text-xs">{{ formatTime(stats.time) }}</span>
-                </div>
-              </div>
-            </div>
+        <div v-else-if="allResults.length === 0" class="text-center py-16">
+          <div class="w-24 h-24 mx-auto mb-6 bg-blue-50 rounded-full flex items-center justify-center">
+            <svg class="w-12 h-12 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
           </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">No Exams Yet</h3>
+          <p class="text-sm text-gray-600 mb-8">Start your first JEE exam to see results here!</p>
         </div>
 
-        <!-- Professional Performance Analysis -->
-        <div class="bg-white rounded-lg p-8 border border-gray-200 shadow-sm mb-8">
-          <div class="mb-8 pb-4 border-b border-gray-200">
-            <h2 class="text-xl font-bold text-gray-900">Performance Analysis</h2>
-            <p class="text-sm text-gray-600 mt-1">Detailed insights into your exam performance</p>
-          </div>
-          
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- Insights -->
-            <div>
-              <h3 class="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                </svg>
-                Key Insights
-              </h3>
-              <div class="space-y-2.5">
-                <div v-for="(msg, i) in conclusions" :key="i" 
-                     class="flex items-start gap-3 p-3 rounded-md border-l-2 border-blue-500 bg-blue-50/50">
-                  <div class="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
-                  <span class="text-sm text-gray-700 leading-relaxed">{{ msg }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Performance Metrics -->
-            <div>
-              <h3 class="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-                Performance Metrics
-              </h3>
-              <div class="grid grid-cols-2 gap-3">
-                <div class="bg-white rounded-md p-4 border border-gray-200">
-                  <div class="text-lg font-bold text-blue-600 mb-1">{{ getStrongestSubject() }}</div>
-                  <div class="text-xs text-gray-600 font-medium">Strongest Subject</div>
-                </div>
-                <div class="bg-white rounded-md p-4 border border-gray-200">
-                  <div class="text-lg font-bold text-blue-600 mb-1">{{ getWeakestSubject() }}</div>
-                  <div class="text-xs text-gray-600 font-medium">Needs Improvement</div>
-                </div>
-                <div class="bg-white rounded-md p-4 border border-gray-200">
-                  <div class="text-lg font-bold text-blue-600 mb-1">{{ getTotalTime() }}</div>
-                  <div class="text-xs text-gray-600 font-medium">Total Time Spent</div>
-                </div>
-                <div class="bg-white rounded-md p-4 border border-gray-200">
-                  <div class="text-lg font-bold text-blue-600 mb-1">{{ Math.round(lastResult.score / (getTotalTimeInMinutes() || 1)) }}</div>
-                  <div class="text-xs text-gray-600 font-medium">Points per Minute</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Professional Call to Action -->
-        <div class="text-center pt-4">
-          <router-link 
-            to="/sthome/details"
-            class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium text-sm rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-sm hover:shadow"
+        <div v-else class="space-y-4">
+          <div 
+            v-for="exam in recentExams" 
+            :key="exam.result_id"
+            class="bg-gray-50 border border-gray-200 rounded-lg p-5 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+            @click="viewExamDetails(exam)"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
-            View Detailed Question Analysis
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-          </router-link>
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div class="flex-1">
+                <div class="flex items-center gap-3 mb-3">
+                  <h3 class="font-bold text-gray-900 text-lg">{{ getExamTypeName(exam.session?.exam_type) }}</h3>
+                  <span class="px-3 py-1 rounded-full text-sm font-bold" :class="getScoreClass(exam.score)">
+                    {{ exam.score }} points
+                  </span>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div class="text-sm">
+                    <span class="text-gray-500">Date:</span>
+                    <span class="text-gray-900 font-medium ml-1">{{ formatDate(exam.creation_date) }}</span>
+                  </div>
+                  <div class="text-sm">
+                    <span class="text-gray-500">Duration:</span>
+                    <span class="text-gray-900 font-medium ml-1">{{ calculateDuration(exam) }}</span>
+                  </div>
+                  <div class="text-sm">
+                    <span class="text-gray-500">Attempted:</span>
+                    <span class="text-gray-900 font-medium ml-1">{{ countAttempted(exam.answers) }}/75</span>
+                  </div>
+                  <div class="text-sm">
+                    <span class="text-gray-500">Accuracy:</span>
+                    <span class="text-gray-900 font-medium ml-1">{{ calculateAccuracy(exam) }}%</span>
+                  </div>
+                </div>
+              </div>
+              
+              <button class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium text-sm rounded-lg hover:bg-blue-700 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+                View Details
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Professional Empty State -->
-      <div v-else class="text-center py-20">
-        <div class="bg-white rounded-lg p-12 max-w-md mx-auto border border-gray-200 shadow-sm">
-          <div class="w-16 h-16 mx-auto mb-6 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100">
-            <img :src="logo" alt="TESTJEE Logo" class="w-12 h-12 object-contain opacity-60" />
-          </div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">No Results Available</h3>
-          <p class="text-sm text-gray-600 mb-8">Complete an exam to view your performance analytics and detailed insights.</p>
-          <router-link 
-            to="/exam"
-            class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium text-sm rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-sm hover:shadow"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            Start Exam
-          </router-link>
-        </div>
-      </div>
+      <!-- Latest Result Detailed Analytics removed - now shown in details page -->
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useExamStore } from '../stores/examStore'
+import { useAuthStore } from '../stores/authStore'
+import { supabase } from '../lib/supabase'
 import logo from '../../assets/logo_test_jee.png'
+import { Line } from 'vue-chartjs'
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
 
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
+
+const router = useRouter()
 const examStore = useExamStore()
-const { lastResult } = storeToRefs(examStore)
+const authStore = useAuthStore()
+const { allResults, statistics, sessionId } = storeToRefs(examStore)
 
-const total = computed(() => {
-  // Use perQuestion length if available, otherwise fall back to examStore
-  return lastResult.value?.perQuestion?.length || examStore.totalQuestions || 75
+const loading = ref(false)
+const hasActiveSession = ref(false)
+
+const studentName = computed(() => authStore.studentProfile?.student_name || 'Student')
+
+const formattedToday = computed(() => {
+  return new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 })
 
-const attempted = computed(() => {
-  // Count from perQuestion data
-  if (lastResult.value?.perQuestion) {
-    return lastResult.value.perQuestion.filter(p => p.chosen).length
+const recentExams = computed(() => {
+  return allResults.value.slice(0, 10) // Show last 10 exams
+})
+
+const latestResult = computed(() => {
+  if (allResults.value.length === 0) return null
+  return allResults.value[0]
+})
+
+// Chart data for score trend
+const chartData = computed(() => {
+  const labels = allResults.value.slice().reverse().map((exam, idx) => `Exam ${idx + 1}`)
+  const scores = allResults.value.slice().reverse().map(exam => exam.score)
+  
+  return {
+    labels,
+    datasets: [{
+      label: 'Score',
+      data: scores,
+      borderColor: 'rgb(59, 130, 246)',
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      tension: 0.4,
+      fill: true
+    }]
   }
-  return examStore.answeredCount
 })
 
-const correctCount = computed(() =>
-  (lastResult.value?.perQuestion || []).filter(p => p.isCorrect).length
-)
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: true,
+  plugins: {
+    legend: {
+      display: false
+    },
+    title: {
+      display: false
+    }
+  },
+  scales: {
+    y: {
+      beginAtZero: false,
+      grid: {
+        color: 'rgba(0, 0, 0, 0.05)'
+      }
+    },
+    x: {
+      grid: {
+        display: false
+      }
+    }
+  }
+}
 
-const wrongCount = computed(() => {
-  const arr = lastResult.value?.perQuestion || []
-  return arr.filter(p => (p.chosen && !p.isCorrect)).length
+// Compute subject stats for latest exam
+const latestSubjectStats = computed(() => {
+  if (!latestResult.value || !latestResult.value.answers) return {}
+  
+  return computeSubjectStatsForExam(latestResult.value)
 })
 
-const percentageScore = computed(() => {
-  if (!lastResult.value?.score) return 0
-  const max = total.value * 4
-  if (max === 0) return 0
-  return Math.round(((lastResult.value.score / max) * 100) * 100) / 100
+onMounted(async () => {
+  loading.value = true
+  try {
+    // Fetch all student results
+    await examStore.fetchStudentResults()
+    
+    // Check for active session
+    await checkActiveSession()
+  } catch (error) {
+    console.error('Error loading dashboard:', error)
+  } finally {
+    loading.value = false
+  }
 })
 
-const subjectStats = computed(() => {
-  const map = {}
-  ;(lastResult.value?.perQuestion || []).forEach(p => {
-    const s = p.subject || 'Unknown'
-    if (!map[s]) map[s] = { total: 0, correct: 0, wrong: 0, time: 0 }
-    map[s].total++
-    if (p.isCorrect) map[s].correct++
-    else if (p.chosen) map[s].wrong++
-    map[s].time += (p.time_taken || 0)
+async function checkActiveSession() {
+  if (!authStore.studentId) return
+  
+  try {
+    const { data, error } = await supabase
+      .from('exam_sessions')
+      .select('session_id')
+      .eq('student_id', authStore.studentId)
+      .eq('exam_type', 'JEE_MAIN_FULL')
+      .eq('is_submitted', false)
+      .maybeSingle()
+    
+    if (error) console.error('Error checking active session:', error)
+    hasActiveSession.value = !!data
+  } catch (error) {
+    console.error('Error checking active session:', error)
+  }
+}
+
+function startExam(examType) {
+  examStore.setExamType(examType)
+  router.push('/exam')
+}
+
+async function viewExamDetails(exam) {
+  try {
+    // Get question IDs
+    const questionIds = exam.answers
+      .filter(a => a && a.question_id)
+      .map(a => a.question_id)
+    
+    if (questionIds.length === 0) {
+      alert('No questions found in this exam')
+      return
+    }
+    
+    // Fetch questions with subject info and correct answers
+    const { data: questionsData, error: questionsError } = await supabase
+      .from('questions')
+      .select(`
+        question_id,
+        subject_id,
+        question_type,
+        subjects (subject_name),
+        topics (topic_name),
+        choices (correct_answer)
+      `)
+      .in('question_id', questionIds)
+    
+    if (questionsError) throw questionsError
+    
+    // Build lookup maps
+    const questionMap = {}
+    const correctById = {}
+    
+    questionsData.forEach(q => {
+      questionMap[q.question_id] = {
+        subject: q.subjects?.subject_name || 'Unknown',
+        topic: q.topics?.topic_name || 'Not specified',
+        question_type: q.question_type
+      }
+      if (q.choices && q.choices.correct_answer) {
+        correctById[q.question_id] = q.choices.correct_answer
+      }
+    })
+    
+    // Build perQuestion array
+    const perQuestion = exam.answers.map((a, idx) => {
+      if (!a || !a.question_id) {
+        return {
+          question_id: null,
+          index: idx,
+          subject: null,
+          topic: null,
+          chosen: null,
+          correct: null,
+          isCorrect: false,
+          time_taken: 0
+        }
+      }
+      
+      const questionInfo = questionMap[a.question_id] || {}
+      const correctAnswer = correctById[a.question_id]
+      
+      // Check if correct
+      let isCorrect = false
+      if (a.answer && correctAnswer) {
+        if (questionInfo.question_type === 'numeric') {
+          isCorrect = Number(a.answer) === Number(correctAnswer)
+        } else {
+          isCorrect = a.answer === correctAnswer
+        }
+      }
+      
+      return {
+        question_id: a.question_id,
+        index: idx,
+        subject: questionInfo.subject || 'Unknown',
+        topic: questionInfo.topic || 'Not specified',
+        chosen: a.answer,
+        correct: correctAnswer,
+        isCorrect,
+        time_taken: a.time_taken || 0
+      }
+    })
+    
+    // Store in examStore
+    examStore.lastResult = {
+      id: exam.result_id,
+      score: exam.score,
+      answers: exam.answers,
+      perQuestion,
+      correctById
+    }
+    examStore.isSubmitted = true
+    
+    // Navigate to details page
+    router.push('/sthome/details')
+  } catch (error) {
+    console.error('Error loading exam details:', error)
+    alert('Failed to load exam details: ' + error.message)
+  }
+}
+
+function computeSubjectStatsForExam(exam) {
+  const stats = {}
+  
+  // We need to fetch question subjects - for now use a simplified version
+  // In production, this should be part of the exam data
+  const subjects = ['Physics', 'Chemistry', 'Mathematics']
+  
+  subjects.forEach(subject => {
+    // Approximate: first 25 questions per subject
+    const subjectAnswers = exam.answers.slice(
+      subjects.indexOf(subject) * 25,
+      (subjects.indexOf(subject) + 1) * 25
+    )
+    
+    const correct = subjectAnswers.filter(a => a && a.answer).length // Simplified
+    const wrong = subjectAnswers.filter(a => a && a.answer === false).length
+    const total = 25
+    
+    stats[subject] = { correct, wrong, total }
   })
-  return map
-})
+  
+  return stats
+}
 
-const conclusions = computed(() => {
-  const msgs = []
-  for (const [name, stats] of Object.entries(subjectStats.value)) {
-    const pct = Math.round((stats.correct / (stats.total || 1)) * 100)
-    if (pct >= 75) msgs.push(`You are quite good at ${name}!`)
-    else if (pct >= 40) msgs.push(`You are decent in ${name}. Keep improving.`)
-    else msgs.push(`You need to improve on ${name}.`)
+function formatDate(dateString) {
+  if (!dateString) return 'N/A'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-IN', { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric'
+  })
+}
+
+function calculateDuration(exam) {
+  if (!exam.answers || !Array.isArray(exam.answers)) return 'N/A'
+  
+  const totalSeconds = exam.answers.reduce((sum, answer) => {
+    return sum + (answer?.time_taken || 0)
+  }, 0)
+  
+  if (totalSeconds === 0) return 'N/A'
+  
+  const hours = Math.floor(totalSeconds / 3600)
+  const mins = Math.floor((totalSeconds % 3600) / 60)
+  
+  if (hours > 0) {
+    return `${hours}h ${mins}m`
+  } else {
+    return `${mins}m`
   }
+}
 
-  const subjects = Object.entries(subjectStats.value)
-  if (subjects.length) {
-    subjects.sort((a, b) => b[1].time - a[1].time)
-    msgs.push(`You spent most of your time in ${subjects[0][0]}. Try to manage time efficiently.`)
+function countAttempted(answers) {
+  if (!answers || !Array.isArray(answers)) return 0
+  return answers.filter(a => a && a.answer).length
+}
+
+function calculateAccuracy(exam) {
+  if (!exam.answers || !Array.isArray(exam.answers)) return 0
+  
+  const attempted = countAttempted(exam.answers)
+  if (attempted === 0) return 0
+  
+  // Estimate: each correct answer gives +4, each wrong gives -1
+  // So if score is positive, approximate correct answers
+  const estimatedCorrect = Math.max(0, Math.round((exam.score + attempted) / 5))
+  
+  return Math.round((estimatedCorrect / attempted) * 100)
+}
+
+function getScoreClass(score) {
+  if (score >= 200) return 'bg-green-500 text-white'
+  if (score >= 100) return 'bg-yellow-500 text-white'
+  return 'bg-red-500 text-white'
+}
+
+function getExamTypeName(examType) {
+  const names = {
+    'JEE_MAIN_FULL': 'JEE Main Full Test',
+    'KCET': 'KCET',
+    'NEET': 'NEET'
   }
-  if (subjects.length) {
-    subjects.sort((a, b) => b[1].wrong - a[1].wrong)
-    if (subjects[0][1].wrong > 0) msgs.push(`You did the most wrong attempts in ${subjects[0][0]}. Re-check concepts there.`)
-  }
-
-  return msgs
-})
-
-function formatTime(seconds) {
-  if (!seconds) return '0s'
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}m ${s}s`
+  return names[examType] || examType
 }
 
-function getSubjectHeaderClass(subject) {
-  // All subjects use blue gradient
-  return 'bg-gradient-to-r from-blue-50 to-blue-100/50'
+function getTrendColorClass(trend) {
+  if (trend === 'improving') return 'text-green-600'
+  if (trend === 'declining') return 'text-red-600'
+  return 'text-gray-600'
 }
 
-function getSubjectColorClass(subject) {
-  // All subjects use blue
-  return 'bg-blue-500'
-}
-
-function getSubjectTextColor(subject) {
-  // All subjects use blue
-  return 'text-blue-600'
-}
-
-function getSubjectProgressColor(subject) {
-  // All subjects use blue gradient
-  return 'bg-gradient-to-r from-blue-500 to-blue-600'
-}
-
-function getStrongestSubject() {
-  let best = null
-  let bestScore = 0
-  for (const [subject, stats] of Object.entries(subjectStats.value)) {
-    const score = (stats.correct / stats.total) * 100
-    if (score > bestScore) {
-      bestScore = score
-      best = subject
-    }
-  }
-  return best || 'N/A'
-}
-
-function getWeakestSubject() {
-  let worst = null
-  let worstScore = 100
-  for (const [subject, stats] of Object.entries(subjectStats.value)) {
-    const score = (stats.correct / stats.total) * 100
-    if (score < worstScore) {
-      worstScore = score
-      worst = subject
-    }
-  }
-  return worst || 'N/A'
-}
-
-function getTotalTime() {
-  const totalSeconds = Object.values(subjectStats.value).reduce((sum, stats) => sum + stats.time, 0)
-  return formatTime(totalSeconds)
-}
-
-function getTotalTimeInMinutes() {
-  const totalSeconds = Object.values(subjectStats.value).reduce((sum, stats) => sum + stats.time, 0)
-  return Math.floor(totalSeconds / 60)
+function getTrendText(trend) {
+  if (trend === 'improving') return 'Improving'
+  if (trend === 'declining') return 'Declining'
+  return 'Stable'
 }
 </script>

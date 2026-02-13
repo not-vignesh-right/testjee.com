@@ -7,6 +7,7 @@ export const useExamStore = defineStore('exam', () => {
   // State
   const sessionId = ref(null) // Track current exam session
   const sessionStartTime = ref(null) // Server start time
+  const examType = ref('JEE_MAIN_FULL') // Current exam type
   const questions = ref([])
   const currentQuestionIndex = ref(0)
   const userAnswers = ref({})
@@ -27,6 +28,8 @@ export const useExamStore = defineStore('exam', () => {
   const currentStartTime = ref(null) // Timestamp when current question timer starts
   const lastResult = ref(null)
   const isSubmitted = ref(false)
+  const allResults = ref([]) // All student results with sessions
+  const statistics = ref(null) // Aggregate statistics
 
 
   // Getters
@@ -53,7 +56,7 @@ export const useExamStore = defineStore('exam', () => {
         .from('exam_sessions')
         .select('*')
         .eq('student_id', authStore.studentId)
-        .eq('exam_type', 'JEE_MAIN_FULL')
+        .eq('exam_type', examType.value)
         .eq('is_submitted', false)
         .maybeSingle()
 
@@ -145,7 +148,7 @@ export const useExamStore = defineStore('exam', () => {
         .from('exam_sessions')
         .insert({
           student_id: authStore.studentId,
-          exam_type: 'JEE_MAIN_FULL',
+          exam_type: examType.value,
           total_duration_seconds: 180 * 60, // 3 hours
           is_submitted: false
         })
@@ -202,7 +205,7 @@ export const useExamStore = defineStore('exam', () => {
         // Section A: 20 MCQs with joined choices
         const { data: mcqRows, error: mcqError } = await supabase
           .from('questions')
-          .select('question_id, subject_id, topic_id, question_type, question_content, external_reference, topics(topic_name), choices(multi_choice, choice1, choice2, choice3, choice4, correct_answer)')
+          .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name), choices(multi_choice, choice1, choice2, choice3, choice4, correct_answer)')
           .eq('subject_id', subjectId)
           .eq('question_type', 'multiple_choice')
           .limit(20)
@@ -213,13 +216,25 @@ export const useExamStore = defineStore('exam', () => {
         // Section B: 10 Numericals (no choices)
         const { data: numRows, error: numError } = await supabase
           .from('questions')
-          .select('question_id, subject_id, topic_id, question_type, question_content, external_reference, topics(topic_name)')
+          .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
           .eq('subject_id', subjectId)
           .eq('question_type', 'numeric')
           .limit(5)
 
         if (numError) throw numError
-        console.log(`Fetched ${numRows?.length || 0} Numericals for ${subjectName}`, numRows)
+        console.log(`Fetched ${numRows?.length || 0} Numericals for ${subjectName}:`, numRows)
+
+        // Verify question types
+        if (numRows && numRows.length > 0) {
+          numRows.forEach((row, idx) => {
+            console.log(`  ${subjectName} Numerical #${idx + 1}: question_type="${row.question_type}", has_choices=${!!row.choices}`)
+          })
+        }
+
+        // WARNING: If we didn't get 5 numericals, log it
+        if (!numRows || numRows.length < 5) {
+          console.warn(`⚠️ ${subjectName}: Expected 5 numerical questions, got ${numRows?.length || 0}. Check database question_type values!`)
+        }
 
         const transformQuestion = (row) => {
           const topicName = row.topics?.topic_name || ''
@@ -227,6 +242,7 @@ export const useExamStore = defineStore('exam', () => {
           const base = {
             id: row.question_id,
             text,
+            image_url: row.image_url || null,
             subject: subjectName,
             topic: topicName,
             question_type: row.question_type
@@ -554,10 +570,92 @@ export const useExamStore = defineStore('exam', () => {
     numericDrafts.value[questionId] = value
   }
 
+  // Fetch all student results with exam sessions
+  const fetchStudentResults = async () => {
+    const authStore = useAuthStore()
+    if (!authStore.studentId) {
+      console.error('No student ID available')
+      return []
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('results')
+        .select(`
+          result_id,
+          score,
+          answers,
+          creation_date,
+          session_id,
+          exam_sessions (
+            session_id,
+            start_time,
+            end_time,
+            exam_type,
+            total_duration_seconds
+          )
+        `)
+        .eq('student_id', authStore.studentId)
+        .order('creation_date', { ascending: false })
+
+      if (error) throw error
+
+      allResults.value = data.map(item => ({
+        ...item,
+        session: item.exam_sessions
+      }))
+
+      // Calculate statistics
+      calculateStatistics()
+
+      return allResults.value
+    } catch (error) {
+      console.error('Error fetching student results:', error)
+      return []
+    }
+  }
+
+  // Calculate aggregate statistics from all results
+  const calculateStatistics = () => {
+    if (allResults.value.length === 0) {
+      statistics.value = null
+      return
+    }
+
+    const scores = allResults.value.map(r => r.score)
+    const totalExams = scores.length
+    const totalScore = scores.reduce((sum, s) => sum + s, 0)
+    const avgScore = totalScore / totalExams
+    const bestScore = Math.max(...scores)
+    const recentScores = scores.slice(0, Math.min(5, scores.length))
+    const olderScores = scores.slice(Math.min(5, scores.length))
+
+    let trend = 'stable'
+    if (recentScores.length >= 2 && olderScores.length >= 2) {
+      const recentAvg = recentScores.reduce((sum, s) => sum + s, 0) / recentScores.length
+      const olderAvg = olderScores.reduce((sum, s) => sum + s, 0) / olderScores.length
+      if (recentAvg > olderAvg + 10) trend = 'improving'
+      else if (recentAvg < olderAvg - 10) trend = 'declining'
+    }
+
+    statistics.value = {
+      totalExams,
+      avgScore: Math.round(avgScore),
+      bestScore,
+      trend
+    }
+  }
+
+  // Set exam type
+  const setExamType = (type) => {
+    examType.value = type
+  }
+
   return {
     // State
     sessionId,
     sessionStartTime,
+    examType,
     questions,
     currentQuestionIndex,
     userAnswers,
@@ -571,6 +669,8 @@ export const useExamStore = defineStore('exam', () => {
     currentStartTime,
     lastResult,
     isSubmitted,
+    allResults,
+    statistics,
     // Getters
     currentQuestion,
     totalQuestions,
@@ -591,6 +691,8 @@ export const useExamStore = defineStore('exam', () => {
     startTimer,
     formatTime,
     getNumericDraft,
-    setNumericDraft
+    setNumericDraft,
+    fetchStudentResults,
+    setExamType
   }
 })

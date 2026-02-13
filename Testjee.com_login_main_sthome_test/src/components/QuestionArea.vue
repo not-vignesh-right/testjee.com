@@ -34,11 +34,24 @@
         </div>
       </div>
       
-      <!-- Question Text -->
-      <div class="prose max-w-none">
-        <p class="text-lg text-gray-800 leading-relaxed">
-          {{ examStore.currentQuestion.text }}
-        </p>
+      <!-- Question Content -->
+      <div class="space-y-4">
+        <!-- Question Image (if available) -->
+        <div v-if="examStore.currentQuestion.image_url" class="mb-4">
+          <img 
+            :src="examStore.currentQuestion.image_url" 
+            :alt="`Question ${examStore.currentQuestionIndex + 1}`"
+            class="max-w-full h-auto rounded-lg border border-gray-200 shadow-sm"
+            style="max-height: 600px; object-fit: contain;"
+          />
+        </div>
+        
+        <!-- Question Text (shown if no image or as supplement) -->
+        <div v-if="examStore.currentQuestion.text" class="prose max-w-none">
+          <p class="text-lg text-gray-800 leading-relaxed">
+            {{ examStore.currentQuestion.text }}
+          </p>
+        </div>
       </div>
     </div>
     
