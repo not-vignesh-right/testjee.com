@@ -464,6 +464,6 @@ async function viewDetails(exam) {
 
 function logout() {
   authStore.logout()
-  router.push('/login')
+  router.push('/')
 }
 </script>

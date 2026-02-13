@@ -6,8 +6,7 @@ import { useExamStore } from '../stores/examStore'
 import { useAuthStore } from '../stores/authStore'
 
 const routes = [
-  // Redirect root to login
-  { path: '/', redirect: '/login' },
+  // Login is the root page of this app (served at /login/ via router base)
 
   // Public pages
   { path: '/about', name: 'About', component: () => import('../components/AboutPage.vue') },
@@ -20,8 +19,8 @@ const routes = [
   // Protected exam routes
   { path: '/exam', name: 'Exam', component: ExamLayout, meta: { requiresAuth: true } },
 
-  // Public routes
-  { path: '/login', name: 'Login', component: () => import('../components/Login.vue') },
+  // Public routes - Login is at root since router base is /login
+  { path: '/', name: 'Login', component: () => import('../components/Login.vue') },
   { path: '/auth/callback', name: 'AuthCallback', component: () => import('../components/AuthCallback.vue') },
 ]
 
@@ -41,7 +40,7 @@ router.beforeEach(async (to, from, next) => {
 
   // ========== AUTH PROTECTION ==========
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return next('/login')
+    return next('/')
   }
 
   // Load student profile if authenticated and not already loaded
