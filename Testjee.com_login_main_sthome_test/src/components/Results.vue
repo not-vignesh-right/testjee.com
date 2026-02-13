@@ -1,192 +1,241 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100/30 to-white p-6 relative overflow-hidden">
-    <!-- Subtle background decorations -->
-    <div class="absolute inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-100/40 rounded-full blur-3xl"></div>
-      <div class="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-200/20 rounded-full blur-3xl"></div>
-      <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-50/30 rounded-full blur-3xl"></div>
-    </div>
-    
-    <div class="max-w-7xl mx-auto relative z-10 w-full">
-      <!-- Title Section (Simplified) -->
-      <div class="mb-8 flex justify-between items-end">
+  <div class="min-h-full">
+    <div class="max-w-7xl mx-auto w-full">
+      <!-- Title Section -->
+      <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
             Student Dashboard
           </h1>
-          <p class="text-gray-600 text-sm font-medium">Overview of your performance</p>
+          <p class="text-blue-600/80 text-sm font-medium">Overview of your performance</p>
         </div>
         <div class="text-right hidden md:block">
           <div class="text-xs text-gray-500 font-medium mb-1">Today's Date</div>
-          <div class="text-sm text-gray-700 font-semibold">{{ formattedToday }}</div>
-        </div>
-      </div>
-
-      <!-- Exam Type Selection Buttons -->
-      <div class="bg-white rounded-xl p-6 shadow-lg border border-gray-200 mb-8">
-        <h2 class="text-xl font-bold text-gray-900 mb-4">Select Exam Type</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <!-- JEE Button (Active) -->
-          <button 
-            @click="startExam('JEE_MAIN_FULL')"
-            class="relative group bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-md"
-          >
-            <div class="flex items-center justify-between mb-2">
-              <h3 class="text-lg font-bold">JEE Main</h3>
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </div>
-            <p class="text-sm text-blue-100">Full Test • 3 Hours • 75 Questions</p>
-            <div v-if="hasActiveSession" class="mt-2 text-xs bg-white/20 px-2 py-1 rounded inline-block">
-              Resume Active Session
-            </div>
-          </button>
-
-          <!-- KCET Button (Coming Soon) -->
-          <button 
-            disabled
-            class="relative bg-gray-100 text-gray-400 p-6 rounded-lg cursor-not-allowed border-2 border-gray-200"
-          >
-            <div class="flex items-center justify-between mb-2">
-              <h3 class="text-lg font-bold">KCET</h3>
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-              </svg>
-            </div>
-            <p class="text-sm">Coming Soon</p>
-            <div class="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-              <span class="bg-gray-800 text-white text-xs px-3 py-1 rounded-full">Coming Soon</span>
-            </div>
-          </button>
-
-          <!-- NEET Button (Coming Soon) -->
-          <button 
-            disabled
-            class="relative bg-gray-100 text-gray-400 p-6 rounded-lg cursor-not-allowed border-2 border-gray-200"
-          >
-            <div class="flex items-center justify-between mb-2">
-              <h3 class="text-lg font-bold">NEET</h3>
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-              </svg>
-            </div>
-            <p class="text-sm">Coming Soon</p>
-            <div class="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-              <span class="bg-gray-800 text-white text-xs px-3 py-1 rounded-full">Coming Soon</span>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      <!-- Quick Statistics -->
-      <div v-if="statistics" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
-          <div class="text-3xl font-bold text-blue-600 mb-1">{{ statistics.totalExams }}</div>
-          <div class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Exams</div>
-        </div>
-        <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
-          <div class="text-3xl font-bold text-blue-600 mb-1">{{ statistics.avgScore }}</div>
-          <div class="text-xs text-gray-500 font-medium uppercase tracking-wide">Average Score</div>
-        </div>
-        <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
-          <div class="text-3xl font-bold text-blue-600 mb-1">{{ statistics.bestScore }}</div>
-          <div class="text-xs text-gray-500 font-medium uppercase tracking-wide">Best Score</div>
-        </div>
-        <div class="bg-white rounded-lg p-5 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
-          <div class="flex items-center gap-2">
-            <svg v-if="statistics.trend === 'improving'" class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-            </svg>
-            <svg v-else-if="statistics.trend === 'declining'" class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
-            </svg>
-            <svg v-else class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"></path>
-            </svg>
-            <span class="text-xl font-bold" :class="getTrendColorClass(statistics.trend)">
-              {{ getTrendText(statistics.trend) }}
-            </span>
+          <div class="text-sm text-gray-900 font-semibold bg-white px-3 py-1 rounded-full shadow-sm border border-gray-100 inline-block">
+            {{ formattedToday }}
           </div>
-          <div class="text-xs text-gray-500 font-medium uppercase tracking-wide">Performance Trend</div>
         </div>
       </div>
 
-      <!-- Performance Chart -->
-      <div v-if="allResults.length > 0" class="bg-white rounded-xl p-8 shadow-lg border border-gray-200 mb-8">
-        <h2 class="text-xl font-bold text-gray-900 mb-6">Score Trend</h2>
-        <Line :data="chartData" :options="chartOptions" />
+      <!-- Stats Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Exams -->
+        <div class="bg-white rounded-2xl p-6 shadow-[0_2px_10px_rgb(0,0,0,0.03)] border border-gray-100 group hover:shadow-lg transition-all duration-300">
+          <div class="flex items-center justify-between mb-4">
+            <div class="p-3 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+              </svg>
+            </div>
+            <span class="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">+2 this week</span>
+          </div>
+          <h3 class="text-gray-500 text-sm font-medium">Total Exams</h3>
+          <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.totalExams }}</p>
+        </div>
+
+        <!-- Average Score -->
+        <div class="bg-white rounded-2xl p-6 shadow-[0_2px_10px_rgb(0,0,0,0.03)] border border-gray-100 group hover:shadow-lg transition-all duration-300">
+          <div class="flex items-center justify-between mb-4">
+            <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+              </svg>
+            </div>
+            <span class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">Top 10%</span>
+          </div>
+          <h3 class="text-gray-500 text-sm font-medium">Average Score</h3>
+          <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.averageScore }}%</p>
+        </div>
+
+        <!-- Accuracy -->
+        <div class="bg-white rounded-2xl p-6 shadow-[0_2px_10px_rgb(0,0,0,0.03)] border border-gray-100 group hover:shadow-lg transition-all duration-300">
+          <div class="flex items-center justify-between mb-4">
+            <div class="p-3 bg-cyan-50 text-cyan-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <span class="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Last 5 exams</span>
+          </div>
+          <h3 class="text-gray-500 text-sm font-medium">Accuracy</h3>
+          <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.accuracy }}%</p>
+        </div>
+
+        <!-- Time Spent -->
+        <div class="bg-white rounded-2xl p-6 shadow-[0_2px_10px_rgb(0,0,0,0.03)] border border-gray-100 group hover:shadow-lg transition-all duration-300">
+          <div class="flex items-center justify-between mb-4">
+            <div class="p-3 bg-amber-50 text-amber-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+             <span class="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-1 rounded-full">Avg / Exam</span>
+          </div>
+          <h3 class="text-gray-500 text-sm font-medium">Time Taken</h3>
+          <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.timeSpent }}m</p>
+        </div>
       </div>
 
-      <!-- Recent Exams -->
-      <div class="bg-white rounded-xl p-8 shadow-lg border border-gray-200 mb-8">
-        <h2 class="text-xl font-bold text-gray-900 mb-6">Recent Exams</h2>
+      <!-- Main Content Area: Chart + Recent Exams -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        <div v-if="loading" class="text-center py-16">
-          <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-          <p class="text-gray-600 text-lg">Loading your exam history...</p>
-        </div>
-
-        <div v-else-if="allResults.length === 0" class="text-center py-16">
-          <div class="w-24 h-24 mx-auto mb-6 bg-blue-50 rounded-full flex items-center justify-center">
-            <svg class="w-12 h-12 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
+        <!-- Chart Section -->
+        <div class="lg:col-span-2 bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.03)] border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-bold text-gray-900">Score Trend</h2>
+            <select class="text-sm border-gray-200 rounded-lg text-gray-500 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 border px-3 py-1">
+              <option>Last 7 Days</option>
+              <option>Last 30 Days</option>
+            </select>
           </div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">No Exams Yet</h3>
-          <p class="text-sm text-gray-600 mb-8">Start your first JEE exam to see results here!</p>
+          <div class="h-80 w-full relative">
+            <Line :data="chartData" :options="chartOptions" />
+          </div>
         </div>
 
-        <div v-else class="space-y-4">
-          <div 
-            v-for="exam in recentExams" 
-            :key="exam.result_id"
-            class="bg-gray-50 border border-gray-200 rounded-lg p-5 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
-            @click="viewExamDetails(exam)"
-          >
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div class="flex-1">
-                <div class="flex items-center gap-3 mb-3">
-                  <h3 class="font-bold text-gray-900 text-lg">{{ getExamTypeName(exam.session?.exam_type) }}</h3>
-                  <span class="px-3 py-1 rounded-full text-sm font-bold" :class="getScoreClass(exam.score)">
-                    {{ exam.score }} points
-                  </span>
-                </div>
-                
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div class="text-sm">
-                    <span class="text-gray-500">Date:</span>
-                    <span class="text-gray-900 font-medium ml-1">{{ formatDate(exam.creation_date) }}</span>
-                  </div>
-                  <div class="text-sm">
-                    <span class="text-gray-500">Duration:</span>
-                    <span class="text-gray-900 font-medium ml-1">{{ calculateDuration(exam) }}</span>
-                  </div>
-                  <div class="text-sm">
-                    <span class="text-gray-500">Attempted:</span>
-                    <span class="text-gray-900 font-medium ml-1">{{ countAttempted(exam.answers) }}/75</span>
-                  </div>
-                  <div class="text-sm">
-                    <span class="text-gray-500">Accuracy:</span>
-                    <span class="text-gray-900 font-medium ml-1">{{ calculateAccuracy(exam) }}%</span>
-                  </div>
-                </div>
+        <!-- Quick Actions / Performance -->
+        <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl shadow-xl p-6 text-white relative overflow-hidden flex flex-col justify-between">
+           <!-- Decorative BG -->
+           <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+           <div class="absolute bottom-0 left-0 w-40 h-40 bg-blue-400/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
+
+           <div class="relative z-10">
+             <h2 class="text-xl font-bold mb-2">Ready to practice?</h2>
+             <p class="text-blue-100 text-sm mb-6">Take a new mock test to improve your score and speed.</p>
+             
+             <div class="bg-white/10 backdrop-blur-md rounded-xl p-4 mb-6 border border-white/20">
+               <div class="flex justify-between items-center mb-2">
+                 <span class="text-sm font-medium text-blue-100">Overall Progress</span>
+                 <span class="text-lg font-bold">Good</span>
+               </div>
+               <div class="w-full bg-blue-900/40 rounded-full h-2">
+                 <div class="bg-white h-2 rounded-full w-[75%] shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
+               </div>
+             </div>
+           </div>
+           
+           <button 
+             @click="toggleExamModal"
+             class="w-full py-4 bg-white text-blue-700 font-bold rounded-xl shadow-lg hover:bg-blue-50 transition-all transform hover:scale-[1.02] active:scale-[0.98] relative z-10 flex items-center justify-center gap-2 group"
+           >
+             <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+             Start New Exam
+           </button>
+        </div>
+      </div>
+
+      <!-- Recent Activity / Exams List -->
+      <div class="mt-8 bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.03)] border border-gray-100 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+          <h2 class="text-lg font-bold text-gray-900">Recent Exams</h2>
+          <button class="text-sm text-blue-600 font-medium hover:text-blue-700">View All</button>
+        </div>
+        
+        <div class="divide-y divide-gray-50">
+          <div v-for="exam in recentExams" :key="exam.id" 
+               class="p-6 hover:bg-blue-50/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg">
+                {{ exam.score }}%
+              </div>
+              <div>
+                <h3 class="text-gray-900 font-semibold">{{ exam.name }}</h3>
+                <p class="text-sm text-gray-500">{{ exam.date }} • {{ exam.duration }}</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-6">
+              <div class="text-center hidden md:block">
+                <div class="text-xs text-gray-400 uppercase font-semibold">Correct</div>
+                <div class="font-medium text-gray-700">{{ exam.correct }}/{{ exam.total }}</div>
+              </div>
+              <div class="text-center hidden md:block">
+                 <div class="text-xs text-gray-400 uppercase font-semibold">Accuracy</div>
+                 <div class="font-medium text-gray-700">{{ Math.round((exam.correct/exam.total)*100) }}%</div>
               </div>
               
-              <button class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium text-sm rounded-lg hover:bg-blue-700 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
-                View Details
+              <button 
+                @click="viewDetails(exam)"
+                class="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+              >
+                View Analysis
               </button>
             </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Latest Result Detailed Analytics removed - now shown in details page -->
+    <!-- Exam Modal (Improved) -->
+    <div v-if="showExamModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+      <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Background overlay -->
+        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="toggleExamModal"></div>
+
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div class="sm:flex sm:items-start">
+              <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              </div>
+              <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                  Start New Exam
+                </h3>
+                <div class="mt-4 space-y-3">
+                  <p class="text-sm text-gray-500 mb-4">Choose the type of exam you want to attempt:</p>
+                  
+                  <button 
+                    @click="startFullExam"
+                    class="w-full flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 hover:shadow-md transition-all group"
+                  >
+                    <div class="flex items-center gap-3">
+                      <div class="p-2 bg-blue-100 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                      </div>
+                      <div class="text-left">
+                        <div class="font-semibold text-gray-900">Full Mock Test</div>
+                        <div class="text-xs text-gray-500">Standard Pattern (PCM)</div>
+                      </div>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                  </button>
+
+                   <button 
+                    class="w-full flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 hover:shadow-md transition-all group opacity-70 cursor-not-allowed"
+                    title="Coming soon"
+                  >
+                    <div class="flex items-center gap-3">
+                      <div class="p-2 bg-purple-100 text-purple-600 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                      </div>
+                      <div class="text-left">
+                        <div class="font-semibold text-gray-900">Subject Wise</div>
+                        <div class="text-xs text-gray-500">Physics, Chem, or Maths</div>
+                      </div>
+                    </div>
+                     <span class="text-xs font-bold px-2 py-1 bg-gray-100 text-gray-500 rounded">HOON</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+            <button 
+              type="button" 
+              class="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm" 
+              @click="toggleExamModal"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

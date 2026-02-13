@@ -53,6 +53,11 @@ router.beforeEach(async (to, from, next) => {
   // Load session
   await auth.loadSession()
 
+  // Redirect if visiting login page while authenticated
+  if (to.path === '/' && auth.isAuthenticated) {
+    return next('/sthome/dashboard')
+  }
+
   // ========== AUTH PROTECTION ==========
   if (to.meta.requiresAuth) {
     if (!auth.isAuthenticated) {
