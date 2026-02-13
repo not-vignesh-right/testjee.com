@@ -37,6 +37,10 @@ const routes = [
   { path: '/', name: 'Login', component: () => import('../components/Login.vue') },
   { path: '/auth/callback', name: 'AuthCallback', component: () => import('../components/AuthCallback.vue') },
   { path: '/auth/reset-password', name: 'ResetPassword', component: ResetPassword },
+
+  // Catch-all/Redirects
+  { path: '/dashboard', redirect: '/sthome' },
+  { path: '/:pathMatch(.*)*', redirect: '/' } // Redirect unknown routes to login
 ]
 
 

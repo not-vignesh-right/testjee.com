@@ -156,7 +156,7 @@
           </div>
           
            <div v-if="isSignUpMode" class="form-group">
-             <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Mobile (Optional)</label>
+             <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Mobile Number</label>
             <input 
               v-model="signUpData.mobile" 
               type="tel" 
@@ -239,7 +239,7 @@ import { useAuthStore } from '../stores/authStore'
 import logo from '../../assets/logo_test_jee.png'
 
 const router = useRouter()
-const auth = useAuthStore()
+const authStore = useAuthStore()
 
 // State
 const isSignUpMode = ref(false)
@@ -286,7 +286,7 @@ function validateSignUp() {
     return false
   }
   
-  if (signUpData.value.mobile && !/^[6-9]\d{9}$/.test(signUpData.value.mobile)) {
+  if (!signUpData.value.mobile || !/^[6-9]\d{9}$/.test(signUpData.value.mobile)) {
     showMessage('Please enter a valid 10-digit mobile number', 'error')
     return false
   }
