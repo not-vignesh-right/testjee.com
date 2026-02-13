@@ -1,3 +1,5 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import ExamLayout from '../components/ExamLayout.vue'
 import StudentLayout from '../components/StudentLayout.vue'
 import Results from '../components/Results.vue'
 import ResultsDetails from '../components/ResultsDetails.vue'
