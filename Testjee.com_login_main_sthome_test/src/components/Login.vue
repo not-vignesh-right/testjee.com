@@ -30,7 +30,7 @@
         <div class="relative z-10">
           <div class="flex items-center gap-3 mb-8 animate-slide-in-left" style="animation-delay: 100ms;">
             <div class="bg-white/20 p-2.5 rounded-xl backdrop-blur-md shadow-inner border border-white/10">
-              <img :src="logo" alt="Logo" class="w-10 h-10 object-contain brightness-0 invert drop-shadow-md" />
+              <img :src="logo" alt="Logo" class="w-10 h-10 object-contain drop-shadow-md" />
             </div>
             <span class="text-xl font-bold tracking-wide drop-shadow-sm">TESTJEE</span>
           </div>
