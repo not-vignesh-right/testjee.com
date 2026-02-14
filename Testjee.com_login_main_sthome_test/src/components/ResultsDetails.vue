@@ -1,174 +1,133 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100/30 to-white p-6 relative overflow-hidden">
-    <!-- Subtle background decorations -->
-    <div class="absolute inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-100/40 rounded-full blur-3xl"></div>
-      <div class="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-200/20 rounded-full blur-3xl"></div>
-      <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-50/30 rounded-full blur-3xl"></div>
-    </div>
-
-    <div class="max-w-7xl mx-auto relative z-10">
-      <div class="mb-8 flex items-center justify-between">
-        <h1 class="text-4xl font-bold text-gray-900">
-          Question Analysis
-        </h1>
-        <router-link 
-          to="/sthome"
-          class="inline-flex items-center px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-colors border border-gray-300 shadow-sm"
-        >
-          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-          </svg>
-          Back to Dashboard
-        </router-link>
-      </div>
-
+  <div class="min-h-full pb-10">
+    <div class="max-w-7xl mx-auto">
 
       <div v-if="lastResult && lastResult.perQuestion?.length">
-        <!-- Subject Performance Analysis -->
-        <div class="bg-white rounded-xl p-8 shadow-lg border border-gray-200 mb-8">
-          <h2 class="text-xl font-bold text-gray-900 mb-6">Subject Performance Analysis</h2>
+
+        <!-- Student Portal Header Banner -->
+        <div class="bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 rounded-2xl p-6 md:p-8 mb-6 shadow-lg relative overflow-hidden animate-fade-in-up">
+          <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
+          <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-white/5 rounded-full blur-2xl"></div>
           
-          <!-- Subject Performance Cards -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div v-for="(stats, subject) in subjectStats" :key="subject" 
-                 class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
-              
-              <!-- Subject Header -->
-              <div class="px-6 py-4 bg-blue-50 border-b border-gray-200">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <div class="w-2 h-2 rounded-full bg-blue-600"></div>
-                    <h3 class="text-base font-semibold text-gray-900">{{ subject }}</h3>
-                  </div>
-                  <div class="text-xl font-bold text-blue-600">
-                    {{ Math.round((stats.correct/stats.total || 0) * 100) }}%
-                  </div>
+          <div class="relative z-10">
+            <!-- Portal Title Row -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="px-2.5 py-0.5 bg-white/20 backdrop-blur-sm text-white text-[10px] font-bold rounded-full uppercase tracking-wider">Performance Review</span>
                 </div>
+                <h1 class="text-2xl md:text-3xl font-bold text-white">JEE Main Mock Test {{ examLabel }}</h1>
+                <p class="text-blue-100 text-sm mt-1">Score: <span class="font-bold text-white">{{ lastResult.score }}</span> / 300</p>
               </div>
+              <router-link 
+                to="/sthome/dashboard"
+                class="inline-flex items-center px-5 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white font-semibold rounded-xl transition-all border border-white/20 text-sm gap-2 self-start"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Dashboard
+              </router-link>
+            </div>
 
-              <!-- Subject Stats -->
-              <div class="p-6">
-                <div class="space-y-5">
-                  <!-- Progress Bar -->
-                  <div>
-                    <div class="flex justify-between items-center mb-2.5">
-                      <span class="text-xs font-medium text-gray-600 uppercase tracking-wide">Performance</span>
-                      <span class="text-xs font-semibold text-gray-700">{{ stats.correct }}/{{ stats.total }} correct</span>
-                    </div>
-                    <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                      <div class="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-1000 ease-out" 
-                           :style="{ width: `${(stats.correct/stats.total || 0) * 100}%` }">
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Quick Stats Grid -->
-                  <div class="grid grid-cols-3 gap-2.5">
-                    <div class="bg-blue-50 rounded-md p-3 border border-blue-100 text-center">
-                      <div class="text-lg font-bold text-blue-600 mb-0.5">{{ stats.correct }}</div>
-                      <div class="text-[10px] text-gray-600 font-medium uppercase tracking-wide">Correct</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-md p-3 border border-gray-200 text-center">
-                      <div class="text-lg font-bold text-gray-600 mb-0.5">{{ stats.wrong }}</div>
-                      <div class="text-[10px] text-gray-600 font-medium uppercase tracking-wide">Wrong</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-md p-3 border border-gray-200 text-center">
-                      <div class="text-lg font-bold text-gray-600 mb-0.5">{{ stats.total - stats.correct - stats.wrong }}</div>
-                      <div class="text-[10px] text-gray-600 font-medium uppercase tracking-wide">Skipped</div>
-                    </div>
-                  </div>
-                </div>
+            <!-- Quick Stats Row -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div class="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center border border-white/20">
+                <div class="text-xl font-bold text-white">{{ totalQuestions }}</div>
+                <div class="text-blue-100 text-[10px] font-medium uppercase tracking-wide">Total</div>
+              </div>
+              <div class="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center border border-white/20">
+                <div class="text-xl font-bold text-green-300">{{ getCorrectCount() }}</div>
+                <div class="text-blue-100 text-[10px] font-medium uppercase tracking-wide">Correct</div>
+              </div>
+              <div class="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center border border-white/20">
+                <div class="text-xl font-bold text-red-300">{{ getWrongCount() }}</div>
+                <div class="text-blue-100 text-[10px] font-medium uppercase tracking-wide">Wrong</div>
+              </div>
+              <div class="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center border border-white/20">
+                <div class="text-xl font-bold text-gray-300">{{ getUnattemptedCount() }}</div>
+                <div class="text-blue-100 text-[10px] font-medium uppercase tracking-wide">Skipped</div>
+              </div>
+              <div class="bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center border border-white/20 col-span-2 md:col-span-1">
+                <div class="text-xl font-bold text-white">{{ getTotalTime() }}</div>
+                <div class="text-blue-100 text-[10px] font-medium uppercase tracking-wide">Time</div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Subject-wise Question Analysis -->
-        <div class="space-y-8">
-          <div v-for="(questions, subject) in groupedBySubject" :key="subject" 
-               class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+        <!-- Subject-wise Analysis -->
+        <div class="space-y-5">
+          <div v-for="(questions, subject, subjectIndex) in groupedBySubject" :key="subject" 
+               class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden animate-fade-in-up"
+               :style="`animation-delay: ${100 + subjectIndex * 60}ms`">
             
-            <!-- Subject Header -->
-            <div class="px-8 py-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100/50">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                  <div class="w-4 h-4 rounded-full mr-4 bg-blue-500"></div>
-                  <h2 class="text-2xl font-bold text-gray-900">{{ subject }}</h2>
+            <!-- Subject Header with inline stats -->
+            <div class="px-5 md:px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50/80 to-cyan-50/30">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                    <span class="text-white text-xs font-bold">{{ subject.charAt(0) }}</span>
+                  </div>
+                  <div>
+                    <h2 class="text-lg font-bold text-gray-900">{{ subject }}</h2>
+                    <p class="text-xs text-gray-500">{{ questions.length }} questions</p>
+                  </div>
                 </div>
-                <div class="flex items-center space-x-6 text-sm">
-                  <div class="text-center">
-                    <div class="text-xl font-bold text-green-600">{{ getSubjectCorrect(questions) }}</div>
-                    <div class="text-gray-600">Correct</div>
+                <div class="flex items-center gap-4">
+                  <!-- Progress bar -->
+                  <div class="hidden sm:block w-32">
+                    <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                      <div class="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all duration-1000" 
+                           :style="{ width: `${(getSubjectCorrect(questions)/questions.length)*100}%` }">
+                      </div>
+                    </div>
                   </div>
-                  <div class="text-center">
-                    <div class="text-xl font-bold text-red-600">{{ getSubjectWrong(questions) }}</div>
-                    <div class="text-gray-600">Wrong</div>
-                  </div>
-                  <div class="text-center">
-                    <div class="text-xl font-bold text-gray-500">{{ getSubjectSkipped(questions) }}</div>
-                    <div class="text-gray-600">Skipped</div>
-                  </div>
-                  <div class="text-center">
-                    <div class="text-xl font-bold text-blue-600">{{ Math.round((getSubjectCorrect(questions)/questions.length)*100) }}%</div>
-                    <div class="text-gray-600">Accuracy</div>
+                  <div class="flex items-center gap-3 text-sm">
+                    <span class="font-bold text-green-600">{{ getSubjectCorrect(questions) }}<span class="text-gray-400 font-normal text-xs ml-0.5">✓</span></span>
+                    <span class="font-bold text-red-500">{{ getSubjectWrong(questions) }}<span class="text-gray-400 font-normal text-xs ml-0.5">✗</span></span>
+                    <span class="font-bold text-gray-400">{{ getSubjectSkipped(questions) }}<span class="text-gray-400 font-normal text-xs ml-0.5">—</span></span>
+                    <span class="pl-2 border-l border-gray-200 font-bold text-blue-600 text-base">{{ Math.round((getSubjectCorrect(questions)/questions.length)*100) }}%</span>
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- Questions Grid -->
-            <div class="p-6">
-              <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                <div v-for="(q, index) in questions" :key="q.index" 
-                     class="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:border-gray-300 transition-colors">
+            <div class="p-4 md:p-5">
+              <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div v-for="q in questions" :key="q.index" 
+                     class="rounded-xl p-3.5 border transition-all duration-200 hover:shadow-sm"
+                     :class="getCardClass(q)">
                   
-                  <!-- Question Header -->
-                  <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center">
-                      <span class="text-sm font-medium text-gray-600 mr-2">Q{{ q.index + 1 }}</span>
-                      <span class="text-xs font-mono bg-white px-2 py-1 rounded text-gray-500 border border-gray-200">
-                        {{ q.question_id ?? '—' }}
+                  <!-- Top row: Q number + time + status -->
+                  <div class="flex items-center justify-between mb-2.5">
+                    <div class="flex items-center gap-2">
+                      <span class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold"
+                            :class="getQNumberClass(q)">
+                        {{ q.index + 1 }}
+                      </span>
+                      <span :class="getStatusBadgeClass(q)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">
+                        {{ getQuestionStatusText(q) }}
                       </span>
                     </div>
-                    <div class="flex items-center">
-                      <svg class="w-4 h-4 mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="text-xs text-gray-400 flex items-center gap-1">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
-                      <span class="text-xs text-gray-600">{{ formatTime(q.time_taken) }}</span>
-                    </div>
-                  </div>
-
-                  <!-- Status Badge -->
-                  <div class="mb-3">
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
-                          :class="getQuestionStatusClass(q)">
-                      <svg v-if="q.isCorrect" class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                      </svg>
-                      <svg v-else-if="q.chosen" class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                      </svg>
-                      <svg v-else class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
-                      </svg>
-                      {{ getQuestionStatusText(q) }}
+                      {{ formatTime(q.time_taken) }}
                     </span>
                   </div>
 
-                  <!-- Answer Details -->
-                  <div class="space-y-2">
-                    <div class="flex justify-between items-center">
-                      <span class="text-sm text-gray-600">Your Answer:</span>
-                      <span class="text-sm font-medium" :class="getAnswerTextColor(q)">
-                        {{ q.chosen ?? 'Not answered' }}
-                      </span>
+                  <!-- Answers row -->
+                  <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center gap-1">
+                      <span class="text-gray-400 text-xs">You:</span>
+                      <span class="font-semibold" :class="getAnswerTextColor(q)">{{ q.chosen ?? '—' }}</span>
                     </div>
-                    <div class="flex justify-between items-center">
-                      <span class="text-sm text-gray-600">Correct Answer:</span>
-                      <span class="text-sm font-medium text-green-600">
-                        {{ q.correct ?? '—' }}
-                      </span>
+                    <div class="flex items-center gap-1">
+                      <span class="text-gray-400 text-xs">Ans:</span>
+                      <span class="font-semibold text-green-600">{{ q.correct ?? '—' }}</span>
                     </div>
                   </div>
                 </div>
@@ -176,44 +135,23 @@
             </div>
           </div>
         </div>
-
-        <!-- Overall Summary -->
-        <div class="mt-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-8 border border-blue-400 shadow-lg">
-          <h3 class="text-2xl font-bold text-center mb-6 text-white">Overall Summary</h3>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div class="text-center">
-              <div class="text-3xl font-bold text-white mb-2">{{ getCorrectCount() }}</div>
-              <div class="text-blue-100">Total Correct</div>
-            </div>
-            <div class="text-center">
-              <div class="text-3xl font-bold text-white mb-2">{{ getWrongCount() }}</div>
-              <div class="text-blue-100">Total Wrong</div>
-            </div>
-            <div class="text-center">
-              <div class="text-3xl font-bold text-white mb-2">{{ getUnattemptedCount() }}</div>
-              <div class="text-blue-100">Unattempted</div>
-            </div>
-            <div class="text-center">
-              <div class="text-3xl font-bold text-white mb-2">{{ getTotalTime() }}</div>
-              <div class="text-blue-100">Total Time</div>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <div v-else class="text-center py-16">
-        <div class="bg-white rounded-3xl p-12 max-w-md mx-auto border border-gray-200 shadow-sm">
-          <div class="w-24 h-24 mx-auto mb-6 bg-blue-50 rounded-full flex items-center justify-center">
-            <svg class="w-12 h-12 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <!-- Empty State -->
+      <div v-else class="text-center py-16 animate-fade-in-up">
+        <div class="bg-white rounded-2xl p-12 max-w-md mx-auto border border-gray-200/80 shadow-sm">
+          <div class="w-16 h-16 mx-auto mb-5 bg-blue-50 rounded-2xl flex items-center justify-center">
+            <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
           </div>
-          <h3 class="text-2xl font-bold text-gray-800 mb-4">No Detailed Data Available</h3>
-          <p class="text-gray-600 mb-6">Complete an exam to see question-wise analysis.</p>
+          <h3 class="text-xl font-bold text-gray-800 mb-2">No Data Available</h3>
+          <p class="text-gray-500 text-sm mb-6">Complete an exam to see your analysis.</p>
           <router-link 
             to="/exam"
-            class="inline-flex items-center px-8 py-3 bg-blue-600 text-white font-semibold rounded-full hover:bg-blue-700 transition-colors shadow-md"
+            class="inline-flex items-center px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-all shadow-md text-sm gap-2"
           >
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
             Start Exam
           </router-link>
         </div>
@@ -229,6 +167,14 @@ import { useExamStore } from '../stores/examStore'
 const examStore = useExamStore()
 const lastResult = examStore.lastResult
 
+// Generate exam label from result id
+const examLabel = computed(() => {
+  if (!lastResult?.id) return ''
+  return `#${lastResult.id}`
+})
+
+const totalQuestions = computed(() => (lastResult?.perQuestion || []).length)
+
 const groupedBySubject = computed(() => {
   const groups = {}
   ;(lastResult?.perQuestion || []).forEach(q => {
@@ -239,37 +185,29 @@ const groupedBySubject = computed(() => {
   return groups
 })
 
-// Calculate subject statistics for performance cards
-const subjectStats = computed(() => {
-  const stats = {}
-  
-  Object.entries(groupedBySubject.value).forEach(([subject, questions]) => {
-    const total = questions.length
-    const correct = questions.filter(q => q.isCorrect).length
-    const wrong = questions.filter(q => q.chosen && !q.isCorrect).length
-    
-    stats[subject] = {
-      total,
-      correct,
-      wrong
-    }
-  })
-  
-  return stats
-})
-
-
 function formatTime(seconds) { 
   if(!seconds) return '0s'
   const m = Math.floor(seconds/60)
   const s = Math.floor(seconds%60)
-  return `${m}m ${s}s` 
+  return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
 
-function getQuestionStatusClass(q) {
-  if (q.isCorrect) return 'bg-green-100 text-green-700 border border-green-200'
-  if (q.chosen) return 'bg-red-100 text-red-700 border border-red-200'
-  return 'bg-gray-100 text-gray-600 border border-gray-200'
+function getCardClass(q) {
+  if (q.isCorrect) return 'bg-green-50/60 border-green-200/70'
+  if (q.chosen) return 'bg-red-50/60 border-red-200/70'
+  return 'bg-gray-50/60 border-gray-200/70'
+}
+
+function getQNumberClass(q) {
+  if (q.isCorrect) return 'bg-green-500 text-white'
+  if (q.chosen) return 'bg-red-500 text-white'
+  return 'bg-gray-300 text-white'
+}
+
+function getStatusBadgeClass(q) {
+  if (q.isCorrect) return 'bg-green-100 text-green-700'
+  if (q.chosen) return 'bg-red-100 text-red-700'
+  return 'bg-gray-100 text-gray-500'
 }
 
 function getQuestionStatusText(q) {
@@ -279,7 +217,7 @@ function getQuestionStatusText(q) {
 }
 
 function getAnswerTextColor(q) {
-  if (!q.chosen) return 'text-gray-500'
+  if (!q.chosen) return 'text-gray-400'
   return q.isCorrect ? 'text-green-600' : 'text-red-600'
 }
 
@@ -312,3 +250,13 @@ function getTotalTime() {
   return formatTime(total)
 }
 </script>
+
+<style scoped>
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out both;
+}
+</style>

@@ -1,31 +1,48 @@
 # TestJEE Full Exam UI
 
-A full-fledged mock exam UI that replicates the NTA JEE Main environment, styled with TestJEE branding. This project includes a complete student authentication system, exam session management, and result tracking.
+A full-fledged mock exam platform that replicates the NTA JEE Main environment, styled with TestJEE branding. Includes student authentication, exam sessions, detailed analytics, and result tracking.
 
 ## Recent Updates (Feb 2026)
-- **Enhanced UI**: Completely redesigned Login and Student Dashboard with a professional "Light Blue & White" theme and glassmorphism effects.
-- **Animations**: Added smooth entrance animations for a better user experience.
-- **Logout Functionality**: Added prominent logout buttons and ensured session persistence.
-- **Navigation**: Added "Back to Home" button on the login page.
+- **Dashboard v2**: Rotating motivational quotes, Score Trend chart (vue-chartjs), redesigned stats cards
+- **Editable Profile**: Settings page now lets students edit name, mobile, class, school/coaching, and target year
+- **Results Redesign**: Glassmorphism cards, color-coded question cards, gradient summary banner
+- **Password Auth**: Full email + password login/signup with password reset flow (replaces magic link)
+- **Layout**: JEE Main-inspired student portal with sidebar navigation and top navbar logout
+- **Animations**: Smooth entrance animations and hover effects throughout
+
+---
 
 ## 🎯 Features
 
 ### Authentication & User Management
-- **Magic Link Login**: Passwordless authentication via email (Supabase Auth).
-- **Student Profiles**: Automatic profile creation with name persistence.
-- **Secure Sessions**: Row Level Security (RLS) ensures students access only their own data.
-- **Data Privacy**: Strict separation of student data.
+- **Email + Password**: Sign up, sign in, password reset via Supabase Auth
+- **Student Profiles**: Automatic profile creation, editable fields (name, mobile, class, school, target year)
+- **Secure Sessions**: Row Level Security (RLS) — students access only their own data
+- **Auth Callback**: Handles email verification redirect flow
+
+### Student Dashboard
+- **Motivational Quotes**: Random JEE quotes rotating every 8 seconds
+- **Score Trend Chart**: Line chart showing exam score progression (vue-chartjs)
+- **Stats Cards**: Total exams, best score, average score, accuracy
+- **Exam History**: Chronological list with score, attempt count, duration
+- **Quick Start**: Exam type modal (Full Mock / Subject-wise coming soon)
 
 ### Core Exam Functionality
-- **NTA-Exact Layout**: Pixel-perfect replica of the official NTA exam interface.
-- **Strict Mode**: Simulates real exam conditions (auto-submit on timer end, one active session).
-- **Timer System**: Server-side time calculation to prevent exploits (refresh/reset protection).
-- **Question Palette**: Real-time status tracking (Visited, Answered, Marked for Review).
-- **Offline Resilience**: Answers saved to `localStorage` for instant recovery on refresh.
+- **NTA-Exact Layout**: Pixel-perfect replica of the official NTA exam interface
+- **Strict Mode**: Auto-submit on timer end, one active session per student
+- **Timer System**: Server-side time calculation (refresh/reset protection)
+- **Question Palette**: Real-time status tracking (Visited, Answered, Marked for Review)
+- **Offline Resilience**: Answers saved to `localStorage` for instant recovery
 
-### TestJEE Branding
-- **Custom UI**: Phoenix-inspired logo and blue-based color scheme (`tailwind.config.js`).
-- **Responsive Design**: Optimized for desktop but mobile-friendly.
+### Results & Analytics
+- **Question Analysis**: Subject-wise breakdown with per-question status (correct/wrong/skipped)
+- **Subject Performance**: Progress bars, accuracy percentages, quick stat grids
+- **Overall Summary**: Total correct, wrong, unattempted, time spent
+
+### Settings
+- **Editable Profile**: Name, mobile, class (11th/12th/Dropper), school/coaching, target year
+- **Password Change**: In-app password update with validation
+- **Read-only Fields**: Email and account creation date
 
 ---
 
@@ -37,17 +54,13 @@ A full-fledged mock exam UI that replicates the NTA JEE Main environment, styled
 
 ### Installation
 ```bash
-# Clone the repository
-git clone https://github.com/vigneshbs33/GTA TestJEE-Web-App
-cd TestJEE-Web-App
+git clone https://github.com/not-vignesh-right/testjee.com
+cd Testjee.com_login_main_sthome_test
 
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 ```
-The app will open at `http://localhost:3000`.
+The app opens at `http://localhost:5173`.
 
 ### Build for Production
 ```bash
@@ -62,31 +75,31 @@ VITE_SUPABASE_URL=your-project-url
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-Update **Supabase Auth Redirect URL**:
-- Development: `http://localhost:3000/auth/callback`
-- Production: `https://yourdomain.com/auth/callback`
+Update **Supabase Auth Redirect URLs**:
+- Development: `http://localhost:5173/auth/callback`
+- Production: `https://login.testjee.com/auth/callback`
 
 ---
 
 ## 🗄️ Database & SQL
 
-The project uses Supabase (PostgreSQL). You must run the following SQL scripts in your Supabase SQL Editor to set up the schema, RLS policies, and triggers.
+The project uses Supabase (PostgreSQL). Run the following SQL in your Supabase SQL Editor.
 
-### 1. Main Schema & Auth (`supabase-migration.sql`)
-Sets up the `students` table linked to Supabase Auth and the `results` table.
-
+### 1. Students Table
 ```sql
--- Students Table
 CREATE TABLE IF NOT EXISTS public.students (
   student_id SERIAL PRIMARY KEY,
-  supabase_user_id UUID UNIQUE, -- Links to auth.users
+  supabase_user_id UUID UNIQUE,
   student_name TEXT NOT NULL,
   email_id TEXT NOT NULL UNIQUE,
+  mobile_number TEXT,
+  student_class TEXT,        -- '11th', '12th', 'Dropper'
+  school_name TEXT,
+  target_year TEXT,
   creation_date TIMESTAMPTZ DEFAULT NOW(),
   modification_date TIMESTAMPTZ DEFAULT NOW()
 );
 
--- RLS: Students can only view/edit their own profile
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Students can view own profile" ON public.students 
@@ -97,8 +110,33 @@ FOR UPDATE TO authenticated USING (auth.uid() = supabase_user_id);
 
 CREATE POLICY "Allow insert for authenticated users" ON public.students 
 FOR INSERT TO authenticated WITH CHECK (auth.uid() = supabase_user_id);
+```
 
--- Results Table
+### 2. Exam Sessions
+```sql
+CREATE TABLE IF NOT EXISTS public.exam_sessions (
+  session_id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL REFERENCES public.students(student_id) ON DELETE CASCADE,
+  exam_type TEXT NOT NULL DEFAULT 'JEE_MAIN_FULL',
+  start_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  end_time TIMESTAMPTZ,
+  total_duration_seconds INTEGER NOT NULL DEFAULT 10800,
+  is_submitted BOOLEAN DEFAULT FALSE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_session 
+ON public.exam_sessions (student_id, exam_type) WHERE is_submitted = FALSE;
+
+ALTER TABLE public.exam_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Students can view own sessions" ON public.exam_sessions 
+FOR SELECT TO authenticated USING (
+  student_id IN (SELECT student_id FROM public.students WHERE supabase_user_id = auth.uid())
+);
+```
+
+### 3. Results Table
+```sql
 ALTER TABLE public.results ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Students can view own results" ON public.results 
@@ -112,112 +150,60 @@ FOR INSERT TO authenticated WITH CHECK (
 );
 ```
 
-### 2. Exam Sessions & Timer Logic (`exam-session-migration.sql`)
-Prevents timer resets by tracking sessions on the server.
-
-```sql
-CREATE TABLE IF NOT EXISTS public.exam_sessions (
-  session_id SERIAL PRIMARY KEY,
-  student_id INTEGER NOT NULL REFERENCES public.students(student_id) ON DELETE CASCADE,
-  exam_type TEXT NOT NULL DEFAULT 'JEE_MAIN_FULL',
-  start_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  end_time TIMESTAMPTZ,
-  total_duration_seconds INTEGER NOT NULL DEFAULT 10800, -- 3 hours
-  is_submitted BOOLEAN DEFAULT FALSE
-);
-
--- Index & Unique Constraint (One active session per student)
-CREATE INDEX IF NOT EXISTS idx_exam_sessions_student_id ON public.exam_sessions(student_id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_session 
-ON public.exam_sessions (student_id, exam_type) WHERE is_submitted = FALSE;
-
--- RLS for Sessions
-ALTER TABLE public.exam_sessions ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Students can view own sessions" ON public.exam_sessions 
-FOR SELECT TO authenticated USING (
-  student_id IN (SELECT student_id FROM public.students WHERE supabase_user_id = auth.uid())
-);
-
--- Function to calculate remaining time
-CREATE OR REPLACE FUNCTION get_remaining_time(p_session_id INTEGER)
-RETURNS INTEGER AS $$
-DECLARE
-  v_start_time TIMESTAMPTZ;
-  v_total_duration INTEGER;
-  v_elapsed_seconds INTEGER;
-BEGIN
-  SELECT start_time, total_duration_seconds INTO v_start_time, v_total_duration
-  FROM exam_sessions WHERE session_id = p_session_id;
-  
-  IF NOT FOUND THEN RETURN NULL; END IF;
-  
-  v_elapsed_seconds := EXTRACT(EPOCH FROM (NOW() - v_start_time))::INTEGER;
-  RETURN GREATEST(0, v_total_duration - v_elapsed_seconds);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-```
-
-### 3. Cleanup & Fixes
-- **Stuck Sessions**: If a student is stuck (e.g., timer expired but not submitted), run:
+### Cleanup: Stuck Sessions
 ```sql
 UPDATE exam_sessions SET is_submitted = TRUE 
 WHERE is_submitted = FALSE AND EXTRACT(EPOCH FROM (NOW() - start_time)) > total_duration_seconds;
 ```
-- **Fix RLS Blocking**: If you see "Row Level Security" errors, re-run the RLS policies above.
 
 ---
 
 ## 🏗️ Architecture
 
-### User Flow
-1. **Login**: User enters Name + Email → Name stored in `localStorage` → Magic Link sent.
-2. **Auth Callback**: User clicks link → `fetchOrCreateStudent()` called.
-   - Checks if `supabase_user_id` exists in `students` table.
-   - If **Yes**: Fetches profile.
-   - If **No**: Creates new student record using name from `localStorage`.
-3. **Exam Start**: `initializeSession()` checks for active session.
-   - **New**: Creates session with `start_time`.
-   - **Existing**: Resumes session, calculates legitimate remaining time.
-4. **During Exam**:
-   - Answers saved instantly to `localStorage`.
-   - Timer counts down locally but validated against server `start_time` on refresh.
-5. **Submit**: `submitExam()` sends results to DB + marks session as `is_submitted = TRUE`.
+### Tech Stack
+| Layer | Technology |
+|-------|-----------|
+| Framework | Vue 3 (Composition API) |
+| Build | Vite |
+| State | Pinia |
+| Routing | Vue Router |
+| Styling | Tailwind CSS |
+| Backend | Supabase (Auth + PostgreSQL) |
+| Charts | vue-chartjs / Chart.js |
 
-### Data Store (Pinia)
-- **`authStore.js`**: Manages user session, student profile, and name persistence.
-- **`examStore.js`**: Manages questions, user answers, and timer logic.
+### User Flow
+1. **Login**: Email + password signup/signin → `fetchOrCreateStudent()` syncs profile
+2. **Dashboard**: Stats, score chart, motivational quotes, start exam CTA
+3. **Exam**: NTA-style interface with timer, question palette, auto-submit
+4. **Results**: Score + detailed question analysis per subject
+5. **Settings**: Edit profile fields, change password
+
+### Data Stores (Pinia)
+- **`authStore.js`**: User session, student profile, login/signup/logout, profile updates
+- **`examStore.js`**: Questions, answers, timer logic, session management, results
 
 ---
 
 ## ❓ Troubleshooting
 
-### Name Shows "Student" Instead of Name
-- **Cause**: `localStorage` cleared or different domain usage (localhost vs 127.0.0.1).
-- **Fix**: Login again using the exact same domain. Ensure `fetchOrCreateStudent()` is called in `AuthCallback.vue`.
-
-### Timer Resets on Refresh
-- **Cause**: Database session tracking not working.
-- **Fix**: Ensure `exam-session-migration.sql` was run. Check `examStore.initializeSession()` logs.
-
-### "No API Key" or 406 Error
-- **Cause**: RLS policies blocking access.
-- **Fix**: Re-run the RLS policy SQL blocks. Ensure policies are `TO authenticated`.
-
-### Duplicate Student Records
-- **Cause**: Missing `UNIQUE` constraint on `supabase_user_id`.
-- **Fix**: Run `ALTER TABLE public.students ADD CONSTRAINT students_supabase_user_id_unique UNIQUE (supabase_user_id);`.
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| Name shows "Student" | localStorage cleared | Login again; `fetchOrCreateStudent()` re-syncs |
+| Timer resets on refresh | Session tracking not set up | Run exam session migration SQL |
+| RLS / 406 errors | Missing RLS policies | Re-run policy SQL blocks |
+| Duplicate students | Missing UNIQUE constraint | `ALTER TABLE students ADD CONSTRAINT students_supabase_user_id_unique UNIQUE (supabase_user_id)` |
 
 ---
 
 ## 📦 Deployment Checklist
 
-- [ ] **Database**: Migration SQL executed in Supabase.
-- [ ] **Env Vars**: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
-- [ ] **Auth**: Redirect URLs configured in Supabase (Development & Production).
-- [ ] **RLS**: Policies enabled for `students`, `results`, `exam_sessions`.
-- [ ] **Build**: `npm run build` passes without errors.
+- [ ] Migration SQL executed in Supabase (students, sessions, results)
+- [ ] New columns added: `student_class`, `school_name`, `target_year`, `mobile_number`
+- [ ] Env vars set: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- [ ] Auth redirect URLs configured (dev + production)
+- [ ] RLS enabled on `students`, `results`, `exam_sessions`
+- [ ] `npm run build` passes
 
 ---
 
-**Built for Gyan-edge Testing Agency**
+**Built for Gyan-edge Testing Agency (GTA)**

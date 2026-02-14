@@ -1,124 +1,138 @@
 # TESTJEE Codebase Context Report
 
 ## 1. Project Overview
-**Application**: TestJEE Mock Exam UI - NTA JEE Main replica
-**Tech Stack**:
-- **Framework**: Vue 3 (Composition API)
-- **Build Tool**: Vite
-- **State Management**: Pinia
-- **Routing**: Vue Router
-- **Styling**: Tailwind CSS
-- **Backend/Database**: Supabase (Auth + Postgres)
+**Application**: TestJEE Mock Exam Platform — NTA JEE Main replica  
+**Live URL**: `https://login.testjee.com`  
+**Tech Stack**: Vue 3 (Composition API) + Vite + Pinia + Vue Router + Tailwind CSS + Supabase
 
-## 2. Architecture & Folder Structure
-- `src/main.js`: Entry point, initializes Vue, Pinia, Router.
-- `src/App.vue`: Root component, handles layout.
-- `src/lib/supabase.js`: Supabase client initialization (configured with URL and Anon Key).
-- `src/router/index.js`: Defines routes and navigation guards (`beforeEach` checks `auth.isAuthenticated`).
-- `src/stores/`: Pinia stores.
-  - `authStore.js`: Manages user session, login/logout, and profile syncing.
-  - `examStore.js`: Manages exam session, questions, answers, timer, and results.
-- `src/components/`:
-  - `Login.vue`: Entry page, currently implements Magic Link auth.
-  - `AuthCallback.vue`: Handles the redirect from magic link email.
-  - `Results.vue`: Student Dashboard (`/sthome`).
-  - `ResultsDetails.vue`: Detailed exam analysis (`/sthome/details`).
-  - `ExamLayout.vue`: The actual exam interface.
+## 2. Folder Structure
+```
+src/
+├── main.js                  # Entry point — Vue, Pinia, Router init
+├── App.vue                  # Root component
+├── style.css                # Global styles + Tailwind directives
+├── lib/supabase.js          # Supabase client initialization
+├── router/index.js          # Routes + auth guards
+├── data/quotes.js           # Motivational quotes array
+├── stores/
+│   ├── authStore.js         # Auth, profile, login/signup/logout
+│   └── examStore.js         # Exam session, questions, timer, results
+└── components/
+    ├── Login.vue             # Email + password login/signup
+    ├── AuthCallback.vue      # Email verification redirect handler
+    ├── ResetPassword.vue     # Password reset flow
+    ├── StudentLayout.vue     # Sidebar + navbar layout for /sthome
+    ├── Dashboard.vue         # Student dashboard (quotes, chart, stats)
+    ├── Results.vue           # Legacy results view (still available)
+    ├── ResultsDetails.vue    # Detailed question analysis per subject
+    ├── Settings.vue          # Editable profile + password change
+    ├── ExamLayout.vue        # NTA exam interface wrapper
+    ├── QuestionArea.vue      # Question display + answer input
+    ├── QuestionPalette.vue   # Question navigation sidebar
+    ├── LandingPage.vue       # Public landing / marketing page
+    ├── AboutPage.vue         # About page
+    ├── ContactPage.vue       # Contact page
+    ├── HeaderBar.vue         # Public page header
+    └── FooterNav.vue         # Public page footer
+```
 
-## 3. Current Authentication System (Magic Link)
-**Status**: Currently uses Supabase Magic Link (`signInWithOtp`).
+## 3. Authentication System (Password-Based)
+**Current**: Email + password via Supabase Auth (`signUpWithPassword`, `signInWithPassword`).
 
-### A. Login Flow (`src/components/Login.vue`)
-1. User enters **Full Name** and **Email**.
-2. on `login()`:
-   - Stores name in `localStorage` key `pendingStudentName`.
-   - Calls `supabase.auth.signInWithOtp({ email, options: { data: { name } } })`.
-   - Redirects to `/auth/callback`.
+### A. Login Flow (`Login.vue`)
+1. User enters **Name**, **Email**, **Mobile**, **Password**
+2. Sign Up → `authStore.signUpWithPassword()` → Supabase `signUp()` with user metadata
+3. Sign In → `authStore.signInWithPassword()` → `fetchOrCreateStudent()` syncs profile
+4. Redirects to `/sthome/dashboard`
 
-### B. Callback Handling (`src/components/AuthCallback.vue`)
-1. Triggered on page load (`onMounted`).
-2. Calls `auth.loadSession()` to retrieve Supabase session from URL fragment/cookie.
-3. Calls `auth.fetchOrCreateStudent()` to sync the `auth.users` record with the public `students` table.
-4. Redirects to `/sthome`.
+### B. Auth Store (`authStore.js`)
+- `signUpWithPassword(email, password, name, mobile)` — creates auth user + stores metadata
+- `signInWithPassword(email, password)` — authenticates + fetches profile
+- `resetPassword(email)` — sends password reset email
+- `updatePassword(newPassword)` — changes password
+- `updateStudentProfile(updates)` — updates `students` table fields
+- `fetchOrCreateStudent()` — syncs auth.users ↔ students table:
+  1. Finds by `supabase_user_id`
+  2. Fallback: finds by `email_id` and links
+  3. Creates new if neither found
+- `logout()` — signs out and clears state
 
-### C. Auth Store Logic (`src/stores/authStore.js`)
-- **`loadSession()`**: Wrapper around `supabase.auth.getSession()`.
-- **`fetchOrCreateStudent()`**: Critical syncing logic.
-  1. Gets `user.id` (Supabase Auth ID) and `user.email`.
-  2. Tries to find a row in `students` table by `supabase_user_id`.
-  3. **Fallback**: If not found by ID, searches by `email_id`.
-     - If found by email (legacy user), it UPDATES the record with the new `supabase_user_id` and name.
-  4. **Creation**: If neither found, INSERTS a new row into `students` table.
-     - `student_name`: From user metadata or `localStorage`.
-     - `email_id`: From user email.
-     - `supabase_user_id`: From auth user ID.
+### C. Auth Callback (`AuthCallback.vue`)
+Handles email verification redirect after signup. Loads session + syncs profile → redirects to `/sthome`.
 
-## 4. Protected Routes (`src/router/index.js`)
-- Routes with `meta: { requiresAuth: true }`: `/sthome`, `/sthome/details`, `/exam`.
-- **Global Guard**:
-  - Checks `auth.isAuthenticated`.
-  - If authenticated but `auth.studentProfile` is missing, awaits `auth.fetchOrCreateStudent()`.
-  - Redirects unauthenticated users to `/`.
+## 4. Routes (`router/index.js`)
+| Path | Component | Auth Required |
+|------|-----------|:---:|
+| `/` | LandingPage | ❌ |
+| `/login` | Login | ❌ |
+| `/auth/callback` | AuthCallback | ❌ |
+| `/auth/reset-password` | ResetPassword | ❌ |
+| `/about` | AboutPage | ❌ |
+| `/contact` | ContactPage | ❌ |
+| `/sthome` | StudentLayout (wrapper) | ✅ |
+| `/sthome/dashboard` | Dashboard | ✅ |
+| `/sthome/details` | ResultsDetails | ✅ |
+| `/sthome/settings` | Settings | ✅ |
+| `/exam` | ExamLayout | ✅ |
 
-## 5. Database Schema (Inferred)
-Based on usage in code:
+Global guard checks `auth.isAuthenticated` → redirects to `/login` if unauthenticated.
+
+## 5. Database Schema
 
 ### Table: `students`
-- `student_id` (Primary Key)
-- `student_name` (Text)
-- `email_id` (Text)
-- `supabase_user_id` (UUID, Foreign Key to `auth.users`)
-- `modification_date` (Timestamp)
+| Column | Type | Notes |
+|--------|------|-------|
+| `student_id` | SERIAL PK | Auto-increment |
+| `supabase_user_id` | UUID UNIQUE | Links to auth.users |
+| `student_name` | TEXT | |
+| `email_id` | TEXT UNIQUE | |
+| `mobile_number` | TEXT | |
+| `student_class` | TEXT | '11th', '12th', 'Dropper' |
+| `school_name` | TEXT | |
+| `target_year` | TEXT | |
+| `creation_date` | TIMESTAMPTZ | |
+| `modification_date` | TIMESTAMPTZ | |
 
 ### Table: `questions`
-- `question_id` (PK)
-- `subject_id`, `topic_id` (FKs)
-- `question_type` ('multiple_choice' or 'numeric')
-- `question_content` (JSON/Text)
-- `image_url` (Text, URL)
-- `external_reference` (Text)
-- `subjects` (Relation)
-- `topics` (Relation)
-- `choices` (Relation - `choice1`...`choice4`, `correct_answer`)
+| Column | Type |
+|--------|------|
+| `question_id` | PK |
+| `subject_id`, `topic_id` | FKs |
+| `question_type` | 'multiple_choice' / 'numeric' |
+| `question_content` | Text |
+| `image_url` | Text |
+| Relations: `subjects`, `topics`, `choices` | |
 
 ### Table: `exam_sessions`
-- `session_id` (PK)
-- `student_id` (FK to students)
-- `exam_type` (Text)
-- `start_time`, `end_time`
-- `is_submitted` (Boolean)
-- `total_duration_seconds` (Int)
+| Column | Type |
+|--------|------|
+| `session_id` | PK |
+| `student_id` | FK → students |
+| `exam_type` | Text |
+| `start_time`, `end_time` | Timestamptz |
+| `is_submitted` | Boolean |
+| `total_duration_seconds` | Integer (default 10800) |
 
 ### Table: `results`
-- `result_id` (PK)
-- `student_id` (FK)
-- `session_id` (FK)
-- `score` (Float)
-- `answers` (JSON - stores per-question answer data)
-- `creation_date` (Timestamp)
+| Column | Type |
+|--------|------|
+| `result_id` | PK |
+| `student_id`, `session_id` | FKs |
+| `score` | Float |
+| `answers` | JSON (per-question data) |
 
-## 6. Migration Objectives (Magic Link -> Password Auth)
-To switch to Username/Password Auth, the following changes are needed:
+## 6. Key Features by Component
 
-1.  **Frontend (`Login.vue`)**:
-    -   Replace "Send Magic Link" with **Email & Password** inputs.
-    -   Add toggle between **Sign In** and **Sign Up** modes.
-    -   **Sign Up**: Collect Name, Email, Password. Call `supabase.auth.signUp()`.
-    -   **Sign In**: Collect Email, Password. Call `supabase.auth.signInWithPassword()`.
+| Component | Key Features |
+|-----------|-------------|
+| **Dashboard** | Rotating motivational quotes, score trend chart (vue-chartjs), stats cards, exam type modal, exam history list |
+| **Settings** | Editable name/mobile/class/school/target year, read-only email, password change |
+| **ResultsDetails** | Overall summary banner, subject performance cards with progress bars, color-coded question grid |
+| **ExamLayout** | NTA-style interface, server-validated timer, question palette, auto-submit |
 
-2.  **Auth Store (`authStore.js`)**:
-    -   Add `loginWithPassword(email, password)` action.
-    -   Add `registerWithPassword(email, password, name)` action.
-    -   Update `fetchOrCreateStudent` (logic largely remains valid as it relies on `user.id`, but ensure it runs after registration/login).
-
-3.  **Router/Callback**:
-    -   `AuthCallback.vue` becomes obsolete for Password login (no redirect needed), but might still be needed if email confirmation is enabled in Supabase.
-    -   Direct redirect to `/sthome` after successful login/register.
-
-4.  **Supabase Config**:
-    -   Ensure "Email provider" is enabled in Supabase dashboard.
-    -   Ensure "Confirm email" setting matches desired flow (if enabled, user needs to verify email before login).
-
-## 7. Key Considerations
-- **Student Profile Sync**: The `fetchOrCreateStudent` logic is robust and should be preserved. It correctly links the Auth User (managed by Supabase) to the public `students` table data.
-- **LocalStorage**: Current magic link flow relies on `localStorage` to persist the user's name across the email redirect. With password auth, this is simpler as we have the name in memory during the session, but preserving it during sign-up is still good practice.
+## 7. Dependencies
+- `vue` 3.x, `vue-router`, `pinia`
+- `@supabase/supabase-js`
+- `tailwindcss`, `autoprefixer`, `postcss`
+- `vue-chartjs`, `chart.js`
+- `vite`

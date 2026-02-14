@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import ExamLayout from '../components/ExamLayout.vue'
 import StudentLayout from '../components/StudentLayout.vue'
 import Results from '../components/Results.vue'
+import Dashboard from '../components/Dashboard.vue'
 import ResultsDetails from '../components/ResultsDetails.vue'
 import ResetPassword from '../components/ResetPassword.vue'
 import { useExamStore } from '../stores/examStore'
@@ -21,7 +22,7 @@ const routes = [
     meta: { requiresAuth: true },
     children: [
       { path: '', redirect: 'dashboard' }, // Default redirect
-      { path: 'dashboard', name: 'Dashboard', component: Results },
+      { path: 'dashboard', name: 'Dashboard', component: Dashboard },
       { path: 'details', name: 'ResultsDetails', component: ResultsDetails },
       { path: 'settings', name: 'Settings', component: () => import('../components/Settings.vue') }
     ]

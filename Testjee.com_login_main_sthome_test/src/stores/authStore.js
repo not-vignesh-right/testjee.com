@@ -183,6 +183,31 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // Update student profile fields
+  async function updateStudentProfile(updates) {
+    try {
+      if (!studentProfile.value?.student_id) throw new Error('No student profile loaded')
+
+      const { data, error } = await supabase
+        .from('students')
+        .update({
+          ...updates,
+          modification_date: new Date().toISOString()
+        })
+        .eq('student_id', studentProfile.value.student_id)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      studentProfile.value = data
+      return { success: true }
+    } catch (error) {
+      console.error('Error updating student profile:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
   async function logout() {
     await supabase.auth.signOut()
     user.value = null
@@ -201,6 +226,7 @@ export const useAuthStore = defineStore('auth', () => {
     signInWithPassword,
     resetPassword,
     updatePassword,
+    updateStudentProfile,
     fetchOrCreateStudent,
     logout
   }
