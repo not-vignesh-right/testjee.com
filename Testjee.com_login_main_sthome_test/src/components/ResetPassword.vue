@@ -98,9 +98,8 @@ const message = ref('')
 const messageType = ref('')
 let authSubscription = null
 
-onMounted(() => {
-  // Supabase sends recovery tokens as URL hash fragments (#access_token=...&type=recovery)
-  // The Supabase JS client automatically parses these and fires a PASSWORD_RECOVERY event
+onMounted(async () => {
+  // Listen for PASSWORD_RECOVERY auth state change
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
       validToken.value = true
@@ -108,12 +107,31 @@ onMounted(() => {
   })
   authSubscription = subscription
 
-  // Also check if there's already an active session (page refresh scenario)
-  // by looking at the hash fragment manually as a fallback
+  // PKCE Flow (Supabase v2+): The reset link redirects with ?code=xxx
+  const urlParams = new URLSearchParams(window.location.search)
+  const code = urlParams.get('code')
+
+  if (code) {
+    try {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+      if (error) {
+        console.error('Code exchange error:', error)
+        validToken.value = false
+      } else {
+        // Session established — PASSWORD_RECOVERY event should fire from listener above
+        // But set it directly too as a safety measure
+        validToken.value = true
+      }
+    } catch (err) {
+      console.error('Code exchange failed:', err)
+      validToken.value = false
+    }
+    return
+  }
+
+  // Fallback: Hash fragment flow (older Supabase or implicit grant)
   const hash = window.location.hash
   if (hash && hash.includes('type=recovery')) {
-    // Supabase client will handle it via onAuthStateChange above
-    // but we set a timeout fallback in case the event already fired before listener was registered
     setTimeout(async () => {
       if (!validToken.value) {
         const { data: { session } } = await supabase.auth.getSession()
@@ -122,7 +140,11 @@ onMounted(() => {
         }
       }
     }, 1000)
+    return
   }
+
+  // No code and no hash — invalid link (user navigated here directly)
+  // validToken stays false
 })
 
 onUnmounted(() => {
@@ -137,7 +159,6 @@ function showMessage(msg, type) {
 }
 
 async function handleResetPassword() {
-  // Validation
   if (newPassword.value.length < 8) {
     showMessage('Password must be at least 8 characters long', 'error')
     return
