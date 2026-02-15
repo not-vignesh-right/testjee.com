@@ -80,14 +80,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
+import { supabase } from '../lib/supabase'
 
 const router = useRouter()
 const auth = useAuthStore()
 
-const validToken = ref(true)
+const validToken = ref(false)
 const loading = ref(false)
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
@@ -95,15 +96,38 @@ const newPassword = ref('')
 const confirmPassword = ref('')
 const message = ref('')
 const messageType = ref('')
+let authSubscription = null
 
 onMounted(() => {
-  // Check if there's a valid reset token in URL
-  const urlParams = new URLSearchParams(window.location.search)
-  const token = urlParams.get('token')
-  const type = urlParams.get('type')
-  
-  if (!token || type !== 'recovery') {
-    validToken.value = false
+  // Supabase sends recovery tokens as URL hash fragments (#access_token=...&type=recovery)
+  // The Supabase JS client automatically parses these and fires a PASSWORD_RECOVERY event
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      validToken.value = true
+    }
+  })
+  authSubscription = subscription
+
+  // Also check if there's already an active session (page refresh scenario)
+  // by looking at the hash fragment manually as a fallback
+  const hash = window.location.hash
+  if (hash && hash.includes('type=recovery')) {
+    // Supabase client will handle it via onAuthStateChange above
+    // but we set a timeout fallback in case the event already fired before listener was registered
+    setTimeout(async () => {
+      if (!validToken.value) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          validToken.value = true
+        }
+      }
+    }, 1000)
+  }
+})
+
+onUnmounted(() => {
+  if (authSubscription) {
+    authSubscription.unsubscribe()
   }
 })
 
