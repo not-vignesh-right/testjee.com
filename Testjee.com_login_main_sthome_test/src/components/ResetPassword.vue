@@ -99,15 +99,27 @@ const messageType = ref('')
 let authSubscription = null
 
 onMounted(async () => {
-  // Listen for PASSWORD_RECOVERY auth state change
+  // Listen for PASSWORD_RECOVERY auth state change (for hash fragment flow or late code exchange)
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'PASSWORD_RECOVERY') {
+    if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
       validToken.value = true
     }
   })
   authSubscription = subscription
 
-  // PKCE Flow (Supabase v2+): The reset link redirects with ?code=xxx
+  // CRITICAL FIX: Check if we already have a session.
+  // The router guard (beforeEach) calls loadSession(), which triggers Supabase to parse the URL
+  // and exchange the code/hash. By the time this component mounts, we might ALREADY be authenticated.
+  const { data: { session } } = await supabase.auth.getSession()
+  
+  if (session) {
+    console.log('Session found on mount:', session)
+    validToken.value = true
+    // If we have a session, we don't need to do manual code exchange
+    return 
+  }
+
+  // PKCE Flow (Supabase v2+): Manual exchange if not auto-handled yet
   const urlParams = new URLSearchParams(window.location.search)
   const code = urlParams.get('code')
 
@@ -116,35 +128,27 @@ onMounted(async () => {
       const { data, error } = await supabase.auth.exchangeCodeForSession(code)
       if (error) {
         console.error('Code exchange error:', error)
-        validToken.value = false
-      } else {
-        // Session established — PASSWORD_RECOVERY event should fire from listener above
-        // But set it directly too as a safety measure
+        // Don't set validToken=false yet, waiting for listener might still work
+      } else if (data.session) {
         validToken.value = true
       }
     } catch (err) {
       console.error('Code exchange failed:', err)
-      validToken.value = false
     }
     return
   }
 
-  // Fallback: Hash fragment flow (older Supabase or implicit grant)
+  // Fallback: Hash fragment flow
   const hash = window.location.hash
   if (hash && hash.includes('type=recovery')) {
     setTimeout(async () => {
       if (!validToken.value) {
         const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          validToken.value = true
-        }
+        if (session) validToken.value = true
       }
     }, 1000)
     return
   }
-
-  // No code and no hash — invalid link (user navigated here directly)
-  // validToken stays false
 })
 
 onUnmounted(() => {
