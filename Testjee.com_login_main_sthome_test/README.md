@@ -7,6 +7,8 @@ A full-fledged mock exam platform that replicates the NTA JEE Main environment, 
 - **Editable Profile**: Settings page now lets students edit name, mobile, class, school/coaching, and target year
 - **Results Redesign**: Glassmorphism cards, color-coded question cards, gradient summary banner
 - **Password Auth**: Full email + password login/signup with password reset flow (replaces magic link)
+- **Mock Exam Deduplication**: Advanced fetching logic to ensure students get unique questions in every attempt
+- **Intelligent Randomization**: Pool-based sampling (60 units fetched, 20 picked) for maximum variety
 - **Layout**: JEE Main-inspired student portal with sidebar navigation and top navbar logout
 - **Animations**: Smooth entrance animations and hover effects throughout
 

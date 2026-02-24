@@ -413,6 +413,7 @@ function getScoreColor(score) {
 
 function startExam(examType) {
   const examStore = useExamStore()
+  examStore.resetExamState() // Clear old submission state
   examStore.setExamType(examType || 'JEE_MAIN_FULL')
   showExamModal.value = false
   router.push('/exam')

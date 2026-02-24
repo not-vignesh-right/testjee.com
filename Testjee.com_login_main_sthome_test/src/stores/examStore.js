@@ -181,6 +181,35 @@ export const useExamStore = defineStore('exam', () => {
 
   const fetchExamData = async () => {
     try {
+      const authStore = useAuthStore()
+      if (!authStore.studentId) throw new Error('No student ID available')
+
+      console.log('fetchExamData: Starting...')
+
+      // 1. Get previously seen question IDs for this student
+      let excludedQuestionIds = []
+      try {
+        const { data: pastResults, error: resultsError } = await supabase
+          .from('results')
+          .select('answers')
+          .eq('student_id', authStore.studentId)
+
+        if (resultsError) {
+          console.error('fetchExamData: Error fetching past results:', resultsError)
+        } else if (pastResults) {
+          excludedQuestionIds = pastResults
+            .flatMap(r => r.answers || [])
+            .map(a => a?.question_id)
+            .filter(id => id != null)
+
+          excludedQuestionIds = [...new Set(excludedQuestionIds)]
+          console.log(`fetchExamData: Found ${excludedQuestionIds.length} unique seen IDs`)
+        }
+      } catch (err) {
+        console.error('fetchExamData: Catch in past results:', err)
+      }
+
+      // 2. Fetch subjects info
       const allSubjectNames = Array.from(new Set(Object.values(subjectNameSynonyms).flat()))
       const { data: subjectsData, error: subjectsError } = await supabase
         .from('subjects')
@@ -189,110 +218,156 @@ export const useExamStore = defineStore('exam', () => {
 
       if (subjectsError) throw subjectsError
 
-      const available = (subjectsData || [])
+      const availableSubjects = (subjectsData || [])
       const lookupIdFor = (canonicalName) => {
         const candidates = subjectNameSynonyms[canonicalName] || [canonicalName]
-        const found = available.find(s => candidates.includes(s.subject_name))
+        const found = availableSubjects.find(s => candidates.includes(s.subject_name))
         return found?.subject_id
+      }
+
+      const shuffleArray = (array) => {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]]
+        }
+        return array
       }
 
       const assembledQuestions = []
 
       for (const subjectName of subjectsOrder) {
         const subjectId = lookupIdFor(subjectName)
-        if (!subjectId) continue
+        if (!subjectId) {
+          console.warn(`fetchExamData: No ID for ${subjectName}`)
+          continue
+        }
 
-        // Section A: 20 MCQs with joined choices
-        const { data: mcqRows, error: mcqError } = await supabase
+        let subjectMcqs = []
+        let subjectNumericals = []
+
+        // --- Fetch MCQs ---
+        let mcqQuery = supabase
           .from('questions')
           .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name), choices(multi_choice, choice1, choice2, choice3, choice4, correct_answer)')
           .eq('subject_id', subjectId)
           .eq('question_type', 'multiple_choice')
-          .limit(20)
 
-        if (mcqError) throw mcqError
-        console.log(`Fetched ${mcqRows?.length || 0} MCQs for ${subjectName}`, mcqRows)
+        if (excludedQuestionIds.length > 0) {
+          // Wrap with parentheses to satisfy PostgREST IN filter requirement
+          mcqQuery = mcqQuery.not('question_id', 'in', `(${excludedQuestionIds.join(',')})`)
+        }
 
-        // Section B: 10 Numericals (no choices)
-        const { data: numRows, error: numError } = await supabase
+        const { data: mcqRows, error: mcqError } = await mcqQuery.limit(60)
+        if (mcqError) {
+          console.error(`fetchExamData: Error for ${subjectName} MCQs:`, mcqError)
+        } else {
+          subjectMcqs = shuffleArray(mcqRows || []).slice(0, 20)
+        }
+
+        // MCQ Fallback
+        if (subjectMcqs.length < 20) {
+          const currentPickedIds = subjectMcqs.map(q => q.question_id)
+          let fillQuery = supabase
+            .from('questions')
+            .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name), choices(multi_choice, choice1, choice2, choice3, choice4, correct_answer)')
+            .eq('subject_id', subjectId)
+            .eq('question_type', 'multiple_choice')
+
+          if (currentPickedIds.length > 0) {
+            fillQuery = fillQuery.not('question_id', 'in', `(${currentPickedIds.join(',')})`)
+          }
+
+          const { data: fillMcqs } = await fillQuery.limit(20 - subjectMcqs.length)
+          if (fillMcqs) subjectMcqs.push(...fillMcqs)
+        }
+
+        // --- Fetch Numericals ---
+        let numQuery = supabase
           .from('questions')
           .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
           .eq('subject_id', subjectId)
           .eq('question_type', 'numeric')
-          .limit(5)
 
-        if (numError) throw numError
-        console.log(`Fetched ${numRows?.length || 0} Numericals for ${subjectName}:`, numRows)
-
-        // Verify question types
-        if (numRows && numRows.length > 0) {
-          numRows.forEach((row, idx) => {
-            console.log(`  ${subjectName} Numerical #${idx + 1}: question_type="${row.question_type}", has_choices=${!!row.choices}`)
-          })
+        if (excludedQuestionIds.length > 0) {
+          numQuery = numQuery.not('question_id', 'in', `(${excludedQuestionIds.join(',')})`)
         }
 
-        // WARNING: If we didn't get 5 numericals, log it
-        if (!numRows || numRows.length < 5) {
-          console.warn(`⚠️ ${subjectName}: Expected 5 numerical questions, got ${numRows?.length || 0}. Check database question_type values!`)
+        const { data: numRows, error: numError } = await numQuery.limit(20)
+        if (numError) {
+          console.error(`fetchExamData: Error for ${subjectName} Numericals:`, numError)
+        } else {
+          subjectNumericals = shuffleArray(numRows || []).slice(0, 5)
         }
 
-        const transformQuestion = (row) => {
-          const topicName = row.topics?.topic_name || ''
-          const text = (row.question_content && (row.question_content.text || row.question_content.stem)) || row.external_reference || ''
-          const base = {
-            id: row.question_id,
-            text,
-            image_url: row.image_url || null,
-            subject: subjectName,
-            topic: topicName,
-            question_type: row.question_type
+        // Num Fallback
+        if (subjectNumericals.length < 5) {
+          const currentPickedIds = subjectNumericals.map(q => q.question_id)
+          let fillQuery = supabase
+            .from('questions')
+            .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
+            .eq('subject_id', subjectId)
+            .eq('question_type', 'numeric')
+
+          if (currentPickedIds.length > 0) {
+            fillQuery = fillQuery.not('question_id', 'in', `(${currentPickedIds.join(',')})`)
           }
-          if (row.question_type === 'multiple_choice') {
-            let c = row.choices || {}
-            const optText = (choice) => (choice && (choice.text || choice.label || choice.value)) || ''
-            return {
-              ...base,
-              options: [
-                { id: 'a', text: optText(c.choice1) },
-                { id: 'b', text: optText(c.choice2) },
-                { id: 'c', text: optText(c.choice3) },
-                { id: 'd', text: optText(c.choice4) }
-              ]
-            }
-          }
-          return { ...base, options: null }
+
+          const { data: fillNums } = await fillQuery.limit(5 - subjectNumericals.length)
+          if (fillNums) subjectNumericals.push(...fillNums)
         }
 
-        assembledQuestions.push(...(mcqRows || []).map(transformQuestion))
-        assembledQuestions.push(...(numRows || []).map(transformQuestion))
+        const transform = (row) => ({
+          id: row.question_id,
+          text: (row.question_content?.text || row.question_content?.stem) || row.external_reference || '',
+          image_url: row.image_url || null,
+          subject: subjectName,
+          topic: row.topics?.topic_name || '',
+          question_type: row.question_type,
+          options: row.question_type === 'multiple_choice' ? [
+            { id: 'a', text: row.choices?.choice1?.text || row.choices?.choice1 || '' },
+            { id: 'b', text: row.choices?.choice2?.text || row.choices?.choice2 || '' },
+            { id: 'c', text: row.choices?.choice3?.text || row.choices?.choice3 || '' },
+            { id: 'd', text: row.choices?.choice4?.text || row.choices?.choice4 || '' }
+          ] : null
+        })
+
+        assembledQuestions.push(...subjectMcqs.map(transform))
+        assembledQuestions.push(...subjectNumericals.map(transform))
       }
 
+      console.log(`fetchExamData: Done. Assembled ${assembledQuestions.length} questions.`)
       questions.value = assembledQuestions
 
-      // Initialize questionStatuses only for questions that don't have status yet
+      // Initialize statuses
       questions.value.forEach(q => {
         if (!questionStatuses.value[q.id]) {
-          questionStatuses.value[q.id] = {
-            visited: false,
-            answered: false,
-            marked: false
-          }
+          questionStatuses.value[q.id] = { visited: false, answered: false, marked: false }
         }
-        if (timeSpent.value[q.id] === undefined) {
-          timeSpent.value[q.id] = 0 // Initialize time spent for each question
-        }
+        if (timeSpent.value[q.id] === undefined) timeSpent.value[q.id] = 0
       })
 
-      // Only mark first question as visited if this is a fresh start
       const hasAnyAnswers = Object.keys(userAnswers.value).length > 0
       if (questions.value.length > 0 && !hasAnyAnswers) {
         questionStatuses.value[questions.value[0].id].visited = true
-        // Start timer for first question
         goToQuestion(0)
       }
     } catch (error) {
-      console.error('Failed to fetch exam data:', error)
+      console.error('fetchExamData: Critical failure:', error)
     }
+  }
+
+  const resetExamState = () => {
+    isSubmitted.value = false
+    questions.value = []
+    userAnswers.value = {}
+    questionStatuses.value = {}
+    sessionId.value = null
+    sessionStartTime.value = null
+    lastResult.value = null
+    remainingTime.value = 180 * 60
+    currentQuestionIndex.value = 0
+    numericDrafts.value = {}
+    timeSpent.value = {}
   }
 
   const saveAnswer = async (questionId, answer) => {
@@ -680,6 +755,7 @@ export const useExamStore = defineStore('exam', () => {
     // Actions
     initializeSession,
     fetchExamData,
+    resetExamState,
     saveAnswer,
     markForReview,
     clearResponse,
