@@ -98,27 +98,27 @@
         <div>
           <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button class="relative block w-full border-2 border-gray-300 border-dashed rounded-lg p-6 text-center hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors bg-white/50 cursor-not-allowed group">
-               <svg class="mx-auto h-8 w-8 text-gray-400 group-hover:text-gray-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button 
+              @click="router.push('/admin/sessions/new')"
+              class="relative block w-full border-2 border-gray-300 border-dashed rounded-lg p-6 text-center hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors bg-white group"
+            >
+               <svg class="mx-auto h-8 w-8 text-blue-500 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
               </svg>
-              <span class="mt-2 block text-sm font-medium text-gray-900">
-                Create New Test
-              </span>
-               <span class="absolute top-2 right-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                Coming Soon
+              <span class="mt-2 block text-sm font-bold text-gray-900">
+                Schedule Live Exam
               </span>
             </button>
             
-            <button class="relative block w-full border border-gray-200 rounded-lg p-6 text-center shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all bg-white cursor-not-allowed group">
-              <svg class="mx-auto h-8 w-8 text-gray-400 group-hover:text-gray-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button 
+              @click="router.push('/admin/sessions')"
+              class="relative block w-full border border-gray-200 rounded-lg p-6 text-center shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all bg-white group"
+            >
+              <svg class="mx-auto h-8 w-8 text-blue-500 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
               </svg>
-              <span class="mt-2 block text-sm font-medium text-gray-900">
-                View All Tests
-              </span>
-               <span class="absolute top-2 right-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                Coming Soon
+              <span class="mt-2 block text-sm font-bold text-gray-900">
+                View All Sessions
               </span>
             </button>
           </div>
