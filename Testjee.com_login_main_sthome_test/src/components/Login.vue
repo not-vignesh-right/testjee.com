@@ -15,6 +15,18 @@
       Back to Home
     </a>
 
+    <!-- Admin/Student Toggle Button (Top Right) -->
+    <div class="absolute top-6 right-6 z-20">
+      <button 
+        @click="toggleMode"
+        class="flex items-center gap-2 bg-white/80 hover:bg-white backdrop-blur-md px-5 py-2.5 rounded-full shadow-sm hover:shadow-md border border-gray-100 transition-all font-semibold text-gray-700 hover:text-blue-700"
+      >
+        <svg v-if="isAdminMode" class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>
+        <svg v-else class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+        {{ isAdminMode ? 'Student Login' : 'Admin Login' }}
+      </button>
+    </div>
+
     <!-- Main Card -->
     <div class="w-full max-w-5xl bg-white/70 backdrop-blur-xl rounded-3xl shadow-[0_8px_40px_rgb(0,0,0,0.06)] overflow-hidden relative z-10 flex flex-col md:flex-row border border-white/60 animate-fade-in-up">
       
@@ -66,7 +78,7 @@
       <!-- Right Side: Forms (White/Clean) -->
       <div class="md:w-1/2 bg-white/80 p-8 md:p-12 flex flex-col justify-center relative">
         <!-- Auth Toggle -->
-        <div class="flex p-1 bg-blue-50/80 rounded-xl mb-8 w-max mx-auto md:mx-0 animate-fade-in" style="animation-delay: 400ms;">
+        <div v-if="!isAdminMode" class="flex p-1 bg-blue-50/80 rounded-xl mb-8 w-max mx-auto md:mx-0 animate-fade-in" style="animation-delay: 400ms;">
           <button 
             @click="isSignUpMode = false"
             class="px-6 py-2 rounded-lg text-sm font-semibold transition-all duration-300"
@@ -83,7 +95,17 @@
           </button>
         </div>
 
-        <div class="mb-8 animate-fade-in" style="animation-delay: 500ms;">
+        <!-- Mode indicator header for Admin -->
+        <div v-if="isAdminMode" class="mb-8 animate-fade-in shrink-0">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm font-semibold mb-4 border border-indigo-100">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+            Secure Admin Access
+          </div>
+          <h2 class="text-3xl font-bold text-gray-900 mb-2">Admin Portal</h2>
+          <p class="text-gray-500">Manage your institute and tests.</p>
+        </div>
+
+        <div v-else class="mb-8 animate-fade-in" style="animation-delay: 500ms;">
           <h2 class="text-2xl font-bold text-gray-900 mb-2">
             {{ isSignUpMode ? 'Create an Account' : 'Welcome Back' }}
           </h2>
@@ -93,9 +115,31 @@
         </div>
 
         <!-- Forms -->
-        <form @submit.prevent="isSignUpMode ? handleSignUp() : handleSignIn()" class="space-y-5 animate-fade-in" style="animation-delay: 600ms;">
+        <form @submit.prevent="isAdminMode ? handleAdminLogin() : (isSignUpMode ? handleSignUp() : handleSignIn())" class="space-y-5 animate-fade-in" style="animation-delay: 600ms;">
           
-          <div v-if="isSignUpMode" class="form-group">
+          <!-- Admin Fields -->
+          <div v-if="isAdminMode" class="form-group">
+            <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Username</label>
+            <input 
+              v-model="adminData.username" 
+              type="text" 
+              class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all outline-none shadow-sm hover:border-blue-300 placeholder-gray-400"
+              placeholder="Enter admin username"
+            />
+          </div>
+
+          <div v-if="isAdminMode" class="form-group">
+            <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Password</label>
+            <input 
+              v-model="adminData.password" 
+              type="password" 
+              class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all outline-none shadow-sm hover:border-blue-300 placeholder-gray-400"
+              placeholder="Enter password"
+            />
+          </div>
+
+          <!-- Student Fields -->
+          <div v-if="!isAdminMode && isSignUpMode" class="form-group">
             <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Full Name</label>
             <input 
               v-model="signUpData.name" 
@@ -105,8 +149,7 @@
             />
           </div>
 
-          <!-- Email Field -->
-          <div v-if="isSignUpMode" class="form-group">
+          <div v-if="!isAdminMode && isSignUpMode" class="form-group">
             <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Email Address</label>
             <input 
               v-model="signUpData.email" 
@@ -115,7 +158,7 @@
               placeholder="student@example.com"
             />
           </div>
-          <div v-else class="form-group">
+          <div v-else-if="!isAdminMode" class="form-group">
             <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Email Address</label>
             <input 
               v-model="signInData.email" 
@@ -126,7 +169,7 @@
           </div>
 
           <!-- Password Field -->
-          <div v-if="isSignUpMode" class="form-group">
+          <div v-if="!isAdminMode && isSignUpMode" class="form-group">
             <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Password</label>
             <input 
               v-model="signUpData.password" 
@@ -135,7 +178,7 @@
               placeholder="••••••••"
             />
           </div>
-          <div v-else class="form-group">
+          <div v-else-if="!isAdminMode" class="form-group">
             <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Password</label>
             <input 
               v-model="signInData.password" 
@@ -145,7 +188,7 @@
             />
           </div>
 
-          <div v-if="isSignUpMode" class="form-group">
+          <div v-if="!isAdminMode && isSignUpMode" class="form-group">
              <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Confirm Password</label>
             <input 
               v-model="signUpData.confirmPassword" 
@@ -155,7 +198,7 @@
             />
           </div>
           
-           <div v-if="isSignUpMode" class="form-group">
+           <div v-if="!isAdminMode && isSignUpMode" class="form-group">
              <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Mobile Number</label>
             <input 
               v-model="signUpData.mobile" 
@@ -165,7 +208,7 @@
             />
           </div>
 
-          <div v-if="!isSignUpMode" class="flex justify-end">
+          <div v-if="!isAdminMode && !isSignUpMode" class="flex justify-end">
              <a @click="showForgotPassword = true" class="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer hover:underline transition-all">Forgot password?</a>
           </div>
 
@@ -178,7 +221,7 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            {{ loading ? 'Processing...' : (isSignUpMode ? 'Create Account' : 'Sign In') }}
+            {{ loading ? 'Processing...' : (isAdminMode ? 'Admin Login' : (isSignUpMode ? 'Create Account' : 'Sign In')) }}
           </button>
         </form>
 
@@ -236,12 +279,15 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
+import { useAdminStore } from '../stores/adminStore'
 import logo from '../assets/logo_test_jee.png'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const adminStore = useAdminStore()
 
 // State
+const isAdminMode = ref(false)
 const isSignUpMode = ref(false)
 const loading = ref(false)
 const showPassword = ref(false)
@@ -250,6 +296,11 @@ const showForgotPassword = ref(false)
 const message = ref('')
 const messageType = ref('') // 'success' or 'error'
 const resetEmail = ref('')
+
+const adminData = ref({
+  username: '',
+  password: ''
+})
 
 const signUpData = ref({
   name: '',
@@ -320,7 +371,36 @@ function showMessage(msg, type) {
   }, 5000)
 }
 
+function toggleMode() {
+  isAdminMode.value = !isAdminMode.value
+  isSignUpMode.value = false
+  message.value = ''
+  adminData.value = { username: '', password: '' }
+  signInData.value = { email: '', password: '' }
+  signUpData.value = { name: '', email: '', password: '', confirmPassword: '', mobile: '' }
+}
+
 // Handlers
+async function handleAdminLogin() {
+  if (!adminData.value.username.trim() || !adminData.value.password) {
+    showMessage('Please enter both username and password', 'error')
+    return
+  }
+
+  loading.value = true
+  const result = await adminStore.login(adminData.value.username, adminData.value.password)
+  loading.value = false
+
+  if (result.success) {
+    showMessage('Admin login successful! Redirecting...', 'success')
+    setTimeout(() => {
+      router.push('/admin/home')
+    }, 1000)
+  } else {
+    showMessage(result.error || 'Invalid username or password', 'error')
+  }
+}
+
 async function handleSignUp() {
   if (!validateSignUp()) return
   

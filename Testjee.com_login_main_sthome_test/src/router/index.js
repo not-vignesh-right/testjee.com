@@ -7,6 +7,7 @@ import ResultsDetails from '../components/ResultsDetails.vue'
 import ResetPassword from '../components/ResetPassword.vue'
 import { useExamStore } from '../stores/examStore'
 import { useAuthStore } from '../stores/authStore'
+import { useAdminStore } from '../stores/adminStore'
 
 const routes = [
   // Login is the root page of this app (served at /login/ via router base)
@@ -31,6 +32,14 @@ const routes = [
   // Settings alias for backward compatibility (optional, or just remove)
   { path: '/settings', redirect: '/sthome/settings' },
 
+  // Admin Routes
+  {
+    path: '/admin/home',
+    name: 'AdminHome',
+    component: () => import('../components/admin/AdminHome.vue'),
+    meta: { requiresAdminAuth: true }
+  },
+
   // Protected exam routes (Independent of Dashboard Layout for full screen focus)
   { path: '/exam', name: 'Exam', component: ExamLayout, meta: { requiresAuth: true } },
 
@@ -54,6 +63,17 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
   const examStore = useExamStore()
+  const adminStore = useAdminStore()
+
+  // Admin route protection
+  if (to.meta.requiresAdminAuth) {
+    await adminStore.loadSession()
+
+    if (!adminStore.isAuthenticated) {
+      return next('/')
+    }
+    return next()
+  }
 
   // Load session
   await auth.loadSession()
