@@ -26,16 +26,16 @@
           <div class="space-y-6">
             
             <div class="form-group">
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Test Template <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Exam Category <span class="text-red-500">*</span></label>
               <div class="relative">
                 <select 
-                  v-model="formData.admin_test_id" 
+                  v-model="formData.category_id" 
                   required
                   class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors appearance-none text-gray-700 font-medium"
                 >
-                  <option value="" disabled>Select a test...</option>
-                  <option v-for="test in availableTests" :key="test.admin_test_id" :value="test.admin_test_id">
-                    {{ test.test_name }} ({{ test.duration_minutes }} mins)
+                  <option value="" disabled>Select a category...</option>
+                  <option v-for="cat in availableCategories" :key="cat.category_id" :value="cat.category_id">
+                    {{ cat.category_name }}
                   </option>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
@@ -153,7 +153,7 @@ const adminStore = useAdminStore()
 
 const loading = ref(false)
 const errorMsg = ref('')
-const availableTests = ref([])
+const availableCategories = ref([])
 
 // Enforce min datetime to local current time
 const minDateTime = computed(() => {
@@ -163,7 +163,7 @@ const minDateTime = computed(() => {
 })
 
 const formData = ref({
-  admin_test_id: '',
+  category_id: '',
   session_name: '',
   start_time: minDateTime.value,
   duration_minutes: 180,
@@ -183,35 +183,24 @@ const isSubmitDisabled = computed(() => {
 })
 
 onMounted(async () => {
-  await fetchAvailableTests()
+  await fetchAvailableCategories()
 })
 
-const fetchAvailableTests = async () => {
+const fetchAvailableCategories = async () => {
   try {
-    const { data, error } = await supabase
-      .from('admin_tests')
-      .select('admin_test_id, test_name, duration_minutes')
-      .eq('admin_id', adminStore.adminProfile.admin_id)
-      .eq('is_active', true)
+    const { data, error } = await supabase.from('categories').select('*')
       
     if (error) throw error
-    availableTests.value = data || []
+    availableCategories.value = data || []
     
-    // Auto select first test if available
-    if (availableTests.value.length > 0) {
-      formData.value.admin_test_id = availableTests.value[0].admin_test_id
-      formData.value.duration_minutes = availableTests.value[0].duration_minutes
+    // Auto select first category if available
+    if (availableCategories.value.length > 0) {
+      formData.value.category_id = availableCategories.value[0].category_id
     }
   } catch (err) {
-    console.error('Error fetching tests:', err)
-    errorMsg.value = 'Failed to load test templates. Please refresh the page.'
+    console.error('Error fetching categories:', err)
+    errorMsg.value = 'Failed to load exam categories. Please refresh the page.'
   }
-}
-
-// Watch template select to update duration automatically
-const handleTestChange = () => {
-  const t = availableTests.value.find(t => t.admin_test_id === formData.value.admin_test_id)
-  if (t) formData.value.duration_minutes = t.duration_minutes
 }
 
 const handleCreateSession = async () => {
@@ -226,15 +215,63 @@ const handleCreateSession = async () => {
 
   try {
     const inputDate = new Date(formData.value.start_time)
+
+    // 1. Generate Question IDs for the session
+    const { data: subjectsData, error: subjectsError } = await supabase
+        .from('subjects')
+        .select('subject_id, subject_name')
+        .in('subject_name', ['Physics', 'Chemistry', 'Mathematics'])
     
-    const { data, error } = await supabase.rpc('create_live_exam_session', {
+    if (subjectsError) throw subjectsError
+    
+    const assembledQuestionIds = []
+    
+    for (const subjectName of ['Physics', 'Chemistry', 'Mathematics']) {
+      const subject = subjectsData.find(s => s.subject_name === subjectName)
+      if (!subject) continue
+      
+      // Fetch MCQs randomly
+      const { data: mcqs } = await supabase
+        .from('questions')
+        .select('question_id')
+        .eq('category_id', formData.value.category_id)
+        .eq('subject_id', subject.subject_id)
+        .eq('question_type', 'multiple_choice')
+        .limit(200)
+        
+      if (mcqs && mcqs.length) {
+         const shuffled = [...mcqs].sort(() => 0.5 - Math.random())
+         assembledQuestionIds.push(...shuffled.slice(0, 20).map(q => q.question_id))
+      }
+      
+      // Fetch Numericals randomly
+      const { data: nums } = await supabase
+        .from('questions')
+        .select('question_id')
+        .eq('category_id', formData.value.category_id)
+        .eq('subject_id', subject.subject_id)
+        .eq('question_type', 'numeric')
+        .limit(50)
+        
+      if (nums && nums.length) {
+         const shuffled = [...nums].sort(() => 0.5 - Math.random())
+         assembledQuestionIds.push(...shuffled.slice(0, 5).map(q => q.question_id))
+      }
+    }
+    
+    if (assembledQuestionIds.length === 0) {
+      throw new Error("No questions found for this Category. Add questions first.")
+    }
+    
+    // 2. Transmit to secure RPC wrapper
+    const { data, error } = await supabase.rpc('create_live_exam_session_custom', {
       input_admin_id: adminStore.adminProfile.admin_id,
-      input_admin_test_id: formData.value.admin_test_id,
       input_session_name: formData.value.session_name,
       input_start_time: inputDate.toISOString(),
       input_duration_minutes: formData.value.duration_minutes,
       input_num_students: formData.value.num_students,
-      input_instructions: formData.value.instructions
+      input_instructions: formData.value.instructions,
+      input_question_ids: assembledQuestionIds
     })
 
     if (error) throw error
