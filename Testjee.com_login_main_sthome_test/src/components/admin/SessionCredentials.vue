@@ -37,8 +37,8 @@
             <span class="block text-sm font-bold text-gray-500 mb-2 uppercase tracking-wider">Instructions For Students</span>
             <div class="bg-white p-4 rounded-lg border border-gray-200 text-gray-700 text-sm">
               <ol class="list-decimal pl-5 space-y-1">
-                <li>Visit <strong class="text-blue-600">testjee.com/live-exam/{{ meta.sessionCode }}</strong></li>
-                <li>Enter the session code, your unique Username, and Password assigned below.</li>
+                <li>Visit <strong class="text-blue-600">login.testjee.com/live-exam/{{ meta.sessionCode }}</strong></li>
+                <li>Enter the session code and your unique User ID assigned below.</li>
                 <li>Write your real Full Name and Roll Code accurately if prompted.</li>
                 <li>Wait in the lobby for the instructor to begin the exam dynamically.</li>
               </ol>
@@ -61,13 +61,8 @@
               {{ index + 1 }}
             </div>
             <div class="overflow-hidden">
-               <div class="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Username</div>
-               <div class="font-mono font-bold text-gray-900 text-base truncate">{{ cred.username }}</div>
-               
-               <div class="text-xs text-gray-500 uppercase tracking-wide mt-2 mb-0.5">Password</div>
-               <div class="font-mono font-bold text-gray-900 text-base flex items-center gap-2">
-                 {{ cred.password }}
-               </div>
+               <div class="text-xs text-gray-500 uppercase tracking-wide mb-0.5">User ID</div>
+               <div class="font-mono font-bold text-gray-900 text-base py-2 truncate">{{ cred.username }}</div>
             </div>
           </div>
           

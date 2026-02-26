@@ -55,19 +55,7 @@
               </div>
             </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <div class="mt-1">
-                <input 
-                  v-model="loginForm.password" 
-                  type="password" 
-                  required 
-                  autocomplete="off"
-                  class="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-colors text-gray-900 font-mono tracking-widest text-lg" 
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
+
 
             <div>
               <button 
@@ -152,8 +140,7 @@ const needsDetails = ref(false)
 
 const loginForm = ref({
   sessionCode: route.params.sessionCode || '',
-  username: '',
-  password: ''
+  username: ''
 })
 
 const detailsForm = ref({
@@ -168,8 +155,7 @@ const handleLogin = async () => {
   try {
     const res = await examStore.loginToExam(
       loginForm.value.sessionCode.trim().toUpperCase(), 
-      loginForm.value.username.trim(), 
-      loginForm.value.password.trim()
+      loginForm.value.username.trim()
     )
     
     if (!res.success) {

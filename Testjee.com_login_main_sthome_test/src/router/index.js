@@ -64,6 +64,7 @@ const routes = [
   },
 
   // Student Live Exam Routes (No global auth guard, custom component-level guards applied)
+  { path: '/live-exam', name: 'LiveExamLoginDirect', component: ExamLogin },
   { path: '/live-exam/:sessionCode', name: 'LiveExamLogin', component: ExamLogin },
   { path: '/live-exam/:sessionCode/lobby', name: 'LiveExamLobby', component: ExamWaitingRoom },
   { path: '/live-exam/:sessionCode/active', name: 'LiveExamActive', component: LiveExamInterface },

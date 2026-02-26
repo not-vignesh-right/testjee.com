@@ -60,12 +60,11 @@ export const useExamSessionStore = defineStore('examSession', () => {
     /**
      * 1. Login to Exam
      */
-    const loginToExam = async (sessionCode, username, password) => {
+    const loginToExam = async (sessionCode, username) => {
         try {
             const { data, error } = await supabase.rpc('student_exam_login', {
                 input_session_code: sessionCode,
-                input_username: username,
-                input_password: password
+                input_username: username
             })
 
             if (error) throw error
