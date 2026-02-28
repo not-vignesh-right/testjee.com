@@ -433,16 +433,13 @@ async function handleSignUp() {
     const approveLink = `${baseUrl}/admin-approve?name=${encodeURIComponent(signUpData.value.name)}&email=${encodeURIComponent(signUpData.value.email)}&pwd=${btoa(signUpData.value.password)}&mobile=${encodeURIComponent(signUpData.value.mobile)}&tests=${signUpData.value.numberOfTests}`;
     
     const emailPayload = {
-      _subject: "New Student Approval Request",
-      _cc:"chinmaypanghri@gmail.com",
-      StudentName: signUpData.value.name,
-      Email: signUpData.value.email,
-      StudentNumber: signUpData.value.mobile || 'Not Provided',
-      NumberOfTests: signUpData.value.numberOfTests,
-      ApproveLink: approveLink
+      name: signUpData.value.name,
+      email: signUpData.value.email,
+      message: `Admin Approval Required!\n\nName: ${signUpData.value.name}\nEmail: ${signUpData.value.email}\nMobile: ${signUpData.value.mobile || 'Not provided'}\nRequested Tests: ${signUpData.value.numberOfTests}\n\nClick here to approve this student:\n${approveLink}`,
+      _subject: "New Student Approval Request"
     };
 
-    const response = await fetch("https://formsubmit.co/ajax/chinpanmay1306@gmail.com", {
+    const response = await fetch("https://formspree.io/f/movjkyre", {
       method: "POST",
       headers: {
           "Content-Type": "application/json",
