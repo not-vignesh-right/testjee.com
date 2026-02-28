@@ -18,7 +18,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // NEW: Sign Up with Password
-  async function signUpWithPassword(email, password, name, mobile) {
+  async function signUpWithPassword(email, password, name, mobile, numberOfTests = 1) {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -27,7 +27,8 @@ export const useAuthStore = defineStore('auth', () => {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             name: name,
-            mobile: mobile
+            mobile: mobile,
+            tests: numberOfTests
           }
         }
       })
@@ -37,6 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Store in localStorage as backup
       localStorage.setItem('pendingStudentName', name)
       if (mobile) localStorage.setItem('pendingMobileNumber', mobile)
+      localStorage.setItem('pendingNumberOfTests', numberOfTests.toString())
 
       return { success: true, data }
     } catch (error) {
@@ -147,6 +149,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (!student) {
         const name = currentUser.user_metadata.name || localStorage.getItem('pendingStudentName') || 'Student'
         const mobile = currentUser.user_metadata.mobile || localStorage.getItem('pendingMobileNumber') || null
+        const tests = currentUser.user_metadata.tests || parseInt(localStorage.getItem('pendingNumberOfTests') || '1')
 
         const { data: newStudent, error: insertError } = await supabase
           .from('students')
@@ -154,6 +157,7 @@ export const useAuthStore = defineStore('auth', () => {
             student_name: name,
             email_id: userEmail,
             mobile_number: mobile,
+            number_of_tests: tests,
             supabase_user_id: supabaseUserId,
             creation_date: new Date().toISOString(),
             modification_date: new Date().toISOString()
@@ -171,6 +175,7 @@ export const useAuthStore = defineStore('auth', () => {
         // Clear localStorage
         localStorage.removeItem('pendingStudentName')
         localStorage.removeItem('pendingMobileNumber')
+        localStorage.removeItem('pendingNumberOfTests')
       }
 
       studentProfile.value = student

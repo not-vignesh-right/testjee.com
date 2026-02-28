@@ -156,6 +156,19 @@
           </div>
           
            <div v-if="isSignUpMode" class="form-group">
+             <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Number of Tests</label>
+            <select 
+              v-model="signUpData.numberOfTests" 
+              class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all outline-none shadow-sm cursor-pointer"
+            >
+              <option :value="1">1 Test</option>
+              <option :value="3">3 Tests</option>
+              <option :value="5">5 Tests</option>
+              <option :value="10">10 Tests</option>
+            </select>
+          </div>
+
+           <div v-if="isSignUpMode" class="form-group">
              <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Mobile Number</label>
             <input 
               v-model="signUpData.mobile" 
@@ -256,7 +269,8 @@ const signUpData = ref({
   email: '',
   password: '',
   confirmPassword: '',
-  mobile: ''
+  mobile: '',
+  numberOfTests: 1
 })
 
 const signInData = ref({
@@ -326,34 +340,58 @@ async function handleSignUp() {
   
   loading.value = true
   
-  const result = await authStore.signUpWithPassword(
-    signUpData.value.email,
-    signUpData.value.password,
-    signUpData.value.name,
-    signUpData.value.mobile
-  )
-  
-  loading.value = false
-  
-  if (result.success) {
+  // const result = await authStore.signUpWithPassword(
+  //   signUpData.value.email,
+  //   signUpData.value.password,
+  //   signUpData.value.name,
+  //   signUpData.value.mobile,
+  //   signUpData.value.numberOfTests
+  // )
+
+  try {
+    const baseUrl = window.location.origin
+    const approveLink = `${baseUrl}/admin-approve?name=${encodeURIComponent(signUpData.value.name)}&email=${encodeURIComponent(signUpData.value.email)}&pwd=${btoa(signUpData.value.password)}&mobile=${encodeURIComponent(signUpData.value.mobile)}&tests=${signUpData.value.numberOfTests}`;
+    
+    const emailPayload = {
+      _subject: "New Student Approval Request",
+      StudentName: signUpData.value.name,
+      Email: signUpData.value.email,
+      StudentNumber: signUpData.value.mobile || 'Not Provided',
+      NumberOfTests: signUpData.value.numberOfTests,
+      ApproveLink: approveLink
+    };
+
+    const response = await fetch("https://formsubmit.co/ajax/chinpanmay1306@gmail.com", {
+      method: "POST",
+      headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+      },
+      body: JSON.stringify(emailPayload)
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to send approval email');
+    }
+
+    loading.value = false
     showMessage(
-      `Verification email sent to ${signUpData.value.email}! Please check your inbox and click the verification link.`,
+      `Your request has been sent for admin approval. Please wait to be approved before logging in.`,
       'success'
     )
+    
     // Clear form
     signUpData.value = {
       name: '',
       email: '',
       password: '',
       confirmPassword: '',
-      mobile: ''
+      mobile: '',
+      numberOfTests: 1
     }
-  } else {
-    if (result.error.includes('already registered')) {
-      showMessage('This email is already registered. Please sign in instead.', 'error')
-    } else {
-      showMessage(result.error, 'error')
-    }
+  } catch (error) {
+    loading.value = false
+    showMessage(error.message || 'An error occurred while sending approval request', 'error')
   }
 }
 

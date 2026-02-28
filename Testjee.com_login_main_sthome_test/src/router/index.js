@@ -38,6 +38,7 @@ const routes = [
   { path: '/', name: 'Login', component: () => import('../components/Login.vue') },
   { path: '/auth/callback', name: 'AuthCallback', component: () => import('../components/AuthCallback.vue') },
   { path: '/auth/reset-password', name: 'ResetPassword', component: ResetPassword },
+  { path: '/admin-approve', name: 'AdminApprove', component: () => import('../components/AdminApprove.vue') },
 
   // Catch-all/Redirects
   { path: '/dashboard', redirect: '/sthome/dashboard' },

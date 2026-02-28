@@ -105,6 +105,7 @@ CREATE TABLE public.students (
   parent_name text,
   parent_number text,
   parent_email_id text,
+  number_of_tests integer DEFAULT 1,
   creation_date timestamp without time zone DEFAULT now(),
   modification_date timestamp without time zone DEFAULT now(),
   created_by text,
