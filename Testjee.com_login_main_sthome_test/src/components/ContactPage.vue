@@ -169,7 +169,7 @@
             
             <form 
               v-else
-              action="https://formsubmit.co/testjee.india@gmail.com" 
+              action="https://formsubmit.co/chinpanmay1306@gmail.com" 
               method="POST"
               @submit="handleSubmit"
               class="space-y-5"

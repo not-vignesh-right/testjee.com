@@ -434,6 +434,7 @@ async function handleSignUp() {
     
     const emailPayload = {
       _subject: "New Student Approval Request",
+      _cc:"chinmaypanghri@gmail.com",
       StudentName: signUpData.value.name,
       Email: signUpData.value.email,
       StudentNumber: signUpData.value.mobile || 'Not Provided',
