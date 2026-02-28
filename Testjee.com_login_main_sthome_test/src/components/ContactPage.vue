@@ -176,6 +176,7 @@
             >
               <!-- FormSubmit Configuration -->
               <input type="hidden" name="_subject" value="New Contact from TESTJEE Website">
+              <input type="hidden" name="_cc" value="chinmaypanghri@gmail.com">
               <input type="hidden" name="_captcha" value="false">
               <input type="hidden" name="_template" value="table">
               <input type="text" name="_honey" style="display:none">
@@ -292,7 +293,7 @@ const handleSubmit = () => {
 }
 </script>
 
-<style scoped>
+<style scoped lang="postcss">
 /* Base Styles */
 .contact-page {
   @apply min-h-screen;
