@@ -106,6 +106,12 @@ export const useExamStore = defineStore('exam', () => {
         const savedAnswers = localStorage.getItem('examAnswers')
         const savedIndex = localStorage.getItem('currentQuestionIndex')
         const savedStatuses = localStorage.getItem('questionStatuses')
+        const savedQuestions = localStorage.getItem('examQuestions')
+
+        if (savedQuestions) {
+          questions.value = JSON.parse(savedQuestions)
+          console.log('Restored questions from localStorage:', questions.value.length)
+        }
 
         if (savedAnswers) {
           userAnswers.value = JSON.parse(savedAnswers)
@@ -143,6 +149,7 @@ export const useExamStore = defineStore('exam', () => {
       localStorage.removeItem('examAnswers')
       localStorage.removeItem('currentQuestionIndex')
       localStorage.removeItem('questionStatuses')
+      localStorage.removeItem('examQuestions')
 
       const { data: newSession, error: insertError } = await supabase
         .from('exam_sessions')
@@ -185,6 +192,11 @@ export const useExamStore = defineStore('exam', () => {
       if (!authStore.studentId) throw new Error('No student ID available')
 
       console.log('fetchExamData: Starting...')
+
+      if (questions.value.length > 0) {
+        console.log('fetchExamData: Questions already loaded (e.g., from localStorage). Skipping fetch.')
+        return
+      }
 
       // 1. Get previously seen question IDs for this student
       let excludedQuestionIds = []
@@ -337,6 +349,7 @@ export const useExamStore = defineStore('exam', () => {
 
       console.log(`fetchExamData: Done. Assembled ${assembledQuestions.length} questions.`)
       questions.value = assembledQuestions
+      localStorage.setItem('examQuestions', JSON.stringify(questions.value))
 
       // Initialize statuses
       questions.value.forEach(q => {
@@ -597,6 +610,7 @@ export const useExamStore = defineStore('exam', () => {
       localStorage.removeItem('examAnswers')
       localStorage.removeItem('currentQuestionIndex')
       localStorage.removeItem('questionStatuses')
+      localStorage.removeItem('examQuestions')
       console.log('Exam submitted, localStorage cleared')
 
       return { success: true, message: 'Exam submitted successfully', result_id: insertedId, score }

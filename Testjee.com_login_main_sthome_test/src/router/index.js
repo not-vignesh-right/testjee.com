@@ -5,8 +5,26 @@ import Results from '../components/Results.vue'
 import Dashboard from '../components/Dashboard.vue'
 import ResultsDetails from '../components/ResultsDetails.vue'
 import ResetPassword from '../components/ResetPassword.vue'
+
+// --- Live Exam Components ---
+// Admin
+import ScheduleExam from '../components/admin/ScheduleExam.vue'
+import SessionCredentials from '../components/admin/SessionCredentials.vue'
+import AdminLiveSessions from '../components/admin/AdminLiveSessions.vue'
+import LiveExamMonitor from '../components/admin/LiveExamMonitor.vue'
+import ExamResults from '../components/admin/ExamResults.vue'
+
+// Student
+import ExamLogin from '../components/live-exam/ExamLogin.vue'
+import ExamWaitingRoom from '../components/live-exam/ExamWaitingRoom.vue'
+import LiveExamInterface from '../components/live-exam/LiveExamInterface.vue'
+import StudentResults from '../components/live-exam/StudentResults.vue'
+// ----------------------------
+
 import { useExamStore } from '../stores/examStore'
 import { useAuthStore } from '../stores/authStore'
+import { useAdminStore } from '../stores/adminStore'
+import { useExamSessionStore } from '../stores/examSessionStore'
 
 const routes = [
   // Login is the root page of this app (served at /login/ via router base)
@@ -30,6 +48,27 @@ const routes = [
 
   // Settings alias for backward compatibility (optional, or just remove)
   { path: '/settings', redirect: '/sthome/settings' },
+
+  // Admin Routes
+  {
+    path: '/admin',
+    meta: { requiresAdminAuth: true },
+    children: [
+      { path: 'home', name: 'AdminHome', component: () => import('../components/admin/AdminHome.vue') },
+      { path: 'sessions', name: 'AdminLiveSessions', component: AdminLiveSessions },
+      { path: 'sessions/new', name: 'ScheduleExam', component: ScheduleExam },
+      { path: 'sessions/:id/credentials', name: 'SessionCredentials', component: SessionCredentials },
+      { path: 'sessions/:id/monitor', name: 'LiveExamMonitor', component: LiveExamMonitor },
+      { path: 'sessions/:id/results', name: 'ExamResults', component: ExamResults }
+    ]
+  },
+
+  // Student Live Exam Routes (No global auth guard, custom component-level guards applied)
+  { path: '/live-exam', name: 'LiveExamLoginDirect', component: ExamLogin },
+  { path: '/live-exam/:sessionCode', name: 'LiveExamLogin', component: ExamLogin },
+  { path: '/live-exam/:sessionCode/lobby', name: 'LiveExamLobby', component: ExamWaitingRoom },
+  { path: '/live-exam/:sessionCode/active', name: 'LiveExamActive', component: LiveExamInterface },
+  { path: '/live-exam/:sessionCode/results', name: 'LiveExamResults', component: StudentResults },
 
   // Protected exam routes (Independent of Dashboard Layout for full screen focus)
   { path: '/exam', name: 'Exam', component: ExamLayout, meta: { requiresAuth: true } },
@@ -55,9 +94,26 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
   const examStore = useExamStore()
+  const adminStore = useAdminStore()
+
+  // Admin route protection
+  if (to.meta.requiresAdminAuth) {
+    await adminStore.loadSession()
+
+    if (!adminStore.isAuthenticated) {
+      return next('/')
+    }
+    return next()
+  }
 
   // Load session
   await auth.loadSession()
+
+  // Bypasses global auth constraints for the standalone live-exam system
+  // (live-exam system uses its own session codes and temp-student tokens mapped in examSessionStore and RLS functions)
+  if (to.path.startsWith('/live-exam')) {
+    return next()
+  }
 
   // Redirect if visiting login page while authenticated
   if (to.path === '/' && auth.isAuthenticated) {
