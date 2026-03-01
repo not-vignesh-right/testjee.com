@@ -293,6 +293,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import { useAdminStore } from '../stores/adminStore'
+import emailjs from '@emailjs/browser'
 import logo from '../assets/logo_test_jee.png'
 
 const router = useRouter()
@@ -419,36 +420,31 @@ async function handleSignUp() {
   if (!validateSignUp()) return
   
   loading.value = true
-  
-  // const result = await authStore.signUpWithPassword(
-  //   signUpData.value.email,
-  //   signUpData.value.password,
-  //   signUpData.value.name,
-  //   signUpData.value.mobile,
-  //   signUpData.value.numberOfTests
-  // )
 
   try {
-    const baseUrl = window.location.origin
-    const approveLink = `${baseUrl}/admin-approve?name=${encodeURIComponent(signUpData.value.name)}&email=${encodeURIComponent(signUpData.value.email)}&pwd=${btoa(signUpData.value.password)}&mobile=${encodeURIComponent(signUpData.value.mobile)}&tests=${signUpData.value.numberOfTests}`;
-    
-    const formData = new FormData()
-    formData.append('name', signUpData.value.name)
-    formData.append('email', signUpData.value.email)
-    formData.append('_subject', 'New Student Approval Request')
-    formData.append('message', `Admin Approval Required!\n\nName: ${signUpData.value.name}\nEmail: ${signUpData.value.email}\nMobile: ${signUpData.value.mobile || 'Not provided'}\nRequested Tests: ${signUpData.value.numberOfTests}\n\nClick here to approve this student:\n${approveLink}`)
+    // Always use production URL for the approval link (admin clicks this from their email)
+    const approveLink = `https://www.testjee.com/admin-approve?name=${encodeURIComponent(signUpData.value.name)}&email=${encodeURIComponent(signUpData.value.email)}&pwd=${btoa(signUpData.value.password)}&mobile=${encodeURIComponent(signUpData.value.mobile)}&tests=${signUpData.value.numberOfTests}`;
 
-    const response = await fetch("https://formspree.io/f/movjkyre", {
-      method: "POST",
-      headers: {
-          "Accept": "application/json"
-      },
-      body: formData
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to send approval email');
+    // Send email via EmailJS
+    // IMPORTANT: You must set up these IDs in your EmailJS dashboard (see instructions below)
+    const templateParams = {
+      student_name: signUpData.value.name,
+      student_email: signUpData.value.email,
+      student_mobile: signUpData.value.mobile || 'Not provided',
+      requested_tests: signUpData.value.numberOfTests,
+      approve_link: approveLink
     }
+
+    console.log('[TESTJEE] Sending approval email via EmailJS...')
+
+    const result = await emailjs.send(
+      'service_testjee',     // EmailJS Service ID (your Gmail)
+      'template_approval',   // EmailJS Template ID
+      templateParams,
+      'I9eXY3TayX67uR-3R'
+    )
+
+    console.log('[TESTJEE] EmailJS response:', result.status, result.text)
 
     loading.value = false
     showMessage(
@@ -467,7 +463,8 @@ async function handleSignUp() {
     }
   } catch (error) {
     loading.value = false
-    showMessage(error.message || 'An error occurred while sending approval request', 'error')
+    console.error('[TESTJEE] Approval email error:', error)
+    showMessage('Failed to send approval request. Please try again or contact us directly.', 'error')
   }
 }
 
@@ -484,13 +481,6 @@ async function handleSignIn() {
   loading.value = false
   
   if (result.success) {
-    // Check if email is verified
-    if (!result.data.user.email_confirmed_at) {
-      showMessage('Please verify your email before signing in. Check your inbox for the verification link.', 'error')
-      await authStore.logout()
-      return
-    }
-    
     showMessage('Sign in successful! Redirecting...', 'success')
     setTimeout(() => {
       router.push('/sthome')

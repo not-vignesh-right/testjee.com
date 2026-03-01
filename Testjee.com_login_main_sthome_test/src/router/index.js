@@ -127,12 +127,8 @@ router.beforeEach(async (to, from, next) => {
       return next('/')
     }
 
-    // Check if email is verified for protected routes
-    if (auth.user && !auth.user.email_confirmed_at) {
-      alert('Please verify your email before accessing this page.')
-      await auth.logout()
-      return next('/')
-    }
+    // Admin approval replaces email verification in this system
+    // No email_confirmed_at check needed
 
     // Load student profile if authenticated and not already loaded
     if (!auth.studentProfile) {

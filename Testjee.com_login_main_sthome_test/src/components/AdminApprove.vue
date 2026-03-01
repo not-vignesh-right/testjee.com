@@ -1,39 +1,49 @@
 <template>
   <div class="min-h-screen bg-[#F0F7FF] flex items-center justify-center p-4">
     <div class="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full text-center">
-      <h2 class="text-2xl font-bold mb-4 text-gray-800">Admin Approval</h2>
+      <!-- TESTJEE Branding -->
+      <div class="flex items-center justify-center gap-2 mb-6">
+        <img :src="logo" alt="TESTJEE" class="w-8 h-8 object-contain" />
+        <span class="text-lg font-bold text-blue-600">TESTJEE Admin</span>
+      </div>
+
+      <h2 class="text-2xl font-bold mb-4 text-gray-800">Student Approval</h2>
       
-      <div v-if="loading" class="flex flex-col items-center justify-center">
+      <!-- Loading State -->
+      <div v-if="loading" class="flex flex-col items-center justify-center py-6">
         <svg class="animate-spin h-10 w-10 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <p class="text-gray-600">Approving student...</p>
+        <p class="text-gray-600">Creating student account...</p>
       </div>
 
-      <div v-else-if="success" class="text-green-600">
-        <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-        </svg>
-        <h3 class="text-xl font-semibold mb-2">Student Approved Successfully!</h3>
-        <p class="text-gray-600">The account for {{ studentName }} has been created with {{ numberOfTests }} test(s).</p>
-        <p class="mt-4 font-medium">You can now ask the student to login.</p>
-        
-        <router-link to="/" class="mt-6 inline-block bg-blue-600 text-white font-medium py-2 px-6 rounded-lg hover:bg-blue-700 transition">
-          Go to Login
-        </router-link>
+      <!-- Success State -->
+      <div v-else-if="success" class="py-4">
+        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-semibold mb-2 text-green-700">Student Approved!</h3>
+        <div class="bg-gray-50 rounded-xl p-4 text-left mt-4 space-y-2">
+          <p class="text-sm"><span class="font-medium text-gray-700">Name:</span> <span class="text-gray-600">{{ studentName }}</span></p>
+          <p class="text-sm"><span class="font-medium text-gray-700">Email:</span> <span class="text-gray-600">{{ studentEmail }}</span></p>
+          <p class="text-sm"><span class="font-medium text-gray-700">Mobile:</span> <span class="text-gray-600">{{ studentMobile || 'Not provided' }}</span></p>
+          <p class="text-sm"><span class="font-medium text-gray-700">Tests:</span> <span class="text-gray-600">{{ numberOfTests }}</span></p>
+        </div>
+        <p class="mt-4 text-gray-600 text-sm">The student can now log in with their credentials. You can close this tab.</p>
       </div>
 
-      <div v-else class="text-red-600">
-        <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        <h3 class="text-xl font-semibold mb-2">Approval Failed</h3>
+      <!-- Error State -->
+      <div v-else class="py-4">
+        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-semibold mb-2 text-red-700">Approval Failed</h3>
         <p class="text-gray-600">{{ errorMessage }}</p>
-        
-        <router-link to="/" class="mt-6 inline-block bg-gray-200 text-gray-800 font-medium py-2 px-6 rounded-lg hover:bg-gray-300 transition">
-          Return Home
-        </router-link>
       </div>
     </div>
   </div>
@@ -42,44 +52,100 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useAuthStore } from '../stores/authStore'
+import { supabase } from '../lib/supabase'
+import logo from '../assets/logo_test_jee.png'
 
 const route = useRoute()
-const authStore = useAuthStore()
 
 const loading = ref(true)
 const success = ref(false)
 const errorMessage = ref('')
 const studentName = ref('')
+const studentEmail = ref('')
+const studentMobile = ref('')
 const numberOfTests = ref(1)
 
 onMounted(async () => {
   try {
     const { name, email, mobile, tests, pwd } = route.query
     if (!email || !pwd) {
-      throw new Error("Missing required approval parameters.")
+      throw new Error("Missing required approval parameters. The approval link might be invalid.")
     }
 
     studentName.value = name || 'Student'
+    studentEmail.value = email
+    studentMobile.value = mobile || ''
     numberOfTests.value = parseInt(tests) || 1
     const decodedPassword = atob(pwd)
 
-    // Attempt to register the student
-    const result = await authStore.signUpWithPassword(email, decodedPassword, studentName.value, mobile, numberOfTests.value)
-    
-    if (result.success) {
-      // Automatically log out so admin isn't accidentally logged in as the new user
-      await authStore.logout()
-      success.value = true
-    } else {
-      // If error contains username already taken
-      if (result.error.toLowerCase().includes('already registered') || result.error.includes('already taken')) {
-         errorMessage.value = "This user is already registered and approved."
-      } else {
-         errorMessage.value = result.error
+    console.log('[TESTJEE Admin] Approving student:', email)
+
+    // Step 1: Create the auth user in Supabase
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password: decodedPassword,
+      options: {
+        data: {
+          name: studentName.value,
+          mobile: mobile,
+          tests: numberOfTests.value
+        }
       }
+    })
+
+    if (authError) {
+      // Check if user already exists
+      if (authError.message.toLowerCase().includes('already registered') || authError.message.toLowerCase().includes('already taken')) {
+        throw new Error("This student is already registered and approved.")
+      }
+      throw authError
     }
+
+    console.log('[TESTJEE Admin] Auth user created:', authData.user?.id)
+
+    // Step 2: Create the student record in the students table directly
+    if (authData.user) {
+      const { error: insertError } = await supabase
+        .from('students')
+        .insert({
+          student_name: studentName.value,
+          email_id: email,
+          mobile_number: mobile || null,
+          number_of_tests: numberOfTests.value,
+          supabase_user_id: authData.user.id,
+          creation_date: new Date().toISOString(),
+          modification_date: new Date().toISOString()
+        })
+
+      if (insertError) {
+        // If student record already exists by email, that's fine
+        if (insertError.message?.includes('duplicate') || insertError.message?.includes('unique')) {
+          console.log('[TESTJEE Admin] Student record already exists, updating...')
+          await supabase
+            .from('students')
+            .update({
+              supabase_user_id: authData.user.id,
+              student_name: studentName.value,
+              number_of_tests: numberOfTests.value,
+              mobile_number: mobile || null,
+              modification_date: new Date().toISOString()
+            })
+            .eq('email_id', email)
+        } else {
+          console.error('[TESTJEE Admin] Insert error:', insertError)
+          throw new Error(`Failed to create student record: ${insertError.message}`)
+        }
+      }
+
+      console.log('[TESTJEE Admin] Student record created/updated successfully')
+    }
+
+    // Step 3: Sign out so admin's browser isn't logged in as the student
+    await supabase.auth.signOut()
+
+    success.value = true
   } catch (err) {
+    console.error('[TESTJEE Admin] Approval error:', err)
     errorMessage.value = err.message || "An unexpected error occurred."
   } finally {
     loading.value = false

@@ -169,14 +169,13 @@
             
             <form 
               v-else
-              action="https://formspree.io/f/movjkyre" 
+              action="https://formspree.io/f/xyzbrzwq" 
               method="POST"
               @submit="handleSubmit"
               class="space-y-5"
             >
               <!-- Form Configuration -->
-              <input type="hidden" name="_subject" value="New Contact from TESTJEE Website">
-              <input type="hidden" name="_cc" value="chinmaypanghri@gmail.com">
+              <input type="hidden" name="_subject" value="[TESTJEE] New Contact Message">
               
               <div class="grid sm:grid-cols-2 gap-5">
                 <div>
