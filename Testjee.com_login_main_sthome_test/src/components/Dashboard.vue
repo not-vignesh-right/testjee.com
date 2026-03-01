@@ -212,6 +212,44 @@
         </div>
       </div>
     </div>
+
+    <!-- Request More Tests Modal -->
+    <div v-if="showRestoreModal" class="fixed inset-0 z-50 overflow-y-auto" style="animation: fadeIn 0.2s ease-out">
+      <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" @click="showRestoreModal = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" style="animation: slideUp 0.3s ease-out">
+          <div class="text-center mb-6">
+            <div class="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-1">No Tests Remaining</h3>
+            <p class="text-sm text-gray-500">You've used all your available tests. Request more from the admin.</p>
+          </div>
+
+          <div class="mb-5">
+            <label class="block text-sm font-medium text-gray-700 mb-2">How many tests do you need?</label>
+            <select v-model="restoreTestCount" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all outline-none cursor-pointer">
+              <option :value="1">1 Test</option>
+              <option :value="3">3 Tests</option>
+              <option :value="5">5 Tests</option>
+              <option :value="10">10 Tests</option>
+            </select>
+          </div>
+
+          <div v-if="restoreMessage" :class="['mb-4 p-3 rounded-xl text-sm font-medium', restoreMessageType === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100']">
+            {{ restoreMessage }}
+          </div>
+
+          <div class="flex gap-3">
+            <button @click="showRestoreModal = false" class="flex-1 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+            <button @click="sendRestoreRequest" :disabled="restoreLoading" class="flex-1 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+              <svg v-if="restoreLoading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              {{ restoreLoading ? 'Sending...' : 'Send Request' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -221,6 +259,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import { useExamStore } from '../stores/examStore'
 import { supabase } from '../lib/supabase'
+import emailjs from '@emailjs/browser'
 import { getRandomQuote } from '../data/quotes'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler } from 'chart.js'
@@ -234,6 +273,11 @@ const studentProfile = computed(() => authStore.studentProfile)
 const examHistory = ref([])
 const loading = ref(true)
 const showExamModal = ref(false)
+const showRestoreModal = ref(false)
+const restoreTestCount = ref(3)
+const restoreLoading = ref(false)
+const restoreMessage = ref('')
+const restoreMessageType = ref('')
 
 // Motivational quote rotation
 const currentQuote = ref('')
@@ -411,12 +455,84 @@ function getScoreColor(score) {
   return 'text-red-500'
 }
 
-function startExam(examType) {
+async function startExam(examType) {
   const examStore = useExamStore()
+
+  // Check if student has tests remaining
+  const testsRemaining = authStore.studentProfile?.number_of_tests || 0
+  if (testsRemaining <= 0) {
+    showExamModal.value = false
+    showRestoreModal.value = true
+    restoreMessage.value = ''
+    return
+  }
+
+  // Decrement the number of tests in Supabase
+  try {
+    const { error } = await supabase
+      .from('students')
+      .update({
+        number_of_tests: testsRemaining - 1,
+        modification_date: new Date().toISOString()
+      })
+      .eq('student_id', authStore.studentProfile.student_id)
+
+    if (error) {
+      console.error('Failed to decrement test count:', error)
+      alert('Something went wrong. Please try again.')
+      return
+    }
+
+    // Update local profile to reflect the change
+    authStore.studentProfile.number_of_tests = testsRemaining - 1
+    console.log(`[TESTJEE] Tests remaining: ${testsRemaining - 1}`)
+  } catch (err) {
+    console.error('Error decrementing tests:', err)
+    alert('Something went wrong. Please try again.')
+    return
+  }
+
   examStore.resetExamState() // Clear old submission state
   examStore.setExamType(examType || 'JEE_MAIN_FULL')
   showExamModal.value = false
   router.push('/exam')
+}
+
+async function sendRestoreRequest() {
+  restoreLoading.value = true
+  restoreMessage.value = ''
+
+  try {
+    const studentName = authStore.studentProfile?.student_name || 'Student'
+    const studentEmail = authStore.studentProfile?.email_id || ''
+    const studentId = authStore.studentProfile?.student_id
+
+    const restoreLink = `https://www.testjee.com/admin-approve?action=restore&email=${encodeURIComponent(studentEmail)}&tests=${restoreTestCount.value}&name=${encodeURIComponent(studentName)}&sid=${studentId}`
+
+    const templateParams = {
+      student_name: studentName,
+      student_email: studentEmail,
+      student_mobile: `Student ID: ${studentId}`,
+      requested_tests: `${restoreTestCount.value} (Restore Request)`,
+      approve_link: restoreLink
+    }
+
+    await emailjs.send(
+      'service_testjee',
+      'template_approval',
+      templateParams,
+      'I9eXY3TayX67uR-3R'
+    )
+
+    restoreMessage.value = 'Request sent! The admin will review and restore your tests.'
+    restoreMessageType.value = 'success'
+  } catch (error) {
+    console.error('[TESTJEE] Restore request error:', error)
+    restoreMessage.value = 'Failed to send request. Please try again.'
+    restoreMessageType.value = 'error'
+  } finally {
+    restoreLoading.value = false
+  }
 }
 
 async function viewDetails(exam) {

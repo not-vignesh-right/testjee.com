@@ -25,14 +25,14 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
           </svg>
         </div>
-        <h3 class="text-xl font-semibold mb-2 text-green-700">Student Approved!</h3>
+        <h3 class="text-xl font-semibold mb-2 text-green-700">{{ isRestore ? 'Tests Restored!' : 'Student Approved!' }}</h3>
         <div class="bg-gray-50 rounded-xl p-4 text-left mt-4 space-y-2">
           <p class="text-sm"><span class="font-medium text-gray-700">Name:</span> <span class="text-gray-600">{{ studentName }}</span></p>
           <p class="text-sm"><span class="font-medium text-gray-700">Email:</span> <span class="text-gray-600">{{ studentEmail }}</span></p>
-          <p class="text-sm"><span class="font-medium text-gray-700">Mobile:</span> <span class="text-gray-600">{{ studentMobile || 'Not provided' }}</span></p>
+          <p v-if="!isRestore" class="text-sm"><span class="font-medium text-gray-700">Mobile:</span> <span class="text-gray-600">{{ studentMobile || 'Not provided' }}</span></p>
           <p class="text-sm"><span class="font-medium text-gray-700">Tests:</span> <span class="text-gray-600">{{ numberOfTests }}</span></p>
         </div>
-        <p class="mt-4 text-gray-600 text-sm">The student can now log in with their credentials. You can close this tab.</p>
+        <p class="mt-4 text-gray-600 text-sm">{{ isRestore ? `${numberOfTests} tests have been restored for this student. You can close this tab.` : 'The student can now log in with their credentials. You can close this tab.' }}</p>
       </div>
 
       <!-- Error State -->
@@ -59,6 +59,7 @@ const route = useRoute()
 
 const loading = ref(true)
 const success = ref(false)
+const isRestore = ref(false)
 const errorMessage = ref('')
 const studentName = ref('')
 const studentEmail = ref('')
@@ -67,15 +68,48 @@ const numberOfTests = ref(1)
 
 onMounted(async () => {
   try {
-    const { name, email, mobile, tests, pwd } = route.query
+    const { action, name, email, mobile, tests, pwd, sid } = route.query
+
+    studentName.value = name || 'Student'
+    studentEmail.value = email || ''
+    studentMobile.value = mobile || ''
+    numberOfTests.value = parseInt(tests) || 1
+
+    // ===== RESTORE TESTS FLOW =====
+    if (action === 'restore') {
+      if (!email && !sid) {
+        throw new Error("Missing required parameters for test restoration.")
+      }
+
+      console.log('[TESTJEE Admin] Restoring tests for:', email, '| Count:', numberOfTests.value)
+
+      // Update the student's number_of_tests
+      const updateQuery = supabase
+        .from('students')
+        .update({
+          number_of_tests: numberOfTests.value,
+          modification_date: new Date().toISOString()
+        })
+
+      // Match by student_id if available, otherwise by email
+      if (sid) {
+        await updateQuery.eq('student_id', parseInt(sid))
+      } else {
+        await updateQuery.eq('email_id', email)
+      }
+
+      console.log('[TESTJEE Admin] Tests restored successfully')
+      isRestore.value = true
+      success.value = true
+      loading.value = false
+      return
+    }
+
+    // ===== NEW STUDENT APPROVAL FLOW =====
     if (!email || !pwd) {
       throw new Error("Missing required approval parameters. The approval link might be invalid.")
     }
 
-    studentName.value = name || 'Student'
-    studentEmail.value = email
-    studentMobile.value = mobile || ''
-    numberOfTests.value = parseInt(tests) || 1
     const decodedPassword = atob(pwd)
 
     console.log('[TESTJEE Admin] Approving student:', email)
@@ -94,7 +128,6 @@ onMounted(async () => {
     })
 
     if (authError) {
-      // Check if user already exists
       if (authError.message.toLowerCase().includes('already registered') || authError.message.toLowerCase().includes('already taken')) {
         throw new Error("This student is already registered and approved.")
       }
@@ -103,7 +136,7 @@ onMounted(async () => {
 
     console.log('[TESTJEE Admin] Auth user created:', authData.user?.id)
 
-    // Step 2: Create the student record in the students table directly
+    // Step 2: Create the student record in the students table
     if (authData.user) {
       const { error: insertError } = await supabase
         .from('students')
@@ -118,7 +151,6 @@ onMounted(async () => {
         })
 
       if (insertError) {
-        // If student record already exists by email, that's fine
         if (insertError.message?.includes('duplicate') || insertError.message?.includes('unique')) {
           console.log('[TESTJEE Admin] Student record already exists, updating...')
           await supabase

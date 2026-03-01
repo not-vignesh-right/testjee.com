@@ -294,6 +294,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import { useAdminStore } from '../stores/adminStore'
 import emailjs from '@emailjs/browser'
+import { supabase } from '../lib/supabase'
 import logo from '../assets/logo_test_jee.png'
 
 const router = useRouter()
@@ -422,11 +423,21 @@ async function handleSignUp() {
   loading.value = true
 
   try {
+    // Check if this email is already registered (prevent duplicate approval emails)
+    // Uses a SECURITY DEFINER function to bypass RLS (only returns true/false)
+    const { data: emailExists } = await supabase
+      .rpc('check_email_exists', { check_email: signUpData.value.email.trim() })
+
+    if (emailExists) {
+      loading.value = false
+      showMessage('This email is already registered. Please sign in instead.', 'error')
+      return
+    }
+
     // Always use production URL for the approval link (admin clicks this from their email)
     const approveLink = `https://www.testjee.com/admin-approve?name=${encodeURIComponent(signUpData.value.name)}&email=${encodeURIComponent(signUpData.value.email)}&pwd=${btoa(signUpData.value.password)}&mobile=${encodeURIComponent(signUpData.value.mobile)}&tests=${signUpData.value.numberOfTests}`;
 
     // Send email via EmailJS
-    // IMPORTANT: You must set up these IDs in your EmailJS dashboard (see instructions below)
     const templateParams = {
       student_name: signUpData.value.name,
       student_email: signUpData.value.email,
@@ -438,8 +449,8 @@ async function handleSignUp() {
     console.log('[TESTJEE] Sending approval email via EmailJS...')
 
     const result = await emailjs.send(
-      'service_testjee',     // EmailJS Service ID (your Gmail)
-      'template_approval',   // EmailJS Template ID
+      'service_testjee',
+      'template_approval',
       templateParams,
       'I9eXY3TayX67uR-3R'
     )

@@ -28,6 +28,7 @@ export const useExamStore = defineStore('exam', () => {
   const currentStartTime = ref(null) // Timestamp when current question timer starts
   const lastResult = ref(null)
   const isSubmitted = ref(false)
+  const globalTimerInterval = ref(null) // Track the global 3-hour timer interval
   const allResults = ref([]) // All student results with sessions
   const statistics = ref(null) // Aggregate statistics
 
@@ -370,6 +371,16 @@ export const useExamStore = defineStore('exam', () => {
   }
 
   const resetExamState = () => {
+    // Clear ALL intervals to prevent timer stacking
+    if (globalTimerInterval.value) {
+      clearInterval(globalTimerInterval.value)
+      globalTimerInterval.value = null
+    }
+    if (currentTimer.value) {
+      clearInterval(currentTimer.value)
+      currentTimer.value = null
+    }
+
     isSubmitted.value = false
     questions.value = []
     userAnswers.value = {}
@@ -631,16 +642,21 @@ export const useExamStore = defineStore('exam', () => {
   }
 
   const startTimer = () => {
-    const timer = setInterval(() => {
+    // CRITICAL: Clear any existing global timer to prevent stacking
+    if (globalTimerInterval.value) {
+      clearInterval(globalTimerInterval.value)
+      globalTimerInterval.value = null
+    }
+
+    globalTimerInterval.value = setInterval(() => {
       if (remainingTime.value > 0) {
         remainingTime.value--
       } else {
-        clearInterval(timer)
+        clearInterval(globalTimerInterval.value)
+        globalTimerInterval.value = null
         submitExam()
       }
     }, 1000)
-
-    return timer
   } // The global timer of 3 hours
 
   const formatTime = (seconds) => {
