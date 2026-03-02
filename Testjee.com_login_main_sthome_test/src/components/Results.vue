@@ -585,7 +585,7 @@ async function sendRestoreRequest() {
     const studentEmail = authStore.studentProfile?.email_id || ''
     const studentId = authStore.studentProfile?.student_id
 
-    const restoreLink = `https://www.testjee.com/admin-approve?action=restore&email=${encodeURIComponent(studentEmail)}&tests=${restoreTestCount.value}&name=${encodeURIComponent(studentName)}&sid=${studentId}`
+    const restoreLink = `https://login.testjee.com/admin-approve?action=restore&email=${encodeURIComponent(studentEmail)}&tests=${restoreTestCount.value}&name=${encodeURIComponent(studentName)}&sid=${studentId}`
 
     const templateParams = {
       student_name: studentName,
