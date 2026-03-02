@@ -214,9 +214,24 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
-    await supabase.auth.signOut()
-    user.value = null
-    studentProfile.value = null
+    try {
+      await supabase.auth.signOut()
+    } catch (e) {
+      console.warn('Supabase sign out error (clearing local session forcefully):', e)
+    } finally {
+      // Fallback: Manually remove standard Supabase auth tokens from localStorage to be absolutely sure
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('sb-') && key.includes('-auth-token')) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch (err) { } // Ignore browser localStorage access errors
+
+      user.value = null
+      studentProfile.value = null
+    }
   }
 
   return {

@@ -459,6 +459,7 @@ async function handleSignUp() {
     // Define your list of admin emails here
     const adminEmails = [
       'vignesh.bs06@gmail.com',
+      'chinmaypanghri@gmail.com'
       // 'another.admin@example.com' // Add more admins here
     ]
 
