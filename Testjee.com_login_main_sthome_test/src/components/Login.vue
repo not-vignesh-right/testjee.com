@@ -444,10 +444,11 @@ async function handleSignUp() {
     )
 
     if (!authResult.success) {
-      if (authResult.error.includes('already registered')) {
+      const errorMsg = authResult.error || 'A network error occurred'
+      if (errorMsg.includes('already registered')) {
         showMessage('This email is already registered. Please sign in instead.', 'error')
       } else {
-        showMessage(authResult.error, 'error')
+        showMessage(errorMsg, 'error')
       }
       loading.value = false
       return
@@ -458,7 +459,7 @@ async function handleSignUp() {
 
     // Define your list of admin emails here
     const adminEmails = [
-      'vignesh.bs06@gmail.com',
+
       'chinmaypanghri@gmail.com'
       // 'another.admin@example.com' // Add more admins here
     ]
@@ -536,10 +537,11 @@ async function handleSignIn() {
       router.push('/sthome')
     }, 1000)
   } else {
-    if (result.error.includes('Invalid login credentials')) {
+    const errorMsg = result.error || 'A network error occurred. Please check your internet connection or disable ad-blockers.'
+    if (errorMsg.includes('Invalid login credentials')) {
       showMessage('Invalid email or password. Please try again.', 'error')
     } else {
-      showMessage(result.error, 'error')
+      showMessage(errorMsg, 'error')
     }
   }
 }
