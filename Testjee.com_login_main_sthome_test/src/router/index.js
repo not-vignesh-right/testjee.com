@@ -137,6 +137,7 @@ router.beforeEach(async (to, from, next) => {
         await auth.fetchOrCreateStudent()
       } catch (error) {
         console.error('Error fetching student profile:', error)
+        await auth.logout() // Fix infinite loop: clear invalid session
         return next('/')
       }
     }
