@@ -97,7 +97,8 @@ CREATE TABLE public.results (
 );
 CREATE TABLE public.students (
   student_id integer NOT NULL DEFAULT nextval('students_student_id_seq'::regclass),
-  supabase_user_id uuid UNIQUE,
+  supabase_user_id TEXT UNIQUE,
+  is_approved BOOLEAN DEFAULT false,
   student_name text NOT NULL,
   email_id text NOT NULL UNIQUE,
   mobile_number text,

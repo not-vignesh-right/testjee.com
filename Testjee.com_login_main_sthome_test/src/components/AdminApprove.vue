@@ -146,6 +146,7 @@ onMounted(async () => {
           mobile_number: mobile || null,
           number_of_tests: numberOfTests.value,
           supabase_user_id: authData.user.id,
+          is_approved: true,
           creation_date: new Date().toISOString(),
           modification_date: new Date().toISOString()
         })
@@ -160,6 +161,7 @@ onMounted(async () => {
               student_name: studentName.value,
               number_of_tests: numberOfTests.value,
               mobile_number: mobile || null,
+              is_approved: true,
               modification_date: new Date().toISOString()
             })
             .eq('email_id', email)

@@ -5,6 +5,7 @@ import Results from '../components/Results.vue'
 import Dashboard from '../components/Dashboard.vue'
 import ResultsDetails from '../components/ResultsDetails.vue'
 import ResetPassword from '../components/ResetPassword.vue'
+import WaitingApproval from '../components/WaitingApproval.vue'
 
 // --- Live Exam Components ---
 // Admin
@@ -77,7 +78,7 @@ const routes = [
   { path: '/', name: 'Login', component: () => import('../components/Login.vue') },
   { path: '/auth/callback', name: 'AuthCallback', component: () => import('../components/AuthCallback.vue') },
   { path: '/auth/reset-password', name: 'ResetPassword', component: ResetPassword },
-  { path: '/admin-approve', name: 'AdminApprove', component: () => import('../components/AdminApprove.vue') },
+  { path: '/waiting-approval', name: 'WaitingApproval', component: WaitingApproval },
 
   // Catch-all/Redirects
   { path: '/dashboard', redirect: '/sthome/dashboard' },
@@ -138,6 +139,11 @@ router.beforeEach(async (to, from, next) => {
         console.error('Error fetching student profile:', error)
         return next('/')
       }
+    }
+
+    // CHECK ADMIN APPROVAL
+    if (!auth.studentProfile?.is_approved && to.name !== 'WaitingApproval') {
+      return next({ name: 'WaitingApproval' })
     }
 
     // ========== EXAM SUBMISSION LOGIC ==========
