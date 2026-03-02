@@ -114,7 +114,9 @@ onMounted(async () => {
 
     console.log('[TESTJEE Admin] Approving student:', email)
 
-    // Step 1: Create the auth user in Supabase
+    // Step 1: Create or fetch the auth user in Supabase
+    let finalAuthUserId = null;
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password: decodedPassword,
@@ -129,41 +131,53 @@ onMounted(async () => {
 
     if (authError) {
       if (authError.message.toLowerCase().includes('already registered') || authError.message.toLowerCase().includes('already taken')) {
-        throw new Error("This student is already registered and approved.")
+        // This is EXPECTED because the student already signed up to verify email.
+        console.log('[TESTJEE Admin] User exists in Auth. Identifying user...');
+        
+        // We need their ID to update the students table.
+        // Easiest way as an admin is to sign in temporarily or just update the table by email.
+        // Since we are updating the students table by email anyway if duplicate, we can proceed.
+      } else {
+         throw authError
       }
-      throw authError
+    } else {
+        if(authData?.user) finalAuthUserId = authData.user.id;
     }
 
-    console.log('[TESTJEE Admin] Auth user created:', authData.user?.id)
+    console.log('[TESTJEE Admin] Auth user processed.');
 
-    // Step 2: Create the student record in the students table
-    if (authData.user) {
-      const { error: insertError } = await supabase
-        .from('students')
-        .insert({
+    // Step 2: Update or create the student record in the students table
+    if (true) { // Proceed regardless of auth signup error
+      const insertPayload = {
           student_name: studentName.value,
           email_id: email,
           mobile_number: mobile || null,
           number_of_tests: numberOfTests.value,
-          supabase_user_id: authData.user.id,
           is_approved: true,
-          creation_date: new Date().toISOString(),
           modification_date: new Date().toISOString()
+      };
+      
+      if(finalAuthUserId) insertPayload.supabase_user_id = finalAuthUserId;
+
+      const { error: insertError } = await supabase
+        .from('students')
+        .insert({
+          ...insertPayload,
+          creation_date: new Date().toISOString()
         })
 
       if (insertError) {
         if (insertError.message?.includes('duplicate') || insertError.message?.includes('unique')) {
           console.log('[TESTJEE Admin] Student record already exists, updating...')
+          
+          const updatePayload = {
+              ...insertPayload,
+              modification_date: new Date().toISOString()
+          }
+
           await supabase
             .from('students')
-            .update({
-              supabase_user_id: authData.user.id,
-              student_name: studentName.value,
-              number_of_tests: numberOfTests.value,
-              mobile_number: mobile || null,
-              is_approved: true,
-              modification_date: new Date().toISOString()
-            })
+            .update(updatePayload)
             .eq('email_id', email)
         } else {
           console.error('[TESTJEE Admin] Insert error:', insertError)

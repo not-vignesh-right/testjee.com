@@ -434,6 +434,25 @@ async function handleSignUp() {
       return
     }
 
+    // Trigger Supabase Sign Up so the student receives their verfication email
+    const authResult = await authStore.signUpWithPassword(
+      signUpData.value.email,
+      signUpData.value.password,
+      signUpData.value.name,
+      signUpData.value.mobile,
+      signUpData.value.numberOfTests
+    )
+
+    if (!authResult.success) {
+      if (authResult.error.includes('already registered')) {
+        showMessage('This email is already registered. Please sign in instead.', 'error')
+      } else {
+        showMessage(authResult.error, 'error')
+      }
+      loading.value = false
+      return
+    }
+
     // Always use production URL for the approval link (admin clicks this from their email)
     const approveLink = `https://login.testjee.com/admin-approve?name=${encodeURIComponent(signUpData.value.name)}&email=${encodeURIComponent(signUpData.value.email)}&pwd=${btoa(signUpData.value.password)}&mobile=${encodeURIComponent(signUpData.value.mobile)}&tests=${signUpData.value.numberOfTests}`;
 
