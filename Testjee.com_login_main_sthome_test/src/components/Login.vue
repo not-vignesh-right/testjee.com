@@ -456,26 +456,44 @@ async function handleSignUp() {
     // Always use production URL for the approval link (admin clicks this from their email)
     const approveLink = `https://login.testjee.com/admin-approve?name=${encodeURIComponent(signUpData.value.name)}&email=${encodeURIComponent(signUpData.value.email)}&pwd=${btoa(signUpData.value.password)}&mobile=${encodeURIComponent(signUpData.value.mobile)}&tests=${signUpData.value.numberOfTests}`;
 
-    // Send email via EmailJS
-    const templateParams = {
-      student_name: signUpData.value.name,
-      student_email: signUpData.value.email,
-      student_mobile: signUpData.value.mobile || 'Not provided',
-      requested_tests: signUpData.value.numberOfTests,
-      approve_link: approveLink,
-      admin_email: 'vignesh.bs06@gmail.com'
-    }
+    // Define your list of admin emails here
+    const adminEmails = [
+      'vignesh.bs06@gmail.com',
+      // 'another.admin@example.com' // Add more admins here
+    ]
 
-    console.log('[TESTJEE] Sending approval email via EmailJS...')
+    console.log(`[TESTJEE] Sending approval emails to ${adminEmails.length} admins via EmailJS...`)
 
-    const result = await emailjs.send(
-      'service_testjee',
-      'template_approval',
-      templateParams,
-      'I9eXY3TayX67uR-3R'
-    )
+    // Send an individual email to each admin in the list
+    const emailPromises = adminEmails.map(adminEmail => {
+      const templateParams = {
+        student_name: signUpData.value.name,
+        student_email: signUpData.value.email,
+        student_mobile: signUpData.value.mobile || 'Not provided',
+        requested_tests: signUpData.value.numberOfTests,
+        approve_link: approveLink,
+        admin_email: adminEmail
+      }
+      
+      return emailjs.send(
+        'service_testjee',
+        'template_approval',
+        templateParams,
+        'I9eXY3TayX67uR-3R'
+      )
+    })
 
-    console.log('[TESTJEE] EmailJS response:', result.status, result.text)
+    // Wait for all emails to be sent
+    const results = await Promise.allSettled(emailPromises)
+    
+    // Log results for debugging
+    results.forEach((res, index) => {
+      if (res.status === 'fulfilled') {
+        console.log(`[TESTJEE] Email to ${adminEmails[index]} sent successfully.`)
+      } else {
+        console.error(`[TESTJEE] Failed to send email to ${adminEmails[index]}:`, res.reason)
+      }
+    })
 
     loading.value = false
     showMessage(
