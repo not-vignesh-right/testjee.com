@@ -16,7 +16,7 @@
       <h2 class="text-3xl font-bold text-gray-900 mb-4">Pending Approval</h2>
       
       <p class="text-gray-600 mb-8 leading-relaxed">
-        Your registration request has been successfully submitted! An administrator is currently reviewing your account. You will be able to access the platform once your account is approved.
+        Your email has been successfully verified! However, an administrator is currently reviewing your account. You will be able to access the platform once your account is fully approved.
       </p>
 
       <div class="bg-blue-50 rounded-xl p-4 mb-8 text-sm text-blue-800 border border-blue-100 flex items-start gap-3 text-left">

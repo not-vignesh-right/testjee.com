@@ -462,7 +462,8 @@ async function handleSignUp() {
       student_email: signUpData.value.email,
       student_mobile: signUpData.value.mobile || 'Not provided',
       requested_tests: signUpData.value.numberOfTests,
-      approve_link: approveLink
+      approve_link: approveLink,
+      admin_email: 'vignesh.bs06@gmail.com'
     }
 
     console.log('[TESTJEE] Sending approval email via EmailJS...')
@@ -478,7 +479,7 @@ async function handleSignUp() {
 
     loading.value = false
     showMessage(
-      `Your request has been sent for admin approval. Please wait to be approved before logging in.`,
+      `Step 1 Complete: Please check your inbox and click the verification link. Step 2: An admin will review and approve your account.`,
       'success'
     )
     
