@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-import { h } from 'vue'
+import { h, computed } from 'vue'
 
 const props = defineProps({
   totalStudents: { type: Number, default: 0 },
@@ -62,7 +62,7 @@ const TestIcon = {
   }
 }
 
-const stats = [
+const stats = computed(() => [
   {
     label: 'Total Students',
     value: props.totalStudents,
@@ -99,5 +99,5 @@ const stats = [
     badge: null,
     badgeColor: ''
   }
-]
+])
 </script>

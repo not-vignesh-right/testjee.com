@@ -238,12 +238,12 @@ const filteredStudents = computed(() => {
 async function fetchStudents() {
   loading.value = true
   try {
-    const res = await fetch('/api/students')
-    if (!res.ok) {
-       const errText = await res.text()
-       throw new Error(`Failed to fetch: ${errText}`)
-    }
-    const data = await res.json()
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .order('creation_date', { ascending: false })
+
+    if (error) throw error
     students.value = data || []
   } catch (err) {
     console.error('Failed to fetch students:', err)

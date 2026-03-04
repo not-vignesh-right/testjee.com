@@ -7,11 +7,20 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIU
 // Instead, we interact with the PostgREST REST API directly using fetch().
 export const supabase = {
     from(tableName) {
-        const tableUrl = `${SUPABASE_URL}/rest/v1/${tableName}`
-        const headers = {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
+        const tablePath = `/rest/v1/${tableName}`
+
+        async function proxyRequest(endpoint, method, payload = null, headers = {}) {
+            try {
+                const res = await fetch('/api/proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ endpoint, method, payload, headers })
+                })
+                const data = await res.json()
+                return { data: res.ok ? data : null, error: res.ok ? null : data }
+            } catch (e) {
+                return { data: null, error: e }
+            }
         }
 
         return {
@@ -20,63 +29,34 @@ export const supabase = {
                     async eq(column, value) {
                         return {
                             async maybeSingle() {
-                                try {
-                                    const res = await fetch(`${tableUrl}?select=${query}&${column}=eq.${value}`, { headers })
-                                    const data = await res.json()
-                                    return { data: data[0] || null, error: res.ok ? null : data }
-                                } catch (e) { return { data: null, error: e } }
+                                const res = await proxyRequest(`${tablePath}?select=${query}&${column}=eq.${value}`, 'GET')
+                                return { data: res.data ? res.data[0] || null : null, error: res.error }
                             }
                         }
                     },
                     async in(column, arrayValues) {
-                        try {
-                            const arrStr = arrayValues.map(v => `"${v}"`).join(',')
-                            const res = await fetch(`${tableUrl}?select=${query}&${column}=in.(${arrStr})`, { headers })
-                            const data = await res.json()
-                            return { data: res.ok ? data : null, error: res.ok ? null : data }
-                        } catch (e) { return { data: null, error: e } }
+                        const arrStr = arrayValues.map(v => `"${v}"`).join(',')
+                        return proxyRequest(`${tablePath}?select=${query}&${column}=in.(${arrStr})`, 'GET')
                     },
                     async order(column, { ascending = true } = {}) {
-                        try {
-                            const res = await fetch(`${tableUrl}?select=${query}&order=${column}.${ascending ? 'asc' : 'desc'}`, { headers })
-                            const data = await res.json()
-                            return { data: res.ok ? data : null, error: res.ok ? null : data }
-                        } catch (e) { return { data: null, error: e } }
+                        return proxyRequest(`${tablePath}?select=${query}&order=${column}.${ascending ? 'asc' : 'desc'}`, 'GET')
                     },
                     async then(resolve) {
-                        try {
-                            const res = await fetch(`${tableUrl}?select=${query}`, { headers })
-                            const data = await res.json()
-                            resolve({ data: res.ok ? data : null, error: res.ok ? null : data })
-                        } catch (e) { resolve({ data: null, error: e }) }
+                        resolve(await proxyRequest(`${tablePath}?select=${query}`, 'GET'))
                     }
                 }
             },
             update(updates) {
                 return {
                     async eq(column, value) {
-                        try {
-                            const res = await fetch(`${tableUrl}?${column}=eq.${value}`, {
-                                method: 'PATCH',
-                                headers: { ...headers, 'Prefer': 'return=representation' },
-                                body: JSON.stringify(updates)
-                            })
-                            const data = await res.json()
-                            return { data: res.ok ? data : null, error: res.ok ? null : data }
-                        } catch (e) { return { data: null, error: e } }
+                        return proxyRequest(`${tablePath}?${column}=eq.${value}`, 'PATCH', updates, { 'Prefer': 'return=representation' })
                     }
                 }
             },
             delete() {
                 return {
                     async eq(column, value) {
-                        try {
-                            const res = await fetch(`${tableUrl}?${column}=eq.${value}`, {
-                                method: 'DELETE',
-                                headers
-                            })
-                            return { data: res.ok ? true : null, error: res.ok ? null : await res.json() }
-                        } catch (e) { return { data: null, error: e } }
+                        return proxyRequest(`${tablePath}?${column}=eq.${value}`, 'DELETE')
                     }
                 }
             }
