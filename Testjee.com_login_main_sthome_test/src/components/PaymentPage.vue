@@ -178,7 +178,7 @@ function copyUpiId() {
 function confirmPayment() {
   // Store the payment status/intent locally so the waiting page can show a tailored message
   localStorage.setItem('paymentAttempted', 'true')
-  router.push('/waiting-approval')
+  router.push('/waiting-approval?step=admin')
 }
 </script>
 

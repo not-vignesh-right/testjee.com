@@ -286,6 +286,14 @@
             </svg>
             {{ loading ? 'Processing...' : (isAdminMode ? 'Admin Login' : (isSignUpMode ? 'Continue to Payment →' : 'Sign In')) }}
           </button>
+
+          <!-- Don't have an account nudge -->
+          <div v-if="!isAdminMode && !isSignUpMode" class="mt-6 text-center animate-fade-in" style="animation-delay: 800ms;">
+            <p class="text-sm text-gray-500">
+              Don't have an account? 
+              <a @click="isSignUpMode = true" class="font-bold text-blue-600 hover:text-blue-700 cursor-pointer hover:underline transition-all ml-1">Sign Up</a>
+            </p>
+          </div>
           <p v-if="!isAdminMode && isSignUpMode" class="text-center text-xs text-gray-400 mt-2">By creating an account you agree to our terms of service.</p>
         </form>
 
@@ -585,7 +593,7 @@ async function handleSignUp() {
     localStorage.setItem('pendingPaymentTests', signUpData.value.numberOfTests.toString())
 
     // Redirect to waiting page — user must verify email FIRST before payment
-    router.push('/waiting-approval')
+    router.push('/waiting-approval?step=email')
     
     // Clear form
     signUpData.value = {
