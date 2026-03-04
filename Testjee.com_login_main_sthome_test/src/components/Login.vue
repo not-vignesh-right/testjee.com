@@ -207,64 +207,64 @@
           </div>
           
            <div v-if="!isAdminMode && isSignUpMode" class="form-group">
-             <!-- Launch Offer Banner -->
-             <div class="flex items-center justify-between bg-gradient-to-r from-orange-500 to-red-500 rounded-xl px-3 py-2 mb-2.5">
-               <div class="flex items-center gap-2">
-                 <span class="text-base">🔥</span>
-                 <div>
-                   <p class="text-white font-black text-xs uppercase tracking-wide leading-none">Launch Offer</p>
-                   <p class="text-orange-100 text-[10px] font-medium mt-0.5">₹50/exam — was ₹70 each</p>
-                 </div>
-               </div>
-               <div class="text-right">
-                 <span class="bg-white/20 text-white text-xs font-black px-2 py-0.5 rounded-full">{{ pricingDetails.discountPercent }}% OFF</span>
-               </div>
-             </div>
 
-             <div class="flex items-center justify-between mb-2 ml-1">
-               <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Select Exams</label>
+             <!-- Label row: clean heading + two pills -->
+             <div class="flex items-center justify-between mb-2 ml-0.5">
+               <div class="flex items-center gap-2">
+                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Exam Package</label>
+                 <span class="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
+                   🔥 Launch Offer
+                 </span>
+               </div>
                <span class="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
-                 🎉 Save ₹{{ pricingDetails.savingsAmount }}
+                 ₹{{ pricingDetails.pricePerExam }}/exam &middot; {{ pricingDetails.discountPercent }}% off
                </span>
              </div>
-             <!-- Compact Horizontal Pricing Tiles -->
+
+             <!-- Pricing Tiles -->
              <div class="grid grid-cols-7 gap-1.5">
                <button 
                  v-for="preset in PRESET_PACKAGES" 
                  :key="preset"
                  type="button"
                  @click="selectPackage(preset)"
-                 class="relative flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all min-h-[52px]"
-                 :class="signUpData.numberOfTests === preset && !isCustomPackage ? 'border-orange-400 bg-orange-50 shadow-sm' : 'border-gray-100 bg-white hover:border-orange-200 hover:bg-orange-50/30'"
+                 class="relative flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all min-h-[54px]"
+                 :class="signUpData.numberOfTests === preset && !isCustomPackage
+                   ? (preset === 5 ? 'border-blue-500 bg-blue-50 shadow-md' : 'border-blue-400 bg-blue-50 shadow-sm')
+                   : (preset === 5 ? 'border-blue-200 bg-blue-50/40 hover:border-blue-400' : 'border-gray-100 bg-white hover:border-blue-200 hover:bg-blue-50/20')"
                >
-                 <span class="text-sm font-bold text-gray-900">{{ preset }}</span>
-                 <span class="text-[9px] text-gray-400 font-medium">exams</span>
+                 <!-- Best Seller badge on 5 -->
+                 <span v-if="preset === 5" class="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[8px] font-black bg-blue-600 text-white px-1.5 py-px rounded-sm whitespace-nowrap tracking-wide uppercase">Best Seller</span>
+                 <span class="text-sm font-bold" :class="preset === 5 ? 'text-blue-700' : 'text-gray-800'">{{ preset }}</span>
+                 <span class="text-[9px] font-medium" :class="preset === 5 ? 'text-blue-500' : 'text-gray-400'">exams</span>
                </button>
                <!-- Custom -->
                <button
                  type="button"
                  @click="enableCustomPackage"
-                 class="relative flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all min-h-[52px]"
-                 :class="isCustomPackage ? 'border-orange-400 bg-orange-50 shadow-sm' : 'border-dashed border-gray-300 bg-white hover:border-orange-300'"
+                 class="relative flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all min-h-[54px]"
+                 :class="isCustomPackage ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-dashed border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/20'"
                >
                  <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                 <span class="text-[9px] text-gray-500 font-medium">custom</span>
+                 <span class="text-[9px] text-gray-400 font-medium mt-0.5">custom</span>
                </button>
              </div>
+
              <!-- Custom Input -->
              <div v-if="isCustomPackage" class="mt-2 flex items-center gap-2">
                <span class="text-xs text-gray-500">Number of exams:</span>
-               <input v-model.number="signUpData.numberOfTests" type="number" min="1" max="100" class="w-20 px-2 py-1.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none shadow-sm text-center font-bold text-gray-900 text-sm" />
+               <input v-model.number="signUpData.numberOfTests" type="number" min="1" max="100" class="w-20 px-2 py-1.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none shadow-sm text-center font-bold text-gray-900 text-sm" />
              </div>
+
              <!-- Price Summary Bar -->
-             <div class="mt-2.5 flex items-center justify-between bg-gray-900 rounded-xl px-4 py-2.5">
-               <div class="flex items-baseline gap-2">
-                 <span class="text-xl font-black text-white tracking-tight">₹{{ pricingDetails.totalPrice }}</span>
-                 <span class="text-xs text-gray-400 line-through font-medium">₹{{ pricingDetails.originalPrice }}</span>
+             <div class="mt-2.5 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl px-4 py-2.5">
+               <div class="flex items-baseline gap-1.5">
+                 <span class="text-xl font-black text-blue-700 tracking-tight">₹{{ pricingDetails.totalPrice }}</span>
+                 <span class="text-xs text-gray-400 line-through">₹{{ pricingDetails.originalPrice }}</span>
                </div>
                <div class="flex items-center gap-2">
                  <span class="text-xs text-gray-400">{{ pricingDetails.count }} exam{{ pricingDetails.count > 1 ? 's' : '' }}</span>
-                 <span class="text-xs font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/20">₹{{ pricingDetails.pricePerExam }}/exam</span>
+                 <span class="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">Save ₹{{ pricingDetails.savingsAmount }}</span>
                </div>
              </div>
           </div>
