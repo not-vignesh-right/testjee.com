@@ -23,12 +23,36 @@
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-8 animate-slide-in-left" style="animation-delay: 100ms;">
           <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
             <div>
-              <p class="font-bold text-gray-900 text-lg">Mock Test Package</p>
+              <div class="flex items-center gap-2">
+                <p class="font-bold text-gray-900 text-lg">Mock Test Package</p>
+                <button @click="showPlanSelector = !showPlanSelector" class="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-md transition-colors">
+                  {{ showPlanSelector ? 'Close' : 'Change Plan' }}
+                </button>
+              </div>
               <p class="text-gray-500 text-sm">{{ pricing.count }} Full-Length {{ pricing.count === 1 ? 'Exam' : 'Exams' }}</p>
             </div>
             <div class="text-right">
               <p class="font-bold text-gray-900 text-lg">₹{{ pricing.totalPrice }}</p>
               <p class="text-blue-600 text-xs font-medium bg-blue-50 px-2 py-0.5 rounded mt-1">₹{{ pricing.pricePerExam }} / exam</p>
+            </div>
+          </div>
+
+          <!-- Plan Selection Grid (visible when editing) -->
+          <div v-if="showPlanSelector" class="mb-6 animate-fade-in">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Select New Package</p>
+            <div class="grid grid-cols-4 gap-2">
+              <button 
+                v-for="preset in PRESET_PACKAGES" 
+                :key="preset"
+                @click="updatePlan(preset)"
+                class="py-2 rounded-xl border-2 transition-all flex flex-col items-center justify-center"
+                :class="testCount === preset 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-gray-100 bg-white hover:border-blue-200'"
+              >
+                <span class="text-sm font-bold text-gray-900">{{ preset }}</span>
+                <span class="text-[9px] text-gray-500">exams</span>
+              </button>
             </div>
           </div>
 
@@ -136,7 +160,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getPriceDetails } from '../data/pricing'
+import { getPriceDetails, PRESET_PACKAGES } from '../data/pricing'
 import qrImage from '../assets/payment_upi_qr.jpeg'
 
 const router = useRouter()
@@ -149,9 +173,18 @@ const upiDetails = {
   phone: '7353560013'
 }
 
-// Get requested tests from query string, or default to 1
-const requestedTests = parseInt(route.query.tests) || 1
-const pricing = computed(() => getPriceDetails(requestedTests))
+// Plan Management
+const testCount = ref(parseInt(route.query.tests) || 5)
+const showPlanSelector = ref(false)
+
+const pricing = computed(() => getPriceDetails(testCount.value))
+
+function updatePlan(count) {
+  testCount.value = count
+  showPlanSelector.value = false
+  // Update query string without reloading
+  router.replace({ query: { ...route.query, tests: count } })
+}
 
 // Generate UPI Deep Link
 const upiDeepLink = computed(() => {
@@ -159,11 +192,11 @@ const upiDeepLink = computed(() => {
   const pn = encodeURIComponent(upiDetails.name);
   const am = pricing.value.totalPrice.toString();
   const cu = 'INR';
-  const tn = encodeURIComponent(`TESTJEE Mock Tests (${requestedTests} pack)`);
+  const tn = encodeURIComponent(`TESTJEE Mock Tests (${testCount.value} pack)`);
   return `upi://pay?pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}`;
 })
 
-const whatsappLink = `https://wa.me/917353560013?text=${encodeURIComponent(`Hi, I need help with my Testjee mock test payment. I requested ${requestedTests} tests.`)}`
+const whatsappLink = computed(() => `https://wa.me/917353560013?text=${encodeURIComponent(`Hi, I need help with my Testjee mock test payment. I requested ${testCount.value} tests.`)}`)
 
 const copied = ref(false)
 

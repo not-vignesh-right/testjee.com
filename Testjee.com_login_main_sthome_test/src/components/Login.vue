@@ -271,9 +271,7 @@
 
            <!-- Mobile: already added in grid above, remove standalone one -->
 
-          <div v-if="!isAdminMode && !isSignUpMode" class="flex justify-end">
-             <a @click="showForgotPassword = true" class="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer hover:underline transition-all">Forgot password?</a>
-          </div>
+
 
           <button 
             type="submit" 
