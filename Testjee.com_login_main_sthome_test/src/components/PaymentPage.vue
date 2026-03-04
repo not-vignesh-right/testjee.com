@@ -171,6 +171,7 @@
 </template>
 
 <script setup>
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getPriceDetails, PRESET_PACKAGES } from '../data/pricing'
 import qrImage from '../assets/payment_upi_qr.jpeg'
