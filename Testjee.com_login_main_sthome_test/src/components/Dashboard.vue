@@ -227,13 +227,70 @@
           </div>
 
           <div class="mb-5">
-            <label class="block text-sm font-medium text-gray-700 mb-2">How many tests do you need?</label>
-            <select v-model="restoreTestCount" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all outline-none cursor-pointer">
-              <option :value="1">1 Test</option>
-              <option :value="3">3 Tests</option>
-              <option :value="5">5 Tests</option>
-              <option :value="10">10 Tests</option>
-            </select>
+            <div class="flex items-center justify-between mb-2 ml-1">
+              <label class="block text-sm font-medium text-gray-700">Select Package to Restore</label>
+              <span v-if="pricingDetails.savingsAmount > 0" class="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
+                Save ₹{{ pricingDetails.savingsAmount }}
+              </span>
+            </div>
+            
+            <!-- Visual Pricing Grid -->
+            <div class="grid grid-cols-3 gap-2 mb-3">
+              <button 
+                v-for="preset in PRESET_PACKAGES" 
+                :key="preset"
+                type="button"
+                @click="selectPackage(preset)"
+                class="relative p-2 rounded-xl border-2 transition-all flex flex-col items-center justify-center min-h-[70px]"
+                :class="restoreTestCount === preset && !isCustomPackage ? 'border-amber-500 bg-amber-50/50 shadow-sm' : 'border-gray-100 bg-white hover:border-amber-200 hover:bg-gray-50'"
+              >
+                <span v-if="getPackageTag(preset)" class="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[9px] font-bold px-1.5 py-0.5 rounded text-white whitespace-nowrap shadow-sm" :class="getPackageTagColor(preset)">
+                  {{ getPackageTag(preset) }}
+                </span>
+                <span class="text-lg font-bold text-gray-900 leading-none mb-1">{{ preset }}</span>
+                <span class="text-xs text-gray-500 font-medium">Exams</span>
+              </button>
+              
+              <!-- Custom Option -->
+              <button 
+                type="button"
+                @click="enableCustomPackage"
+                class="relative p-2 rounded-xl border-2 transition-all flex flex-col items-center justify-center min-h-[70px]"
+                :class="isCustomPackage ? 'border-amber-500 bg-amber-50/50 shadow-sm' : 'border-gray-100 bg-white hover:border-amber-200 hover:bg-gray-50'"
+              >
+                <span class="text-xs font-bold text-gray-900">Custom</span>
+                <span class="text-[10px] text-gray-500 mt-1">Any amount</span>
+              </button>
+            </div>
+
+            <!-- Custom Input -->
+            <div v-if="isCustomPackage" class="mb-3 animate-fade-in flex items-center gap-3">
+              <label class="text-sm text-gray-600 whitespace-nowrap">I want to restore:</label>
+              <input 
+                v-model.number="restoreTestCount" 
+                type="number" 
+                min="1" 
+                max="100"
+                class="w-24 px-3 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-200 focus:border-amber-400 transition-all outline-none shadow-sm text-center font-bold text-gray-900"
+              />
+              <span class="text-sm text-gray-600">exams</span>
+            </div>
+
+            <!-- Price Summary -->
+            <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <p class="text-xs text-gray-500 font-medium mb-0.5">Total to Pay</p>
+                <div class="flex items-baseline gap-1.5">
+                  <p class="text-lg font-bold text-amber-700">₹{{ pricingDetails.totalPrice }}</p>
+                  <p v-if="pricingDetails.originalPrice > pricingDetails.totalPrice" class="text-xs text-gray-400 line-through">₹{{ pricingDetails.originalPrice }}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="text-xs text-amber-800 font-medium bg-amber-100/50 px-2 py-1 rounded inline-block">
+                  ₹{{ pricingDetails.pricePerExam }} / exam
+                </p>
+              </div>
+            </div>
           </div>
 
           <div v-if="restoreMessage" :class="['mb-4 p-3 rounded-xl text-sm font-medium', restoreMessageType === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100']">
@@ -263,6 +320,7 @@ import emailjs from '@emailjs/browser'
 import { getRandomQuote } from '../data/quotes'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler } from 'chart.js'
+import { getPriceDetails, PRESET_PACKAGES, EXAM_PRICE_TIERS } from '../data/pricing'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler)
 
@@ -278,6 +336,33 @@ const restoreTestCount = ref(3)
 const restoreLoading = ref(false)
 const restoreMessage = ref('')
 const restoreMessageType = ref('')
+
+const isCustomPackage = ref(false)
+const pricingDetails = computed(() => getPriceDetails(restoreTestCount.value))
+
+function selectPackage(count) {
+  isCustomPackage.value = false
+  restoreTestCount.value = count
+}
+
+function enableCustomPackage() {
+  isCustomPackage.value = true
+  if (PRESET_PACKAGES.includes(restoreTestCount.value)) {
+    restoreTestCount.value = restoreTestCount.value + 1
+  }
+}
+
+function getPackageTag(count) {
+  const tier = EXAM_PRICE_TIERS.find(t => count >= t.min && count <= t.max)
+  return tier?.tag || null
+}
+
+function getPackageTagColor(count) {
+  const tier = EXAM_PRICE_TIERS.find(t => count >= t.min && count <= t.max)
+  if (tier?.tagColor === 'green') return 'bg-green-500'
+  if (tier?.tagColor === 'purple') return 'bg-purple-500'
+  return 'bg-blue-500'
+}
 
 // Motivational quote rotation
 const currentQuote = ref('')
@@ -524,8 +609,15 @@ async function sendRestoreRequest() {
       'I9eXY3TayX67uR-3R'
     )
 
-    restoreMessage.value = 'Request sent! The admin will review and restore your tests.'
-    restoreMessageType.value = 'success'
+    // Redirect to the payment component to actually prompt UI payment
+    // But since Dashboard requires auth, we can just push to the payment route.
+    // Make sure we clear modal and modal state.
+    showRestoreModal.value = false
+    router.push({
+      path: '/payment',
+      query: { tests: restoreTestCount.value }
+    })
+    
   } catch (error) {
     console.error('[TESTJEE] Restore request error:', error)
     restoreMessage.value = 'Failed to send request. Please try again.'

@@ -4,29 +4,70 @@
     <div class="absolute inset-0 bg-gradient-to-br from-white via-blue-50 to-blue-100 pointer-events-none"></div>
 
     <!-- Main Card -->
-    <div class="w-full max-w-md bg-white/80 backdrop-blur-xl rounded-3xl shadow-[0_8px_40px_rgb(0,0,0,0.06)] overflow-hidden relative z-10 p-8 md:p-12 text-center border border-white/60 animate-fade-in-up">
+    <div class="w-full max-w-lg bg-white/80 backdrop-blur-xl rounded-3xl shadow-[0_8px_40px_rgb(0,0,0,0.06)] overflow-hidden relative z-10 p-8 md:p-10 border border-white/60 animate-fade-in-up">
       
-      <!-- Icon -->
-      <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-600 ring-8 ring-blue-50">
-        <svg class="w-10 h-10 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
+      <!-- Timeline Header -->
+      <div class="mb-10 animate-fade-in">
+        <h2 class="text-3xl font-bold text-gray-900 mb-2">Final Step: Approval</h2>
+        <p class="text-gray-500">We're verifying your details and payment.</p>
       </div>
 
-      <h2 class="text-3xl font-bold text-gray-900 mb-4">Pending Approval</h2>
-      
-      <p class="text-gray-600 mb-8 leading-relaxed">
-        Your email has been successfully verified! However, an administrator is currently reviewing your account. You will be able to access the platform once your account is fully approved.
-      </p>
+      <!-- Progressive Status Timeline -->
+      <div class="space-y-6 mb-10">
+        <!-- Step 1: Account Created -->
+        <div class="flex gap-4 animate-slide-in-left" style="animation-delay: 100ms;">
+          <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center shadow-sm">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <div class="w-0.5 h-full bg-green-200 my-1"></div>
+          </div>
+          <div class="pb-2">
+            <h4 class="text-gray-900 font-bold">Account Created</h4>
+            <p class="text-sm text-gray-500">Email verified and profile set up.</p>
+          </div>
+        </div>
 
-      <div class="bg-blue-50 rounded-xl p-4 mb-8 text-sm text-blue-800 border border-blue-100 flex items-start gap-3 text-left">
+        <!-- Step 2: Payment -->
+        <div class="flex gap-4 animate-slide-in-left" style="animation-delay: 200ms;">
+          <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center shadow-sm" :class="hasAttemptedPayment ? 'bg-green-500 text-white' : 'bg-blue-100 text-blue-600 border-2 border-blue-500'">
+              <svg v-if="hasAttemptedPayment" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              <span v-else class="text-sm font-bold">2</span>
+            </div>
+            <div class="w-0.5 h-full my-1" :class="hasAttemptedPayment ? 'bg-green-200' : 'bg-gray-100'"></div>
+          </div>
+          <div class="pb-2">
+            <h4 class="text-gray-900 font-bold">Payment Status</h4>
+            <p class="text-sm text-gray-500" v-if="hasAttemptedPayment">Payment marked as completed by you.</p>
+            <p class="text-sm text-gray-500" v-else>Waiting for package payment.</p>
+          </div>
+        </div>
+
+        <!-- Step 3: Admin Approval -->
+        <div class="flex gap-4 animate-slide-in-left" style="animation-delay: 300ms;">
+          <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 border-2 border-blue-500 flex items-center justify-center shadow-sm relative">
+              <span class="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-20 animate-ping"></span>
+              <span class="text-sm font-bold relative z-10">3</span>
+            </div>
+          </div>
+          <div>
+            <h4 class="text-gray-900 font-bold">Admin Verification</h4>
+            <p class="text-sm text-gray-500">Checking payment receipt and approving access. Usually takes less than <span class="font-medium text-gray-700">24 hours</span>.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Box -->
+      <div v-if="hasAttemptedPayment" class="bg-blue-50/80 rounded-2xl p-4 mb-8 text-sm text-blue-800 border border-blue-100 flex items-start gap-3 animate-fade-in" style="animation-delay: 400ms;">
         <svg class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
-        <p>You can safely close this window. Try logging in again later to check your status.</p>
+        <p>You can safely close this window. We'll send an email notification once your account is fully activated.</p>
       </div>
 
-      <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-3 animate-fade-in" style="animation-delay: 500ms;">
         <button 
           @click="checkStatus" 
           :disabled="loading"
@@ -46,19 +87,34 @@
           Return to Login
         </button>
       </div>
+      
+      <!-- Contact Support -->
+      <div class="mt-8 text-center animate-fade-in" style="animation-delay: 600ms;">
+        <p class="text-sm text-gray-500">Need immediate help? Contact support on WhatsApp</p>
+        <a href="https://wa.me/917353560013" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 mt-2 text-sm font-bold text-green-600 hover:text-green-700 transition-colors">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 00-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"></path></svg>
+          +91 7353560013
+        </a>
+      </div>
 
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const loading = ref(false)
+const hasAttemptedPayment = ref(false)
+
+onMounted(() => {
+  hasAttemptedPayment.value = localStorage.getItem('paymentAttempted') === 'true'
+  // Clean up if desired, but retaining it is fine for persistence
+})
 
 async function checkStatus() {
   loading.value = true
@@ -83,6 +139,34 @@ async function checkStatus() {
 
 async function logoutAndReturn() {
   await authStore.logout()
+  localStorage.removeItem('paymentAttempted')
   router.push('/')
 }
 </script>
+
+<style scoped>
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+  opacity: 0;
+}
+.animate-slide-in-left {
+  animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+</style>

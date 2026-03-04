@@ -6,6 +6,7 @@ import Dashboard from '../components/Dashboard.vue'
 import ResultsDetails from '../components/ResultsDetails.vue'
 import ResetPassword from '../components/ResetPassword.vue'
 import WaitingApproval from '../components/WaitingApproval.vue'
+import PaymentPage from '../components/PaymentPage.vue'
 
 // --- Live Exam Components ---
 // Admin
@@ -79,6 +80,7 @@ const routes = [
   { path: '/auth/callback', name: 'AuthCallback', component: () => import('../components/AuthCallback.vue') },
   { path: '/auth/reset-password', name: 'ResetPassword', component: ResetPassword },
   { path: '/waiting-approval', name: 'WaitingApproval', component: WaitingApproval },
+  { path: '/payment', name: 'Payment', component: PaymentPage },
 
   // Catch-all/Redirects
   { path: '/dashboard', redirect: '/sthome/dashboard' },
