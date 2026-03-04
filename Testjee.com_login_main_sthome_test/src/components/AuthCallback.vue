@@ -69,9 +69,9 @@ onMounted(async () => {
     
     loading.value = false
     
-    // Redirect to student home
+    // Redirect to waiting approval — student is email-verified but still needs admin to approve
     setTimeout(() => {
-      router.push('/sthome')
+      router.push('/waiting-approval')
     }, 1500)
     
   } catch (err) {

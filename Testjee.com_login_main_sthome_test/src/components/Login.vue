@@ -624,7 +624,9 @@ async function handleSignIn() {
     }, 1000)
   } else {
     const errorMsg = result.error || 'A network error occurred. Please check your internet connection or disable ad-blockers.'
-    if (errorMsg.includes('Invalid login credentials')) {
+    if (errorMsg.toLowerCase().includes('email not confirmed') || errorMsg.toLowerCase().includes('not confirmed')) {
+      showMessage('Please verify your email first — check your inbox for a confirmation link from Testjee.', 'error')
+    } else if (errorMsg.includes('Invalid login credentials')) {
       showMessage('Invalid email or password. Please try again.', 'error')
     } else {
       showMessage(errorMsg, 'error')
