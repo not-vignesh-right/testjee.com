@@ -35,7 +35,7 @@
           </svg>
         </div>
         <h2 class="text-2xl font-bold text-green-800">Email Verified! ✅</h2>
-        <p class="text-gray-600">Redirecting to your dashboard...</p>
+        <p class="text-gray-600">Redirecting you to payment...</p>
       </div>
     </div>
   </div>
@@ -69,9 +69,10 @@ onMounted(async () => {
     
     loading.value = false
     
-    // Redirect to waiting approval — student is email-verified but still needs admin to approve
+    // After email verification, go to payment (test count was saved at signup)
+    const pendingTests = localStorage.getItem('pendingPaymentTests') || '5'
     setTimeout(() => {
-      router.push('/waiting-approval')
+      router.push({ path: '/payment', query: { tests: pendingTests } })
     }, 1500)
     
   } catch (err) {

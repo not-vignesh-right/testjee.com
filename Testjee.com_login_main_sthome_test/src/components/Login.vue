@@ -581,13 +581,11 @@ async function handleSignUp() {
       }
     })
 
-    // Redirect to Payment Page instead of just showing success
-    router.push({
-      path: '/payment',
-      query: {
-        tests: signUpData.value.numberOfTests
-      }
-    })
+    // Save the test count so AuthCallback can forward to payment after email verification
+    localStorage.setItem('pendingPaymentTests', signUpData.value.numberOfTests.toString())
+
+    // Redirect to waiting page — user must verify email FIRST before payment
+    router.push('/waiting-approval')
     
     // Clear form
     signUpData.value = {

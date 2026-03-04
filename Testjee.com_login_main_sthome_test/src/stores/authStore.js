@@ -24,7 +24,7 @@ export const useAuthStore = defineStore('auth', () => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: 'https://login.testjee.com/auth/callback',
           data: {
             name: name,
             mobile: mobile,
