@@ -1,7 +1,7 @@
 // Pricing logic for Testjee exams - Opening Launch Offer 🎉
-// MRP: ₹700/exam | Offer: ₹50/exam (flat for all packages)
+// MRP: ₹70/exam | Offer: ₹50/exam (flat for all packages)
 
-const MRP_PRICE = 700;   // Original price per exam
+const MRP_PRICE = 70;    // Original price per exam
 const OFFER_PRICE = 50;  // Launch offer price per exam (same for all)
 
 export const EXAM_PRICE_TIERS = [

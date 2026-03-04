@@ -213,7 +213,7 @@
                  <span class="text-base">🔥</span>
                  <div>
                    <p class="text-white font-black text-xs uppercase tracking-wide leading-none">Launch Offer</p>
-                   <p class="text-orange-100 text-[10px] font-medium mt-0.5">₹50/exam — was ₹700 each</p>
+                   <p class="text-orange-100 text-[10px] font-medium mt-0.5">₹50/exam — was ₹70 each</p>
                  </div>
                </div>
                <div class="text-right">
