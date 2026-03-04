@@ -20,56 +20,69 @@
           <p class="text-gray-500 text-sm">Review your package details before paying.</p>
         </div>
 
-        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-8 animate-slide-in-left" style="animation-delay: 100ms;">
-          <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
-            <div>
-              <div class="flex items-center gap-2">
-                <p class="font-bold text-gray-900 text-lg">Mock Test Package</p>
-                <button @click="showPlanSelector = !showPlanSelector" class="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-md transition-colors">
+        <div class="bg-white rounded-3xl border border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden mb-8 animate-slide-in-left" style="animation-delay: 100ms;">
+          <!-- Package Header -->
+          <div class="p-6 pb-5 border-b border-gray-100">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-bold text-gray-900 text-lg flex items-center gap-2">
+                Mock Test Package
+                <button @click="showPlanSelector = !showPlanSelector" class="text-[10px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full transition-colors border border-blue-100 uppercase tracking-tight">
                   {{ showPlanSelector ? 'Close' : 'Change Plan' }}
                 </button>
-              </div>
-              <p class="text-gray-500 text-sm">{{ pricing.count }} Full-Length {{ pricing.count === 1 ? 'Exam' : 'Exams' }}</p>
+              </h3>
             </div>
-            <div class="text-right">
-              <p class="font-bold text-gray-900 text-lg">₹{{ pricing.totalPrice }}</p>
-              <p class="text-blue-600 text-xs font-medium bg-blue-50 px-2 py-0.5 rounded mt-1">₹{{ pricing.pricePerExam }} / exam</p>
+            <p class="text-gray-500 text-sm mb-4">{{ pricing.count }} Full-Length {{ pricing.count === 1 ? 'Exam' : 'Exams' }}</p>
+            
+            <div class="flex items-baseline gap-1">
+              <span class="text-3xl font-black text-gray-900">₹{{ pricing.totalPrice }}</span>
+              <span class="text-gray-400 text-xs font-medium ml-1">/ {{ pricing.count }} tests</span>
             </div>
+            <p class="text-blue-600 text-[11px] font-bold bg-blue-50/50 inline-block px-2 py-0.5 rounded-md mt-1.5 border border-blue-100/50">₹{{ pricing.pricePerExam }} per exam</p>
           </div>
 
           <!-- Plan Selection Grid (visible when editing) -->
-          <div v-if="showPlanSelector" class="mb-6 animate-fade-in">
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Select New Package</p>
+          <div v-if="showPlanSelector" class="p-6 bg-gray-50/50 border-b border-gray-100 animate-fade-in">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Choose a package</p>
             <div class="grid grid-cols-4 gap-2">
               <button 
                 v-for="preset in PRESET_PACKAGES" 
                 :key="preset"
                 @click="updatePlan(preset)"
-                class="py-2 rounded-xl border-2 transition-all flex flex-col items-center justify-center"
+                class="py-2.5 rounded-xl border-2 transition-all flex flex-col items-center justify-center"
                 :class="testCount === preset 
                   ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-100 bg-white hover:border-blue-200'"
+                  : 'border-white bg-white hover:border-blue-200 shadow-sm'"
               >
-                <span class="text-sm font-bold text-gray-900">{{ preset }}</span>
-                <span class="text-[9px] text-gray-500">exams</span>
+                <span class="text-sm font-black text-gray-900">{{ preset }}</span>
+                <span class="text-[9px] font-bold text-gray-400 uppercase">Tests</span>
               </button>
             </div>
           </div>
 
-          <div class="space-y-3 text-sm">
-            <div class="flex justify-between text-gray-500">
-              <span>Original Price</span>
-              <span class="line-through">₹{{ pricing.originalPrice }}</span>
+          <!-- Price Breakdown -->
+          <div class="p-6 space-y-3.5">
+            <div class="flex justify-between items-center text-sm font-medium">
+              <span class="text-gray-500">Original Price</span>
+              <span class="text-gray-400 line-through">₹{{ pricing.originalPrice }}</span>
             </div>
-            <div v-if="pricing.discountPercent > 0" class="flex justify-between text-green-600 font-medium bg-green-50/50 p-2 rounded-lg -mx-2">
-              <span>Volume Discount ({{ pricing.discountPercent }}%)</span>
-              <span>-₹{{ pricing.savingsAmount }}</span>
+            <div v-if="pricing.discountPercent > 0" class="flex justify-between items-center text-sm">
+              <span class="text-emerald-600 font-bold flex items-center gap-1.5">
+                Volume Discount ({{ pricing.discountPercent }}%)
+                <span class="w-1 h-1 rounded-full bg-emerald-200"></span>
+              </span>
+              <span class="text-emerald-600 font-bold">-₹{{ pricing.savingsAmount }}</span>
             </div>
           </div>
 
-          <div class="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
-            <span class="font-bold text-gray-900">Total to Pay</span>
-            <span class="text-2xl font-black text-blue-600 tracking-tight">₹{{ pricing.totalPrice }}</span>
+          <!-- Grand Total -->
+          <div class="px-6 py-5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex justify-between items-center">
+            <div>
+              <p class="text-[10px] font-bold uppercase tracking-[0.1em] opacity-80">Total to Pay</p>
+              <p class="text-2xl font-black tracking-tight">₹{{ pricing.totalPrice }}</p>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+            </div>
           </div>
         </div>
 
