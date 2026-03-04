@@ -171,13 +171,15 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getPriceDetails, PRESET_PACKAGES } from '../data/pricing'
 import qrImage from '../assets/payment_upi_qr.jpeg'
+import { useAuthStore } from '../stores/authStore'
+import emailjs from '@emailjs/browser'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 
 // UPI Details from the image
 const upiDetails = {
@@ -192,11 +194,20 @@ const showPlanSelector = ref(false)
 
 const pricing = computed(() => getPriceDetails(testCount.value))
 
-function updatePlan(count) {
+async function updatePlan(count) {
   testCount.value = count
   showPlanSelector.value = false
   // Update query string without reloading
   router.replace({ query: { ...route.query, tests: count } })
+
+  // SYNC WITH DATABASE
+  try {
+    console.log(`[PAYMENT] Updating DB test count to ${count}...`)
+    await authStore.updateStudentProfile({ number_of_tests: count })
+    localStorage.setItem('pendingPaymentTests', count.toString())
+  } catch (err) {
+    console.error('[PAYMENT] Failed to sync test count with DB:', err)
+  }
 }
 
 // Generate UPI Deep Link
@@ -221,9 +232,41 @@ function copyUpiId() {
   }, 2000)
 }
 
-function confirmPayment() {
-  // Store the payment status/intent locally so the waiting page can show a tailored message
+async function confirmPayment() {
+  // Store the payment status/intent locally
   localStorage.setItem('paymentAttempted', 'true')
+  
+  // SEND UPDATE TO ADMIN
+  try {
+    const student = authStore.studentProfile
+    if (student) {
+      console.log('[PAYMENT] Notifying admin of payment completion...')
+      
+      // We use the same approval template but with updated data
+      // Note: In a real app, we'd have a 'template_payment_confirmed'
+      const approveLink = `https://login.testjee.com/admin-approve?name=${encodeURIComponent(student.student_name)}&email=${encodeURIComponent(student.email_id)}&mobile=${encodeURIComponent(student.mobile_number || '')}&tests=${testCount.value}`;
+
+      const templateParams = {
+        student_name: student.student_name,
+        student_email: student.email_id,
+        student_mobile: student.mobile_number || 'Not provided',
+        requested_tests: testCount.value,
+        approve_link: approveLink,
+        admin_email: 'chinmaypanghri@gmail.com',
+        payment_status: 'USER_CLAIMED_PAID' // Extra context for admin
+      }
+
+      await emailjs.send(
+        'service_testjee',
+        'template_approval',
+        templateParams,
+        'I9eXY3TayX67uR-3R'
+      )
+    }
+  } catch (err) {
+    console.error('[PAYMENT] Error notifying admin:', err)
+  }
+
   router.push('/waiting-approval?step=admin')
 }
 </script>
