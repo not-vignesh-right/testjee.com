@@ -171,7 +171,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getPriceDetails, PRESET_PACKAGES } from '../data/pricing'
 import qrImage from '../assets/payment_upi_qr.jpeg'
@@ -195,6 +195,18 @@ const showPlanSelector = ref(false)
 
 const pricing = computed(() => getPriceDetails(testCount.value))
 
+onMounted(async () => {
+  try {
+    // Ensure student profile is loaded so we can update it
+    if (!authStore.studentProfile) {
+      console.log('[PAYMENT] Loading student profile...')
+      await authStore.fetchOrCreateStudent()
+    }
+  } catch (err) {
+    console.error('[PAYMENT] Error loading student profile on mount:', err)
+  }
+})
+
 async function updatePlan(count) {
   testCount.value = count
   showPlanSelector.value = false
@@ -203,11 +215,26 @@ async function updatePlan(count) {
 
   // SYNC WITH DATABASE
   try {
-    console.log(`[PAYMENT] Updating DB test count to ${count}...`)
-    await authStore.updateStudentProfile({ number_of_tests: count })
-    localStorage.setItem('pendingPaymentTests', count.toString())
+    // If profile not loaded yet, wait a bit or try to fetch it
+    if (!authStore.studentProfile) {
+      console.warn('[PAYMENT] Student profile missing during plan update, attempting to fetch...')
+      await authStore.fetchOrCreateStudent()
+    }
+
+    if (authStore.studentProfile) {
+      console.log(`[PAYMENT] Syncing DB test count to ${count}...`)
+      const res = await authStore.updateStudentProfile({ number_of_tests: count })
+      if (!res.success) {
+        console.error('[PAYMENT] DB Sync failed:', res.error)
+      } else {
+        console.log('[PAYMENT] DB Sync successful')
+        localStorage.setItem('pendingPaymentTests', count.toString())
+      }
+    } else {
+      console.error('[PAYMENT] Cannot sync with DB: Still no student profile')
+    }
   } catch (err) {
-    console.error('[PAYMENT] Failed to sync test count with DB:', err)
+    console.error('[PAYMENT] Unexpected error during plan sync:', err)
   }
 }
 
@@ -239,30 +266,37 @@ async function confirmPayment() {
   
   // SEND UPDATE TO ADMIN
   try {
+    // Ensure profile is loaded for the email
+    if (!authStore.studentProfile) {
+      await authStore.fetchOrCreateStudent()
+    }
+
     const student = authStore.studentProfile
     if (student) {
-      console.log('[PAYMENT] Notifying admin of payment completion...')
+      console.log('[PAYMENT] Notifying admin of payment completion...', { tests: testCount.value })
       
       // We use the same approval template but with updated data
-      // Note: In a real app, we'd have a 'template_payment_confirmed'
       const approveLink = `https://login.testjee.com/admin-approve?name=${encodeURIComponent(student.student_name)}&email=${encodeURIComponent(student.email_id)}&mobile=${encodeURIComponent(student.mobile_number || '')}&tests=${testCount.value}`;
 
       const templateParams = {
         student_name: student.student_name,
         student_email: student.email_id,
-        student_mobile: student.mobile_number || 'Not provided',
+        student_total_tests: testCount.value, // Make sure these keys match your EmailJS template
         requested_tests: testCount.value,
         approve_link: approveLink,
         admin_email: 'chinmaypanghri@gmail.com',
-        payment_status: 'USER_CLAIMED_PAID' // Extra context for admin
+        payment_status: 'USER_CLAIMED_PAID'
       }
 
-      await emailjs.send(
+      const res = await emailjs.send(
         'service_testjee',
         'template_approval',
         templateParams,
         'I9eXY3TayX67uR-3R'
       )
+      console.log('[PAYMENT] Admin notification sent:', res.status)
+    } else {
+      console.error('[PAYMENT] Abandoning admin notification: No student profile found even after retry')
     }
   } catch (err) {
     console.error('[PAYMENT] Error notifying admin:', err)
