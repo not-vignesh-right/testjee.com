@@ -119,14 +119,14 @@ const markForReviewAndNext = async () => {
       const draft = examStore.getNumericDraft(questionId)
       const value = String((draft ?? '').toString().trim())
       if (value !== '') {
-        const res = await examStore.commitAnswer(questionId)
+        const res = await examStore.commitAnswer(questionId, value)
         if (res && res.success === false && res.reason === 'numeric_limit_reached') {
           alert('You have already answered 5 numericals for this subject.')
           return
         }
       }
     } else {
-      await examStore.commitAnswer(questionId)
+      await examStore.commitAnswer(questionId, examStore.draftAnswers[questionId])
     }
   }
 
@@ -144,14 +144,14 @@ const saveAndNext = async () => {
       const draft = examStore.getNumericDraft(questionId)
       const value = String((draft ?? '').toString().trim())
       if (value !== '') {
-        const res = await examStore.commitAnswer(questionId)
+        const res = await examStore.commitAnswer(questionId, value)
         if (res && res.success === false && res.reason === 'numeric_limit_reached') {
           alert('You have already answered 5 numericals for this subject.')
           return
         }
       }
     } else {
-      await examStore.commitAnswer(questionId)
+      await examStore.commitAnswer(questionId, examStore.draftAnswers[questionId])
     }
   }
   

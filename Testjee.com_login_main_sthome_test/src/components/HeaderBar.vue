@@ -77,7 +77,9 @@ const authStore = useAuthStore()
 const router = useRouter()
 
 async function handleSubmit() {
+  examStore.isManuallySubmitting = true
   if (!confirm("Are you sure you want to submit the exam?")) {
+    examStore.isManuallySubmitting = false
     return
   }
   const result = await examStore.submitExam()

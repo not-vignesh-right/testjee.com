@@ -189,7 +189,7 @@ const handleVisibilityChange = async () => {
 }
 
 const handleWindowBlur = async () => {
-  if (!examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value) {
+  if (!examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
     // If window loses focus (clicked outside window/tab) - STRICT AUTO SUBMIT
     console.warn("Window blurred - STRICT AUTO SUBMIT")
     autoSubmitReason.value = 'clicked outside the exam window or opened another application'

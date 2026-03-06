@@ -32,6 +32,7 @@ export const useExamStore = defineStore('exam', () => {
   const globalTimerInterval = ref(null) // Track the global 3-hour timer interval
   const allResults = ref([]) // All student results with sessions
   const statistics = ref(null) // Aggregate statistics
+  const isManuallySubmitting = ref(false) // Flag to prevent window blur cheating detection on manual submit
 
 
   // Getters
@@ -521,6 +522,11 @@ export const useExamStore = defineStore('exam', () => {
         currentStartTime.value = Date.now() // Reset just in case
       }
 
+      // Auto-save any lingering draft for the very final question
+      if (currentQuestionId && draftAnswers.value[currentQuestionId] !== undefined) {
+        userAnswers.value[currentQuestionId] = draftAnswers.value[currentQuestionId]
+      }
+
       // Build answers array (fixed length 75)
       const answersArray = Array(75).fill(null).map((_, i) => {
         const question = questions.value[i]
@@ -675,6 +681,10 @@ export const useExamStore = defineStore('exam', () => {
         const elapsed = (Date.now() - currentStartTime.value) / 1000
         timeSpent.value[currentQuestionId] = (timeSpent.value[currentQuestionId] || 0) + elapsed
         currentStartTime.value = Date.now()
+      }
+
+      if (currentQuestionId && draftAnswers.value[currentQuestionId] !== undefined) {
+        userAnswers.value[currentQuestionId] = draftAnswers.value[currentQuestionId]
       }
 
       const formattedAnswers = questions.value.map(q => {
@@ -899,6 +909,7 @@ export const useExamStore = defineStore('exam', () => {
     getNumericDraft,
     setNumericDraft,
     fetchStudentResults,
-    setExamType
+    setExamType,
+    isManuallySubmitting
   }
 })
