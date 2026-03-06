@@ -10,8 +10,9 @@ export const useExamStore = defineStore('exam', () => {
   const examType = ref('JEE_MAIN_FULL') // Current exam type
   const questions = ref([])
   const currentQuestionIndex = ref(0)
-  const userAnswers = ref({})
-  const questionStatuses = ref({})
+  const userAnswers = ref({}) // Format: { questionId: chosenOptionId }
+  const draftAnswers = ref({}) // New: format { questionId: chosenOptionId } - highlighted but not saved
+  const questionStatuses = ref({}) // Format: { questionId: { visited: true, answered: true, marked: false } })
   const remainingTime = ref(180 * 60) // 3 hours in seconds
   const isFullScreen = ref(false)
   const examTitle = ref('Test JEE Main - Full Test')
@@ -105,6 +106,7 @@ export const useExamStore = defineStore('exam', () => {
 
         // Restore from localStorage (not database)
         const savedAnswers = localStorage.getItem('examAnswers')
+        const savedDrafts = localStorage.getItem('examDrafts')
         const savedIndex = localStorage.getItem('currentQuestionIndex')
         const savedStatuses = localStorage.getItem('questionStatuses')
         const savedQuestions = localStorage.getItem('examQuestions')
@@ -119,6 +121,11 @@ export const useExamStore = defineStore('exam', () => {
           console.log('Restored answers from localStorage:', Object.keys(userAnswers.value).length)
         } else {
           console.warn('⚠️ localStorage cleared - continuing with empty answers (strict mode)')
+        }
+
+        if (savedDrafts) {
+          draftAnswers.value = JSON.parse(savedDrafts)
+          console.log('Restored draft answers from localStorage:', Object.keys(draftAnswers.value).length)
         }
 
         if (savedIndex) {
@@ -141,6 +148,7 @@ export const useExamStore = defineStore('exam', () => {
 
       // Reset all exam state for fresh start
       userAnswers.value = {}
+      draftAnswers.value = {}
       questionStatuses.value = {}
       currentQuestionIndex.value = 0
       isSubmitted.value = false
@@ -148,6 +156,7 @@ export const useExamStore = defineStore('exam', () => {
 
       // Clear localStorage
       localStorage.removeItem('examAnswers')
+      localStorage.removeItem('examDrafts')
       localStorage.removeItem('currentQuestionIndex')
       localStorage.removeItem('questionStatuses')
       localStorage.removeItem('examQuestions')
@@ -183,6 +192,7 @@ export const useExamStore = defineStore('exam', () => {
   // Save to localStorage (instant, no API calls)
   const saveToLocalStorage = () => {
     localStorage.setItem('examAnswers', JSON.stringify(userAnswers.value))
+    localStorage.setItem('examDrafts', JSON.stringify(draftAnswers.value))
     localStorage.setItem('currentQuestionIndex', currentQuestionIndex.value.toString())
     localStorage.setItem('questionStatuses', JSON.stringify(questionStatuses.value))
   }
@@ -384,6 +394,7 @@ export const useExamStore = defineStore('exam', () => {
     isSubmitted.value = false
     questions.value = []
     userAnswers.value = {}
+    draftAnswers.value = {}
     questionStatuses.value = {}
     sessionId.value = null
     sessionStartTime.value = null
@@ -394,14 +405,20 @@ export const useExamStore = defineStore('exam', () => {
     timeSpent.value = {}
   }
 
-  const saveAnswer = async (questionId, answer) => {
+  const selectDraftAnswer = (questionId, answer) => {
+    draftAnswers.value[questionId] = answer
+    // Save to localStorage (instant, no API call)
+    saveToLocalStorage()
+  }
+
+  const commitAnswer = async (questionId, answer) => {
     try {
       const question = questions.value.find(q => q.id === questionId)
       if (!question) return { success: false }
 
-      if (question.type === 'numeric') {
+      if (question.question_type === 'numeric') {
         const answeredNumericForSubject = questions.value
-          .filter(q => q.subject === question.subject && q.type === 'numeric' && userAnswers.value[q.id])
+          .filter(q => q.subject === question.subject && q.question_type === 'numeric' && userAnswers.value[q.id])
           .length
         if (answeredNumericForSubject >= numericAnswerLimitPerSubject) {
           return { success: false, reason: 'numeric_limit_reached' }
@@ -413,6 +430,7 @@ export const useExamStore = defineStore('exam', () => {
       userAnswers.value[questionId] = answer
       questionStatuses.value[questionId].answered = true
       questionStatuses.value[questionId].visited = true
+      delete draftAnswers.value[questionId] // Clear draft once committed
 
       // Save to localStorage (instant, no API call)
       saveToLocalStorage()
@@ -427,10 +445,12 @@ export const useExamStore = defineStore('exam', () => {
   const markForReview = (questionId) => {
     questionStatuses.value[questionId].marked = true
     questionStatuses.value[questionId].visited = true
+    saveToLocalStorage()
   }
 
   const clearResponse = (questionId) => {
     delete userAnswers.value[questionId]
+    delete draftAnswers.value[questionId]
     questionStatuses.value[questionId].answered = false
 
     // Save to localStorage
@@ -619,6 +639,7 @@ export const useExamStore = defineStore('exam', () => {
 
       // Clear localStorage after successful submission
       localStorage.removeItem('examAnswers')
+      localStorage.removeItem('examDrafts')
       localStorage.removeItem('currentQuestionIndex')
       localStorage.removeItem('questionStatuses')
       localStorage.removeItem('examQuestions')
@@ -626,8 +647,64 @@ export const useExamStore = defineStore('exam', () => {
 
       return { success: true, message: 'Exam submitted successfully', result_id: insertedId, score }
     } catch (error) {
-      console.error('Failed to submit exam:', error)
-      return { success: false, message: 'Failed to submit exam' }
+      console.error('Error submitting exam:', error)
+      alert("Error submitting exam. Please check your internet connection.")
+      return { success: false, error }
+    }
+  }
+
+  const emergencySubmit = () => {
+    if (isSubmitted.value || !sessionId.value) return;
+
+    try {
+      const currentQuestionId = questions.value[currentQuestionIndex.value]?.id
+      if (currentQuestionId && currentStartTime.value) {
+        const elapsed = (Date.now() - currentStartTime.value) / 1000
+        timeSpent.value[currentQuestionId] = (timeSpent.value[currentQuestionId] || 0) + elapsed
+      }
+
+      const formattedAnswers = questions.value.map(q => {
+        let answerData = {
+          question_id: q.id,
+          answer: userAnswers.value[q.id] || null,
+          time_taken: Math.round(timeSpent.value[q.id] || 0)
+        }
+
+        const status = questionStatuses.value[q.id] || {}
+        if (status.marked) {
+          answerData.is_marked = true;
+        }
+        return answerData;
+      })
+
+      const payload = JSON.stringify({
+        session_id: sessionId.value,
+        answers: formattedAnswers
+      })
+
+      // Use App URL and append /api if we had an edge function, 
+      // but Supabase REST API via sendBeacon is tricky because of auth headers.
+      // Easiest reliable way: store in LS for later sync if sendBeacon is complex.
+      // But we can try a sync fetch if possible (which beforeunload limits).
+
+      const authStore = useAuthStore()
+      const token = authStore.session?.access_token || authStore.accessToken
+
+      // We will save to localStorage immediately to guarantee recovery
+      const pendingKey = `pending_submit_${authStore.studentProfile?.student_id || 'unauth'}`
+      localStorage.setItem(pendingKey, JSON.stringify({
+        session_id: sessionId.value,
+        answers: formattedAnswers,
+        timestamp: Date.now()
+      }))
+
+      // Try beacon to an edge function if it exists, otherwise rely on the above localStorage backup
+      // This is a common pattern for offline/close recovery without Edge functions
+      console.log('Emergency saved exam state to localStorage.')
+      isSubmitted.value = true
+
+    } catch (e) {
+      console.error('Emergency full submit failed', e)
     }
   }
 
@@ -668,11 +745,15 @@ export const useExamStore = defineStore('exam', () => {
   }
 
   const getNumericDraft = (questionId) => {
-    return numericDrafts.value[questionId] ?? ''
+    // Check main draftAnswers first, then userAnswers
+    const draft = draftAnswers.value[questionId]
+    if (typeof draft !== 'undefined') return draft
+
+    return userAnswers.value[questionId] || ''
   }
 
   const setNumericDraft = (questionId, value) => {
-    numericDrafts.value[questionId] = value
+    selectDraftAnswer(questionId, value)
   }
 
   // Fetch all student results with exam sessions
@@ -764,6 +845,7 @@ export const useExamStore = defineStore('exam', () => {
     questions,
     currentQuestionIndex,
     userAnswers,
+    draftAnswers,
     questionStatuses,
     remainingTime,
     isFullScreen,
@@ -776,6 +858,7 @@ export const useExamStore = defineStore('exam', () => {
     isSubmitted,
     allResults,
     statistics,
+
     // Getters
     currentQuestion,
     totalQuestions,
@@ -786,13 +869,15 @@ export const useExamStore = defineStore('exam', () => {
     initializeSession,
     fetchExamData,
     resetExamState,
-    saveAnswer,
+    selectDraftAnswer,
+    commitAnswer,
     markForReview,
     clearResponse,
     goToQuestion,
     nextQuestion,
     previousQuestion,
     submitExam,
+    emergencySubmit,
     toggleFullScreen,
     startTimer,
     formatTime,

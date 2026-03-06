@@ -108,8 +108,28 @@ const clearResponse = () => {
   examStore.clearResponse(questionId)
 }
 
-const markForReviewAndNext = () => {
-  const questionId = examStore.currentQuestion.id
+const markForReviewAndNext = async () => {
+  const q = examStore.currentQuestion
+  if (!q) return
+  const questionId = q.id
+  
+  // If there's a draft, commit it first
+  if (examStore.draftAnswers[questionId] !== undefined) {
+    if (q.question_type === 'numeric') {
+      const draft = examStore.getNumericDraft(questionId)
+      const value = String((draft ?? '').toString().trim())
+      if (value !== '') {
+        const res = await examStore.commitAnswer(questionId)
+        if (res && res.success === false && res.reason === 'numeric_limit_reached') {
+          alert('You have already answered 5 numericals for this subject.')
+          return
+        }
+      }
+    } else {
+      await examStore.commitAnswer(questionId)
+    }
+  }
+
   examStore.markForReview(questionId)
   examStore.nextQuestion()
 }
@@ -118,21 +138,24 @@ const saveAndNext = async () => {
   const q = examStore.currentQuestion
   if (!q) return
   const questionId = q.id
-  if (q.question_type === 'multiple_choice') {
-    const ans = examStore.userAnswers[questionId]
-    if (typeof ans === 'undefined') return examStore.nextQuestion()
-    // already saved by select
-  } else if (q.question_type === 'numeric') {
-    const draft = examStore.getNumericDraft(questionId)
-    const value = String((draft ?? '').toString().trim())
-    if (value !== '') {
-      const res = await examStore.saveAnswer(questionId, value)
-      if (res && res.success === false && res.reason === 'numeric_limit_reached') {
-        alert('You have already answered 5 numericals for this subject.')
-        return
+  
+  if (examStore.draftAnswers[questionId] !== undefined) {
+    if (q.question_type === 'numeric') {
+      const draft = examStore.getNumericDraft(questionId)
+      const value = String((draft ?? '').toString().trim())
+      if (value !== '') {
+        const res = await examStore.commitAnswer(questionId)
+        if (res && res.success === false && res.reason === 'numeric_limit_reached') {
+          alert('You have already answered 5 numericals for this subject.')
+          return
+        }
       }
+    } else {
+      await examStore.commitAnswer(questionId)
     }
   }
+  
+  // If they click Save & Next but already had an answer saved (and no new draft), just move to next
   examStore.nextQuestion()
 }
 </script> 

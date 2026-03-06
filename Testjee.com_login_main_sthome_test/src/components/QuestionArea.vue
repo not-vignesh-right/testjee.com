@@ -58,30 +58,68 @@
     <!-- Options / Numeric Input -->
     <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
       <template v-if="examStore.currentQuestion.question_type === 'multiple_choice'">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Select the correct answer:</h3>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-800">Select the correct answer:</h3>
+          <span v-if="examStore.userAnswers[examStore.currentQuestion.id]" class="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200">Answer Saved</span>
+          <span v-else-if="examStore.draftAnswers[examStore.currentQuestion.id]" class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">Not Saved (Click Save & Next)</span>
+        </div>
         <div class="space-y-3">
           <div
             v-for="option in examStore.currentQuestion.options"
             :key="option.id"
             @click="selectOption(option.id)"
             :class="[
-              'question-option',
-              { 'selected': examStore.userAnswers[examStore.currentQuestion.id] === option.id }
+              'p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center group',
+              { 
+                // Saved answer styling
+                'border-green-500 bg-green-50 shadow-sm': examStore.userAnswers[examStore.currentQuestion.id] === option.id,
+                
+                // Draft answer styling (selected but not saved)
+                'border-blue-500 bg-blue-50 shadow-sm': examStore.draftAnswers[examStore.currentQuestion.id] === option.id && examStore.userAnswers[examStore.currentQuestion.id] !== option.id,
+                
+                // Unselected styling
+                'border-gray-200 hover:border-blue-300 hover:bg-gray-50': 
+                  examStore.userAnswers[examStore.currentQuestion.id] !== option.id && 
+                  examStore.draftAnswers[examStore.currentQuestion.id] !== option.id 
+              }
             ]"
           >
-            <div class="flex items-center space-x-3">
-              <div class="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
-                <div v-if="examStore.userAnswers[examStore.currentQuestion.id] === option.id" 
-                     class="w-3 h-3 bg-gta-primary rounded-full"></div>
+            <div class="flex items-center space-x-3 w-full">
+              <!-- Radio Button Circle -->
+              <div 
+                class="w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
+                :class="[
+                  examStore.userAnswers[examStore.currentQuestion.id] === option.id ? 'border-green-500' :
+                  examStore.draftAnswers[examStore.currentQuestion.id] === option.id ? 'border-blue-500' :
+                  'border-gray-300 group-hover:border-blue-400'
+                ]"
+              >
+                <!-- Inner Dot -->
+                <div 
+                  v-if="examStore.userAnswers[examStore.currentQuestion.id] === option.id" 
+                  class="w-3 h-3 bg-green-500 rounded-full"
+                ></div>
+                <div 
+                  v-else-if="examStore.draftAnswers[examStore.currentQuestion.id] === option.id" 
+                  class="w-3 h-3 bg-blue-500 rounded-full"
+                ></div>
               </div>
-              <span class="font-medium text-gray-700">{{ option.id.toUpperCase() }}.</span>
-              <span class="text-gray-800">{{ option.text }}</span>
+              <span class="font-bold whitespace-nowrap" :class="[
+                  examStore.userAnswers[examStore.currentQuestion.id] === option.id ? 'text-green-800' :
+                  examStore.draftAnswers[examStore.currentQuestion.id] === option.id ? 'text-blue-800' :
+                  'text-gray-700'
+              ]">{{ option.id.toUpperCase() }}.</span>
+              <span class="text-gray-800 flex-1">{{ option.text }}</span>
             </div>
           </div>
         </div>
       </template>
       <template v-else>
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Enter your answer (Numeric):</h3>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-800">Enter your answer (Numeric):</h3>
+          <span v-if="examStore.userAnswers[examStore.currentQuestion.id]" class="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200">Answer Saved</span>
+          <span v-else-if="examStore.draftAnswers[examStore.currentQuestion.id]" class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">Not Saved (Click Save & Next)</span>
+        </div>
         <div class="flex items-center space-x-3">
           <input
             type="text"
@@ -135,9 +173,10 @@ watch(() => examStore.currentQuestion?.id, () => {
   }
 })
 
-const selectOption = async (optionId) => {
+const selectOption = (optionId) => {
   const questionId = examStore.currentQuestion.id
-  await examStore.saveAnswer(questionId, optionId)
+  // Only select draft, don't save. User must click "Save & Next"
+  examStore.selectDraftAnswer(questionId, optionId)
 }
 
 // Numeric saving is handled by the footer's Save & Next

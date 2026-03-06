@@ -13,7 +13,30 @@
     </div>
 
     <!-- Stats Row -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8 animate-fadeIn" style="animation-delay:0.05s">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-8 animate-fadeIn" style="animation-delay:0.05s">
+      <!-- Tests Remaining Card -->
+      <div 
+        class="stat-card group cursor-pointer transition-colors" 
+        :class="studentProfile?.number_of_tests === 0 ? 'bg-red-50 border-red-200' : 'hover:border-blue-300'"
+        @click="studentProfile?.number_of_tests === 0 ? showRestoreModal = true : null"
+      >
+        <div 
+          class="stat-icon"
+          :class="studentProfile?.number_of_tests === 0 ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600'"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
+        </div>
+        <div>
+          <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Tests Left</p>
+          <div class="flex items-baseline gap-2">
+            <p class="text-2xl font-bold" :class="studentProfile?.number_of_tests === 0 ? 'text-red-600' : 'text-gray-900'">
+              {{ studentProfile?.number_of_tests || 0 }}
+            </p>
+            <span v-if="studentProfile?.number_of_tests === 0" class="text-[10px] font-bold text-red-500 uppercase tracking-wider bg-red-100 px-1.5 py-0.5 rounded">Buy More</span>
+          </div>
+        </div>
+      </div>
+
       <div class="stat-card group">
         <div class="stat-icon bg-blue-100 text-blue-600">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
@@ -182,7 +205,7 @@
           <h3 class="text-xl font-bold text-gray-900 mb-1">Start New Exam</h3>
           <p class="text-sm text-gray-500 mb-5">Choose the type of exam:</p>
 
-          <button @click="startExam('JEE_MAIN_FULL')" class="w-full flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50/50 transition-all group mb-3">
+          <button @click="confirmExamStart('JEE_MAIN_FULL')" class="w-full flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50/50 transition-all group mb-3">
             <div class="flex items-center gap-3">
               <div class="p-2.5 bg-blue-100 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -209,6 +232,33 @@
           </button>
 
           <button @click="showExamModal = false" class="w-full py-2.5 text-sm font-semibold text-gray-600 hover:text-gray-900 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Start Modal -->
+    <div v-if="showConfirmModal" class="fixed inset-0 z-[60] overflow-y-auto" style="animation: fadeIn 0.2s ease-out">
+      <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showConfirmModal = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center" style="animation: slideUp 0.3s ease-out">
+          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
+            <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h3 class="text-lg leading-6 font-bold text-gray-900 mb-2">Ready to Start?</h3>
+          <div class="mt-2 text-sm text-gray-500 space-y-2 mb-6 text-left bg-gray-50 p-4 rounded-lg">
+            <p>• You are about to start a <strong>3-hour JEE Main Mock Test</strong>.</p>
+            <p>• The exam will enter <strong>full-screen mode</strong> automatically.</p>
+            <p>• Your test will be <strong>auto-submitted</strong> if you leave the page or close the tab.</p>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <button @click="showConfirmModal = false" class="w-full sm:w-1/2 justify-center rounded-xl border border-gray-300 px-4 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors">Cancel</button>
+            <button @click="startExam(selectedExamType)" class="w-full sm:w-1/2 justify-center rounded-xl border border-transparent px-4 py-3 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none shadow-sm transition-colors flex items-center gap-2">
+              <span>Yes, Start Exam</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -331,6 +381,8 @@ const studentProfile = computed(() => authStore.studentProfile)
 const examHistory = ref([])
 const loading = ref(true)
 const showExamModal = ref(false)
+const showConfirmModal = ref(false)
+const selectedExamType = ref(null)
 const showRestoreModal = ref(false)
 const restoreTestCount = ref(3)
 const restoreLoading = ref(false)
@@ -540,13 +592,27 @@ function getScoreColor(score) {
   return 'text-red-500'
 }
 
+function confirmExamStart(examType) {
+  const testsRemaining = authStore.studentProfile?.number_of_tests || 0
+  if (testsRemaining <= 0) {
+    showExamModal.value = false
+    showRestoreModal.value = true
+    restoreMessage.value = ''
+    return
+  }
+  
+  selectedExamType.value = examType
+  showExamModal.value = false
+  showConfirmModal.value = true
+}
+
 async function startExam(examType) {
   const examStore = useExamStore()
 
   // Check if student has tests remaining
   const testsRemaining = authStore.studentProfile?.number_of_tests || 0
   if (testsRemaining <= 0) {
-    showExamModal.value = false
+    showConfirmModal.value = false
     showRestoreModal.value = true
     restoreMessage.value = ''
     return
@@ -579,7 +645,7 @@ async function startExam(examType) {
 
   examStore.resetExamState() // Clear old submission state
   examStore.setExamType(examType || 'JEE_MAIN_FULL')
-  showExamModal.value = false
+  showConfirmModal.value = false
   router.push('/exam')
 }
 

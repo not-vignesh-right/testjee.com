@@ -15,20 +15,20 @@
           <span class="text-gray-600">Not Visited</span>
         </div>
         <div class="flex items-center space-x-2">
-          <div class="w-4 h-4 bg-gta-danger border border-gta-danger rounded"></div>
-          <span class="text-gray-600">Visited</span>
+          <div class="w-4 h-4 bg-red-500 border border-red-600 rounded"></div>
+          <span class="text-gray-600">Not Answered</span>
         </div>
         <div class="flex items-center space-x-2">
-          <div class="w-4 h-4 bg-gta-success border border-gta-success rounded"></div>
+          <div class="w-4 h-4 bg-green-500 border border-green-600 rounded"></div>
           <span class="text-gray-600">Answered</span>
         </div>
         <div class="flex items-center space-x-2">
-          <div class="w-4 h-4 bg-gta-purple border border-gta-purple rounded"></div>
-          <span class="text-gray-600">Marked</span>
+          <div class="w-4 h-4 bg-purple-500 border border-purple-600 rounded"></div>
+          <span class="text-gray-600">Marked for Review</span>
         </div>
         <div class="flex items-center space-x-2 col-span-2">
-          <div class="w-4 h-4 bg-gta-purple border-2 border-gta-success rounded"></div>
-          <span class="text-gray-600">Answered + Marked</span>
+          <div class="w-4 h-4 bg-purple-500 border-2 border-green-500 rounded relative"><span class="absolute bottom-0 right-0 w-1.5 h-1.5 bg-green-500 rounded-full"></span></div>
+          <span class="text-gray-600">Answered & Marked for Review</span>
         </div>
       </div>
     </div>
@@ -46,7 +46,7 @@
             :key="item.question.id"
             @click="goToQuestion(item.index)"
             :class="[
-              'palette-button',
+              'w-10 h-10 rounded-md font-bold text-sm flex items-center justify-center transition-all',
               getPaletteButtonClass(item.question.id)
             ]"
             :title="`Question ${item.index + 1}: ${item.question.subject} - ${item.question.topic}`"
@@ -114,18 +114,18 @@ const goToQuestion = (index) => {
 
 const getPaletteButtonClass = (questionId) => {
   const status = examStore.questionStatuses[questionId]
-  if (!status) return 'palette-not-visited'
+  if (!status) return 'bg-gray-100 text-gray-700 border border-gray-300' // Not visited
   
   if (status.answered && status.marked) {
-    return 'palette-answered-marked'
+    return 'bg-purple-500 text-white border-2 border-green-500 shadow-inner' // Answered + Marked
   } else if (status.answered) {
-    return 'palette-answered'
+    return 'bg-green-500 text-white border border-green-600 shadow-sm' // Answered (Saved)
   } else if (status.marked) {
-    return 'palette-marked'
+    return 'bg-purple-500 text-white border border-purple-600 shadow-sm' // Marked (No answer)
   } else if (status.visited) {
-    return 'palette-visited'
+    return 'bg-red-500 text-white border border-red-600 shadow-sm' // Visited but no answer saved
   } else {
-    return 'palette-not-visited'
+    return 'bg-gray-100 text-gray-700 border border-gray-300' // Fallback
   }
 }
 </script> 
