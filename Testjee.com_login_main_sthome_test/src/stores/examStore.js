@@ -646,6 +646,10 @@ export const useExamStore = defineStore('exam', () => {
       localStorage.removeItem('currentQuestionIndex')
       localStorage.removeItem('questionStatuses')
       localStorage.removeItem('examQuestions')
+
+      const pendingKey = `pending_submit_${authStore.studentProfile?.student_id || authStore.studentId || 'unauth'}`
+      localStorage.removeItem(pendingKey)
+
       console.log('Exam submitted, localStorage cleared')
 
       return { success: true, message: 'Exam submitted successfully', result_id: insertedId, score }
@@ -711,7 +715,8 @@ export const useExamStore = defineStore('exam', () => {
       // Try beacon to an edge function if it exists, otherwise rely on the above localStorage backup
       // This is a common pattern for offline/close recovery without Edge functions
       console.log('Emergency saved exam state to localStorage.')
-      isSubmitted.value = true
+      // Intentionally NOT setting isSubmitted.value = true here, 
+      // so that the subsequent await submitExam() can still hit the database!
 
     } catch (e) {
       console.error('Emergency full submit failed', e)
