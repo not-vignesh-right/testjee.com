@@ -149,7 +149,7 @@ function forceExitToDashboard() {
 // --- Security & Enforcement ---
 
 const handleFullscreenChange = async () => {
-  if (!document.fullscreenElement && !examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value) {
+  if (!document.fullscreenElement && !examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
     // Student exited full screen mid-exam - STRICT AUTO SUBMIT
     examStore.isFullScreen = false
     autoSubmitReason.value = 'exited full-screen mode'
@@ -163,7 +163,7 @@ const handleFullscreenChange = async () => {
 }
 
 const handleBeforeUnload = (e) => {
-  if (!examStore.isSubmitted && !showInstructions.value) {
+  if (!examStore.isSubmitted && !showInstructions.value && !examStore.isManuallySubmitting) {
     e.preventDefault()
     e.returnValue = '' // Shows browser default warning
     
@@ -177,7 +177,7 @@ const handleBeforeUnload = (e) => {
 }
 
 const handleVisibilityChange = async () => {
-  if (document.hidden && !examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value) {
+  if (document.hidden && !examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
     // If tab becomes hidden (switched away) - STRICT AUTO SUBMIT
     console.warn("Tab hidden - STRICT AUTO SUBMIT")
     autoSubmitReason.value = 'switched tabs or minimized the window'

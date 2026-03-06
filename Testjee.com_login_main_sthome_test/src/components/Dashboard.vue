@@ -254,10 +254,16 @@
             <p>• <strong>WARNING:</strong> Your test will be <strong>IMMEDIATELY AUTO-SUBMITTED</strong> if you exit full-screen, switch tabs, or open other applications. No exceptions.</p>
           </div>
           <div class="flex flex-col sm:flex-row gap-3">
-            <button @click="showConfirmModal = false" class="w-full sm:w-1/2 justify-center rounded-xl border border-gray-300 px-4 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors">Cancel</button>
-            <button @click="startExam(selectedExamType)" class="w-full sm:w-1/2 justify-center rounded-xl border border-transparent px-4 py-3 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none shadow-sm transition-colors flex items-center gap-2">
-              <span>Yes, Start Exam</span>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            <button @click="showConfirmModal = false" :disabled="isStartingExam" class="w-full sm:w-1/2 justify-center rounded-xl border border-gray-300 px-4 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors disabled:opacity-50">Cancel</button>
+            <button @click="startExam(selectedExamType)" :disabled="isStartingExam" class="w-full sm:w-1/2 justify-center rounded-xl border border-transparent px-4 py-3 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none shadow-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-75">
+              <span v-if="isStartingExam" class="flex items-center gap-2">
+                <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Starting...
+              </span>
+              <template v-else>
+                <span>Yes, Start Exam</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+              </template>
             </button>
           </div>
         </div>
@@ -389,6 +395,7 @@ const restoreTestCount = ref(3)
 const restoreLoading = ref(false)
 const restoreMessage = ref('')
 const restoreMessageType = ref('')
+const isStartingExam = ref(false)
 
 const isCustomPackage = ref(false)
 const pricingDetails = computed(() => getPriceDetails(restoreTestCount.value))
@@ -608,19 +615,21 @@ function confirmExamStart(examType) {
 }
 
 async function startExam(examType) {
-  const examStore = useExamStore()
-
-  // Check if student has tests remaining
-  const testsRemaining = authStore.studentProfile?.number_of_tests || 0
-  if (testsRemaining <= 0) {
-    showConfirmModal.value = false
-    showRestoreModal.value = true
-    restoreMessage.value = ''
-    return
-  }
-
-  // Decrement the number of tests in Supabase
+  if (isStartingExam.value) return
+  isStartingExam.value = true
   try {
+    const examStore = useExamStore()
+
+    // Check if student has tests remaining
+    const testsRemaining = authStore.studentProfile?.number_of_tests || 0
+    if (testsRemaining <= 0) {
+      showConfirmModal.value = false
+      showRestoreModal.value = true
+      restoreMessage.value = ''
+      return
+    }
+
+    // Decrement the number of tests in Supabase
     const { error } = await supabase
       .from('students')
       .update({
@@ -638,16 +647,17 @@ async function startExam(examType) {
     // Update local profile to reflect the change
     authStore.studentProfile.number_of_tests = testsRemaining - 1
     console.log(`[TESTJEE] Tests remaining: ${testsRemaining - 1}`)
+
+    examStore.resetExamState() // Clear old submission state
+    examStore.setExamType(examType || 'JEE_MAIN_FULL')
+    showConfirmModal.value = false
+    router.push('/exam')
   } catch (err) {
     console.error('Error decrementing tests:', err)
     alert('Something went wrong. Please try again.')
-    return
+  } finally {
+    isStartingExam.value = false
   }
-
-  examStore.resetExamState() // Clear old submission state
-  examStore.setExamType(examType || 'JEE_MAIN_FULL')
-  showConfirmModal.value = false
-  router.push('/exam')
 }
 
 async function sendRestoreRequest() {

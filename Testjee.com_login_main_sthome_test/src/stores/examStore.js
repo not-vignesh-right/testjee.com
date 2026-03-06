@@ -33,6 +33,7 @@ export const useExamStore = defineStore('exam', () => {
   const allResults = ref([]) // All student results with sessions
   const statistics = ref(null) // Aggregate statistics
   const isManuallySubmitting = ref(false) // Flag to prevent window blur cheating detection on manual submit
+  const isSubmitting = ref(false) // Global lock to prevent duplicate async database writes
 
 
   // Getters
@@ -500,14 +501,14 @@ export const useExamStore = defineStore('exam', () => {
   }
 
   const submitExam = async () => {
+    if (isSubmitting.value || isSubmitted.value) {
+      console.warn('⚠️ Exam already submitting or submitted, ignoring duplicate submit')
+      return { success: false, message: 'Exam currently submitting or already submitted' }
+    }
+
+    isSubmitting.value = true
     try {
       const authStore = useAuthStore()
-
-      // Prevent double submission
-      if (isSubmitted.value) {
-        console.warn('⚠️ Exam already submitted, ignoring duplicate submit')
-        return { success: false, message: 'Exam already submitted' }
-      }
 
       // Flush final timer
       if (currentTimer.value) {
@@ -663,6 +664,8 @@ export const useExamStore = defineStore('exam', () => {
       console.error('Error submitting exam:', error)
       alert("Error submitting exam. Please check your internet connection.")
       return { success: false, error }
+    } finally {
+      isSubmitting.value = false
     }
   }
 
