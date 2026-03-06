@@ -25,20 +25,22 @@
 
     <!-- Normal exam view -->
     <div v-else class="exam-container">
-      <!-- Fullscreen warning overlay -->
-      <div v-if="showFullscreenWarning" class="fixed inset-0 z-[100] bg-gray-900/95 flex items-center justify-center p-4">
+      <!-- Submission Reason Modal -->
+      <div v-if="autoSubmitReason" class="fixed inset-0 z-[100] bg-gray-900/95 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center animate-fadeIn">
           <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+            <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
           </div>
-          <h2 class="text-2xl font-bold text-gray-900 mb-3">Full Screen Required</h2>
-          <p class="text-gray-600 mb-8">You have exited full-screen mode. To maintain exam integrity, you must return to full-screen mode immediately.</p>
+          <h2 class="text-2xl font-bold text-gray-900 mb-3">Exam Auto-Submitted</h2>
+          <p class="text-gray-600 mb-4">Your exam has been automatically submitted because you <strong class="text-red-600">{{ autoSubmitReason }}</strong>.</p>
+          <p class="text-sm text-gray-500 mb-8 border-t pt-4">As per the instructions, exiting full-screen mode or switching tabs is strictly prohibited.</p>
           <button 
-            @click="enforceFullScreen" 
-            class="w-full py-4 px-6 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold shadow-lg shadow-red-200 transition-all flex items-center justify-center gap-2"
+            @click="forceExitToDashboard" 
+            class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg transition-all"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
-            Return to Exam
+            Return to Dashboard
           </button>
         </div>
       </div>
@@ -78,7 +80,7 @@ const auth = useAuthStore()
 const router = useRouter()
 
 const showInstructions = ref(true)
-const showFullscreenWarning = ref(false)
+const autoSubmitReason = ref('')
 
 // Exam initialization
 onMounted(async () => {
@@ -133,23 +135,29 @@ async function enforceFullScreen() {
     if (!document.fullscreenElement) {
       await document.documentElement.requestFullscreen()
     }
-    showFullscreenWarning.value = false
     examStore.isFullScreen = true
   } catch (err) {
     console.warn("Fullscreen request failed. Proceeding anyway.", err)
-    showFullscreenWarning.value = false // Don't block if browser prevents it
   }
+}
+
+function forceExitToDashboard() {
+  autoSubmitReason.value = ''
+  router.push('/sthome')
 }
 
 // --- Security & Enforcement ---
 
-const handleFullscreenChange = () => {
-  if (!document.fullscreenElement && !examStore.isSubmitted && !showInstructions.value) {
-    // Student exited full screen mid-exam
-    showFullscreenWarning.value = true
+const handleFullscreenChange = async () => {
+  if (!document.fullscreenElement && !examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value) {
+    // Student exited full screen mid-exam - STRICT AUTO SUBMIT
     examStore.isFullScreen = false
+    autoSubmitReason.value = 'exited full-screen mode'
+    if (examStore.emergencySubmit) {
+      examStore.emergencySubmit()
+    }
+    await examStore.submitExam()
   } else if (document.fullscreenElement) {
-    showFullscreenWarning.value = false
     examStore.isFullScreen = true
   }
 }
@@ -160,8 +168,6 @@ const handleBeforeUnload = (e) => {
     e.returnValue = '' // Shows browser default warning
     
     // Emergency submit attempt
-    // In many browsers, async fetch fails here. navigator.sendBeacon is better, 
-    // but we'll try the emergency submit in the store.
     if (examStore.emergencySubmit) {
       examStore.emergencySubmit()
     } else {
@@ -170,14 +176,15 @@ const handleBeforeUnload = (e) => {
   }
 }
 
-const handleVisibilityChange = () => {
-  // If tab becomes hidden (switched away), we could auto-submit here, 
-  // but just warning/submitting on actual leave is safer.
-  if (document.hidden && !examStore.isSubmitted && !showInstructions.value) {
-    // You could trigger an auto-submit here: 
-    // examStore.submitExam()
-    // router.push('/sthome')
-    console.warn("Tab hidden - potentially cheating")
+const handleVisibilityChange = async () => {
+  if (document.hidden && !examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value) {
+    // If tab becomes hidden (switched away) - STRICT AUTO SUBMIT
+    console.warn("Tab hidden - STRICT AUTO SUBMIT")
+    autoSubmitReason.value = 'switched tabs or minimized the window'
+    if (examStore.emergencySubmit) {
+      examStore.emergencySubmit()
+    }
+    await examStore.submitExam()
   }
 }
 

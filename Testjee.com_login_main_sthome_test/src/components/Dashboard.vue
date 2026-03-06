@@ -247,10 +247,11 @@
             </svg>
           </div>
           <h3 class="text-lg leading-6 font-bold text-gray-900 mb-2">Ready to Start?</h3>
-          <div class="mt-2 text-sm text-gray-500 space-y-2 mb-6 text-left bg-gray-50 p-4 rounded-lg">
-            <p>• You are about to start a <strong>3-hour JEE Main Mock Test</strong>.</p>
-            <p>• The exam will enter <strong>full-screen mode</strong> automatically.</p>
-            <p>• Your test will be <strong>auto-submitted</strong> if you leave the page or close the tab.</p>
+          <div class="mt-2 text-sm text-gray-500 space-y-2 mb-6 text-left bg-red-50 p-4 rounded-lg border border-red-100">
+            <p class="text-red-800 font-bold mb-1">STRICT SECURITY ENFORCED:</p>
+            <p>• Ensure you have a <strong>stable internet connection</strong> and sit in a calm environment before starting.</p>
+            <p>• The exam will immediately lock into <strong>full-screen mode</strong>.</p>
+            <p>• <strong>WARNING:</strong> Your test will be <strong>IMMEDIATELY AUTO-SUBMITTED</strong> if you exit full-screen, switch tabs, or open other applications. No exceptions.</p>
           </div>
           <div class="flex flex-col sm:flex-row gap-3">
             <button @click="showConfirmModal = false" class="w-full sm:w-1/2 justify-center rounded-xl border border-gray-300 px-4 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors">Cancel</button>

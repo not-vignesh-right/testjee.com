@@ -88,7 +88,7 @@
             />
           </div>
           <div class="text-sm text-gray-700">
-            <p>I have read and understood the instructions. All computer hardware allotted to me are in proper working condition. I agree that I will not carry any prohibited items into the exam. I understand that my exam will open in full-screen and closing the window will auto-submit my test.</p>
+            <p>I have read and understood the instructions. All computer hardware allotted to me are in proper working condition. I agree that I will not carry any prohibited items into the exam. I understand that my exam is in full-screen and <strong>EXITING FULL SCREEN OR SWITCHING TABS WILL RESULT IN IMMEDIATE AUTOMATIC SUBMISSION</strong>.</p>
           </div>
         </label>
 
@@ -117,10 +117,22 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
 const emit = defineEmits(['start'])
 const hasReadInstructions = ref(false)
+
+onMounted(() => {
+  // Request full screen as soon as instructions load
+  try {
+    const el = document.documentElement
+    if (el.requestFullscreen) el.requestFullscreen()
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen()
+    else if (el.msRequestFullscreen) el.msRequestFullscreen()
+  } catch (err) {
+    console.error('Initial fullscreen request failed:', err)
+  }
+})
 
 function startExam() {
   if (hasReadInstructions.value) {

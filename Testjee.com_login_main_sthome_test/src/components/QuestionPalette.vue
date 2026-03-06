@@ -27,7 +27,7 @@
           <span class="text-gray-600">Marked for Review</span>
         </div>
         <div class="flex items-center space-x-2 col-span-2">
-          <div class="w-4 h-4 bg-purple-500 border-2 border-green-500 rounded relative"><span class="absolute bottom-0 right-0 w-1.5 h-1.5 bg-green-500 rounded-full"></span></div>
+          <div class="w-4 h-4 bg-purple-500 border-4 border-green-500 rounded relative"><span class="absolute bottom-0 right-0 w-1.5 h-1.5 bg-green-500 rounded-full"></span></div>
           <span class="text-gray-600">Answered & Marked for Review</span>
         </div>
       </div>
@@ -117,7 +117,7 @@ const getPaletteButtonClass = (questionId) => {
   if (!status) return 'bg-gray-100 text-gray-700 border border-gray-300' // Not visited
   
   if (status.answered && status.marked) {
-    return 'bg-purple-500 text-white border-2 border-green-500 shadow-inner' // Answered + Marked
+    return 'bg-purple-500 text-white border-4 border-green-500 shadow-inner' // Answered + Marked
   } else if (status.answered) {
     return 'bg-green-500 text-white border border-green-600 shadow-sm' // Answered (Saved)
   } else if (status.marked) {

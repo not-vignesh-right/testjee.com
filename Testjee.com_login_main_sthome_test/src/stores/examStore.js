@@ -508,14 +508,17 @@ export const useExamStore = defineStore('exam', () => {
         return { success: false, message: 'Exam already submitted' }
       }
 
-      // Pause final timer
+      // Flush final timer
       if (currentTimer.value) {
         clearInterval(currentTimer.value)
-        const currentQuestionId = questions.value[currentQuestionIndex.value]?.id
-        if (currentQuestionId && currentStartTime.value) {
-          const elapsed = (Date.now() - currentStartTime.value) / 1000
-          timeSpent.value[currentQuestionId] = (timeSpent.value[currentQuestionId] || 0) + elapsed
-        }
+        currentTimer.value = null
+      }
+
+      const currentQuestionId = questions.value[currentQuestionIndex.value]?.id
+      if (currentQuestionId && currentStartTime.value) {
+        const elapsed = (Date.now() - currentStartTime.value) / 1000
+        timeSpent.value[currentQuestionId] = (timeSpent.value[currentQuestionId] || 0) + elapsed
+        currentStartTime.value = Date.now() // Reset just in case
       }
 
       // Build answers array (fixed length 75)
@@ -657,10 +660,17 @@ export const useExamStore = defineStore('exam', () => {
     if (isSubmitted.value || !sessionId.value) return;
 
     try {
+      // Flush final timer
+      if (currentTimer.value) {
+        clearInterval(currentTimer.value)
+        currentTimer.value = null
+      }
+
       const currentQuestionId = questions.value[currentQuestionIndex.value]?.id
       if (currentQuestionId && currentStartTime.value) {
         const elapsed = (Date.now() - currentStartTime.value) / 1000
         timeSpent.value[currentQuestionId] = (timeSpent.value[currentQuestionId] || 0) + elapsed
+        currentStartTime.value = Date.now()
       }
 
       const formattedAnswers = questions.value.map(q => {
