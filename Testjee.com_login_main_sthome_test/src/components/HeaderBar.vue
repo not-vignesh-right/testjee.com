@@ -47,20 +47,7 @@
           </div>
         </div>
         
-        <!-- Full Screen Toggle -->
-        <button
-          @click="examStore.toggleFullScreen"
-          class="p-2.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 border border-transparent hover:border-blue-200"
-          :title="examStore.isFullScreen ? 'Exit Full Screen' : 'Enter Full Screen'"
-        >
-          <svg v-if="!examStore.isFullScreen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
-          </svg>
-          <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-        
+
         <!-- Submit Exam Button -->
         <button
           @click="handleSubmit"

@@ -188,16 +188,92 @@ const handleVisibilityChange = async () => {
   }
 }
 
+const handleWindowBlur = async () => {
+  if (!examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value) {
+    // If window loses focus (clicked outside window/tab) - STRICT AUTO SUBMIT
+    console.warn("Window blurred - STRICT AUTO SUBMIT")
+    autoSubmitReason.value = 'clicked outside the exam window or opened another application'
+    if (examStore.emergencySubmit) {
+      examStore.emergencySubmit()
+    }
+    await examStore.submitExam()
+  }
+}
+
+const handleContextMenu = (e) => {
+  if (!examStore.isSubmitted && !showInstructions.value) {
+    e.preventDefault()
+  }
+}
+
+const handleKeyDown = (e) => {
+  if (examStore.isSubmitted || showInstructions.value) return
+
+  // Prevent F12 (DevTools)
+  if (e.key === 'F12') {
+    e.preventDefault()
+    return
+  }
+
+  // Prevent Ctrl/Cmd modifiers for specific actions
+  if (e.ctrlKey || e.metaKey) {
+    const key = e.key.toLowerCase()
+    const blockList = [
+      'c', // Copy
+      'v', // Paste
+      'x', // Cut
+      'a', // Select All
+      's', // Save
+      'p', // Print
+      'f', // Find
+      'i', // DevTools (Ctrl+Shift+I)
+      'j', // DevTools (Ctrl+Shift+J)
+      'u', // View Source
+    ]
+    if (blockList.includes(key)) {
+      e.preventDefault()
+    }
+  }
+
+  // Prevent Alt toggling (Alt+Tab usually handled by OS but block alt key menus)
+  if (e.altKey) {
+    e.preventDefault()
+  }
+}
+
+const handleDragSelect = (e) => {
+  if (!examStore.isSubmitted && !showInstructions.value) {
+    e.preventDefault()
+  }
+}
+
 function setupSecurityListeners() {
   document.addEventListener('fullscreenchange', handleFullscreenChange)
   window.addEventListener('beforeunload', handleBeforeUnload)
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  window.addEventListener('blur', handleWindowBlur)
+  document.addEventListener('contextmenu', handleContextMenu)
+  document.addEventListener('keydown', handleKeyDown)
+  
+  // Prevent dragging and copy/pasting
+  document.addEventListener('dragstart', handleDragSelect)
+  document.addEventListener('copy', handleDragSelect)
+  document.addEventListener('cut', handleDragSelect)
+  document.addEventListener('paste', handleDragSelect)
 }
 
 function removeSecurityListeners() {
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
   window.removeEventListener('beforeunload', handleBeforeUnload)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('blur', handleWindowBlur)
+  document.removeEventListener('contextmenu', handleContextMenu)
+  document.removeEventListener('keydown', handleKeyDown)
+  
+  document.removeEventListener('dragstart', handleDragSelect)
+  document.removeEventListener('copy', handleDragSelect)
+  document.removeEventListener('cut', handleDragSelect)
+  document.removeEventListener('paste', handleDragSelect)
 }
 </script>
 
@@ -214,5 +290,15 @@ function removeSecurityListeners() {
 .exam-container {
   min-height: 100vh;
   position: relative;
+  /* Prevent text selection in the entire exam container */
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none; /* IE 10 and IE 11 */
+  user-select: none; /* Standard syntax */
+}
+
+/* Allow text selection in the Submission Modal, but not the question body */
+:deep(input[type="number"]) {
+  -webkit-user-select: auto;
+  user-select: auto;
 }
 </style>
