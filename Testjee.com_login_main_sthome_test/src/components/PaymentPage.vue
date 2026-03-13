@@ -176,7 +176,6 @@ import { useRouter, useRoute } from 'vue-router'
 import { getPriceDetails, PRESET_PACKAGES } from '../data/pricing'
 import qrImage from '../assets/payment_upi_qr.jpeg'
 import { useAuthStore } from '../stores/authStore'
-import emailjs from '@emailjs/browser'
 
 const router = useRouter()
 const route = useRoute()
@@ -264,42 +263,21 @@ async function confirmPayment() {
   // Store the payment status/intent locally
   localStorage.setItem('paymentAttempted', 'true')
   
-  // SEND UPDATE TO ADMIN
+  // SYNC WITH DATABASE: Update test count and set approved=false for admin review
   try {
-    // Ensure profile is loaded for the email
     if (!authStore.studentProfile) {
       await authStore.fetchOrCreateStudent()
     }
-
-    const student = authStore.studentProfile
-    if (student) {
-      console.log('[PAYMENT] Notifying admin of payment completion...', { tests: testCount.value })
-      
-      // We use the same approval template but with updated data
-      const approveLink = `https://login.testjee.com/admin-approve?name=${encodeURIComponent(student.student_name)}&email=${encodeURIComponent(student.email_id)}&mobile=${encodeURIComponent(student.mobile_number || '')}&tests=${testCount.value}`;
-
-      const templateParams = {
-        student_name: student.student_name,
-        student_email: student.email_id,
-        student_total_tests: testCount.value, // Make sure these keys match your EmailJS template
-        requested_tests: testCount.value,
-        approve_link: approveLink,
-        admin_email: 'chinmaypanghri@gmail.com',
-        payment_status: 'USER_CLAIMED_PAID'
-      }
-
-      const res = await emailjs.send(
-        'service_testjee',
-        'template_approval',
-        templateParams,
-        'I9eXY3TayX67uR-3R'
-      )
-      console.log('[PAYMENT] Admin notification sent:', res.status)
-    } else {
-      console.error('[PAYMENT] Abandoning admin notification: No student profile found even after retry')
+    
+    if (authStore.studentProfile) {
+      console.log('[PAYMENT] Finalizing request in DB...', { tests: testCount.value })
+      await authStore.updateStudentProfile({ 
+        number_of_tests: testCount.value,
+        is_approved: false 
+      })
     }
   } catch (err) {
-    console.error('[PAYMENT] Error notifying admin:', err)
+    console.error('[PAYMENT] Error syncing final payment state:', err)
   }
 
   router.push('/waiting-approval?step=admin')

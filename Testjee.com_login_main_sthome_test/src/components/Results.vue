@@ -293,7 +293,6 @@ import { storeToRefs } from 'pinia'
 import { useExamStore } from '../stores/examStore'
 import { useAuthStore } from '../stores/authStore'
 import { supabase } from '../lib/supabase'
-import emailjs from '@emailjs/browser'
 import logo from '../assets/logo_test_jee.png'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
@@ -581,29 +580,21 @@ async function sendRestoreRequest() {
   restoreMessage.value = ''
 
   try {
-    const studentName = authStore.studentProfile?.student_name || 'Student'
-    const studentEmail = authStore.studentProfile?.email_id || ''
-    const studentId = authStore.studentProfile?.student_id
-
-    const restoreLink = `https://login.testjee.com/admin-approve?action=restore&email=${encodeURIComponent(studentEmail)}&tests=${restoreTestCount.value}&name=${encodeURIComponent(studentName)}&sid=${studentId}`
-
-    const templateParams = {
-      student_name: studentName,
-      student_email: studentEmail,
-      student_mobile: `Student ID: ${studentId}`,
-      requested_tests: `${restoreTestCount.value} (Restore Request)`,
-      approve_link: restoreLink
+    // Set is_approved to false when requesting more tests so admin can re-approve after payment
+    if (authStore.studentProfile) {
+      await authStore.updateStudentProfile({ is_approved: false })
     }
+    
+    // Clear message
+    restoreMessage.value = ''
 
-    await emailjs.send(
-      'service_testjee',
-      'template_approval',
-      templateParams,
-      'I9eXY3TayX67uR-3R'
-    )
-
-    restoreMessage.value = 'Request sent! The admin will review and restore your tests.'
-    restoreMessageType.value = 'success'
+    // Redirect to the payment component to actually prompt UI payment
+    showRestoreModal.value = false
+    router.push({
+      path: '/payment',
+      query: { tests: restoreTestCount.value }
+    })
+    
   } catch (error) {
     console.error('[TESTJEE] Restore request error:', error)
     restoreMessage.value = 'Failed to send request. Please try again.'
