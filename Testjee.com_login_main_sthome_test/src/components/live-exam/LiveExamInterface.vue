@@ -305,10 +305,11 @@ const toggleMarkForReview = () => {
    handleAnswerChange()
 }
 
-// saveAndNext: save with CURRENT mark state, then navigate.
-// This preserves the user's intent: if they marked it, it stays marked after save.
-// If they want to unmark, they should click 'Mark for Review' again BEFORE saving.
+// saveAndNext: explicitly unmarks the question then saves.
+// Logic: "Save & Next" means "I'm done with this question" → remove review flag → turn full green.
+// If user wants to keep the mark, they should NOT click Save & Next — they should navigate via palette.
 const saveAndNext = async () => {
+  localIsMarked.value = false  // ← Clicking Save & Next clears the review mark
   await handleAnswerChange()
   store.navigateToQuestion(store.currentQuestionNumber + 1)
 }

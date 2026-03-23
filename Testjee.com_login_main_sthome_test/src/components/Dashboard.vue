@@ -249,6 +249,7 @@
           <h3 class="text-lg leading-6 font-bold text-gray-900 mb-2">Ready to Start?</h3>
           <div class="mt-2 text-sm text-gray-500 space-y-2 mb-6 text-left bg-red-50 p-4 rounded-lg border border-red-100">
             <p class="text-red-800 font-bold mb-1">STRICT SECURITY ENFORCED:</p>
+            <p>• 🖥️ <strong>Laptop / Desktop only.</strong> Mobile phones and tablets are not permitted for this exam.</p>
             <p>• Ensure you have a <strong>stable internet connection</strong> and sit in a calm environment before starting.</p>
             <p>• The exam will immediately lock into <strong>full-screen mode</strong>.</p>
             <p>• <strong>WARNING:</strong> Your test will be <strong>IMMEDIATELY AUTO-SUBMITTED</strong> if you exit full-screen, switch tabs, or open other applications. No exceptions.</p>
