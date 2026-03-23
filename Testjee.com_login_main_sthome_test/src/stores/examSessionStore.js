@@ -150,20 +150,22 @@ export const useExamSessionStore = defineStore('examSession', () => {
 
             // Sync local state with loaded database data
             answers.value = {}
-            markedForReview.value.clear()
             timeSpent.value = {}
 
+            // Build a fresh Set so Vue reactivity is triggered correctly
+            const freshMarked = new Set()
             questions.value.forEach(q => {
                 if (q.selected_answer) {
                     answers.value[q.question_id] = q.selected_answer
                 }
                 if (q.is_marked_for_review) {
-                    markedForReview.value.add(q.question_number)
+                    freshMarked.add(q.question_number)
                 }
                 if (q.time_spent_seconds) {
                     timeSpent.value[q.question_id] = q.time_spent_seconds
                 }
             })
+            markedForReview.value = freshMarked
 
             return { success: true }
         } catch (err) {
@@ -190,10 +192,14 @@ export const useExamSessionStore = defineStore('examSession', () => {
                 delete answers.value[questionId] // To Clear Response
             }
 
+            // Always replace the Set (not mutate) so Vue detects the change
+            // and re-renders the question palette immediately.
             if (isMarkedRef) {
-                markedForReview.value.add(question.question_number)
+                markedForReview.value = new Set([...markedForReview.value, question.question_number])
             } else {
-                markedForReview.value.delete(question.question_number)
+                const updated = new Set(markedForReview.value)
+                updated.delete(question.question_number)
+                markedForReview.value = updated
             }
 
             // Calculate active time spent dynamically before hitting API
@@ -338,7 +344,7 @@ export const useExamSessionStore = defineStore('examSession', () => {
         questionOrder.value = []
         questions.value = []
         answers.value = {}
-        markedForReview.value.clear()
+        markedForReview.value = new Set()
         timeSpent.value = {}
         currentQuestionNumber.value = 1
         timeRemainingSeconds.value = 0

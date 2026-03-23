@@ -7,6 +7,23 @@
        <div class="absolute -bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-indigo-100 mix-blend-multiply filter blur-3xl opacity-50"></div>
     </div>
 
+    <!-- Mobile Block Overlay -->
+    <div v-if="isMobile" class="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center px-8 text-center">
+      <div class="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <svg class="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-black text-gray-900 mb-3">Mobile Not Allowed</h1>
+      <p class="text-gray-500 text-base leading-relaxed max-w-sm">
+        This exam must be taken on a <strong class="text-gray-800">laptop or desktop computer</strong>.<br/>
+        Please switch to a desktop browser to continue.
+      </p>
+      <div class="mt-8 px-5 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold">
+        📵 Mobile &amp; Tablet access is not permitted
+      </div>
+    </div>
+
     <!-- Main Card -->
     <div v-if="store.sessionDetails" class="max-w-3xl w-full bg-white rounded-2xl shadow-xl shadow-blue-900/5 overflow-hidden z-10 border border-gray-100">
        
@@ -81,6 +98,10 @@
                 Important Instructions
              </h4>
              <ul class="text-sm text-blue-800/80 space-y-3 font-medium">
+               <li class="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 -mx-1">
+                  <span class="text-red-500 mt-0.5 shrink-0">🖥️</span>
+                  <span class="text-red-700 font-semibold">This exam must be attended on a <strong>laptop or desktop only</strong>. Mobile phones and tablets are not permitted.</span>
+               </li>
                <li class="flex items-start gap-2">
                   <span class="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5 shrink-0 block"></span>
                   Duration: {{ store.sessionDetails.durationMinutes }} minutes. The timer will begin exactly when you click 'Start Exam'.
@@ -116,6 +137,18 @@ const pollInterval = ref(null)
 const countdownInterval = ref(null)
 const startCountdownDisplay = ref('00:00:00')
 
+// Detect mobile/tablet devices — block from starting exam
+const isMobile = ref(false)
+const checkDevice = () => {
+  const w = window.innerWidth
+  const ua = navigator.userAgent || ''
+  const touchDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)
+  // Block if screen width < 1024px OR is a known touch/mobile user-agent
+  isMobile.value = w < 1024 || touchDevice
+}
+window.addEventListener('resize', checkDevice)
+checkDevice()
+
 const canStartExam = computed(() => store.sessionDetails?.sessionStatus === 'live' || store.sessionDetails?.canStart)
 
 onMounted(() => {
@@ -137,6 +170,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (pollInterval.value) clearInterval(pollInterval.value)
   if (countdownInterval.value) clearInterval(countdownInterval.value)
+  window.removeEventListener('resize', checkDevice)
 })
 
 const startStatusPolling = () => {
