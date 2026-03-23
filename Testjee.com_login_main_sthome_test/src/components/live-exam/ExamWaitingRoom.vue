@@ -143,15 +143,16 @@ const checkDevice = () => {
   const w = window.innerWidth
   const ua = navigator.userAgent || ''
   const touchDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)
-  // Block if screen width < 1024px OR is a known touch/mobile user-agent
   isMobile.value = w < 1024 || touchDevice
 }
-window.addEventListener('resize', checkDevice)
-checkDevice()
 
 const canStartExam = computed(() => store.sessionDetails?.sessionStatus === 'live' || store.sessionDetails?.canStart)
 
 onMounted(() => {
+  // Run device check here so window is guaranteed available
+  checkDevice()
+  window.addEventListener('resize', checkDevice)
+
   if (!store.studentSessionId) {
     router.push(`/live-exam/${route.params.sessionCode}`)
     return

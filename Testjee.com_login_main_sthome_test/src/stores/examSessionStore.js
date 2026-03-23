@@ -16,8 +16,8 @@ export const useExamSessionStore = defineStore('examSession', () => {
 
     // Maps question_id to selected_answer
     const answers = ref({})
-    // Set of question_numbers (1-based index) marked for review
-    const markedForReview = ref(new Set())
+    // Plain object map: { [questionNumber]: true } — Vue can track property reads/writes natively
+    const markedForReview = ref({})
     // Maps question_id to total seconds spent
     const timeSpent = ref({})
 
@@ -152,14 +152,14 @@ export const useExamSessionStore = defineStore('examSession', () => {
             answers.value = {}
             timeSpent.value = {}
 
-            // Build a fresh Set so Vue reactivity is triggered correctly
-            const freshMarked = new Set()
+            // Build marked map so Vue reactivity is triggered correctly
+            const freshMarked = {}
             questions.value.forEach(q => {
                 if (q.selected_answer) {
                     answers.value[q.question_id] = q.selected_answer
                 }
                 if (q.is_marked_for_review) {
-                    freshMarked.add(q.question_number)
+                    freshMarked[q.question_number] = true
                 }
                 if (q.time_spent_seconds) {
                     timeSpent.value[q.question_id] = q.time_spent_seconds
@@ -192,14 +192,11 @@ export const useExamSessionStore = defineStore('examSession', () => {
                 delete answers.value[questionId] // To Clear Response
             }
 
-            // Always replace the Set (not mutate) so Vue detects the change
-            // and re-renders the question palette immediately.
+            // Update markedForReview plain object — Vue tracks property reads/writes natively
             if (isMarkedRef) {
-                markedForReview.value = new Set([...markedForReview.value, question.question_number])
+                markedForReview.value[question.question_number] = true
             } else {
-                const updated = new Set(markedForReview.value)
-                updated.delete(question.question_number)
-                markedForReview.value = updated
+                delete markedForReview.value[question.question_number]
             }
 
             // Calculate active time spent dynamically before hitting API
@@ -243,7 +240,7 @@ export const useExamSessionStore = defineStore('examSession', () => {
                 input_question_number: prevQ.question_number,
                 input_selected_answer: answers.value[prevQ.question_id] || null,
                 input_time_spent_seconds: Math.floor(timeSpent.value[prevQ.question_id] || 0),
-                input_is_marked_for_review: markedForReview.value.has(prevQ.question_number)
+                input_is_marked_for_review: !!markedForReview.value[prevQ.question_number]
             }).then()
         }
 
@@ -344,7 +341,7 @@ export const useExamSessionStore = defineStore('examSession', () => {
         questionOrder.value = []
         questions.value = []
         answers.value = {}
-        markedForReview.value = new Set()
+        markedForReview.value = {}
         timeSpent.value = {}
         currentQuestionNumber.value = 1
         timeRemainingSeconds.value = 0
