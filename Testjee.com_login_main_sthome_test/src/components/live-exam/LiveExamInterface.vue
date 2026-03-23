@@ -206,22 +206,22 @@
                     // Active ring
                     'ring-2 ring-blue-500 ring-offset-1': store.currentQuestionNumber === i,
 
-                    // Logic Priority 1: Answered & Marked (Rare but possible in JEE) -> Usually green with purple corner, we'll use Green here with Review style
-                    'bg-green-100 text-green-800 border-green-300 border-2': getIsAnswered(i) && !store.markedForReview[i],
-                    
-                    // Logic Priority 2: Not Answered but Marked -> Yellow Review
-                    'bg-purple-100 text-purple-800 border-purple-300 border-2': !getIsAnswered(i) && !!store.markedForReview[i],
+                    // Logic Priority 1: Answered & Marked (Rare but possible in JEE) -> Usually green with purple                     // Green: answered, NOT marked
+                     'bg-green-100 text-green-800 border-green-300 border-2': getIsAnswered(i) && !store.markedForReview[store.questions[i-1]?.question_id],
+                     
+                     // Purple: NOT answered, marked
+                     'bg-purple-100 text-purple-800 border-purple-300 border-2': !getIsAnswered(i) && !!store.markedForReview[store.questions[i-1]?.question_id],
 
-                    // Logic Priority 3: Answered AND Marked for Review -> Green with Review indication
-                     'bg-green-100 text-green-800 border-purple-400 border-[3px]': getIsAnswered(i) && !!store.markedForReview[i],
+                     // Green + purple border: answered AND marked
+                     'bg-green-100 text-green-800 border-purple-400 border-[3px]': getIsAnswered(i) && !!store.markedForReview[store.questions[i-1]?.question_id],
 
-                    // Default Default
-                    'bg-white text-gray-500 border border-gray-300 hover:bg-gray-100': !getIsAnswered(i) && !store.markedForReview[i]
+                     // White: not answered, not marked
+                     'bg-white text-gray-500 border border-gray-300 hover:bg-gray-100': !getIsAnswered(i) && !store.markedForReview[store.questions[i-1]?.question_id]
                  }"
                >
                  {{ i }}
                  <!-- Small top right visual for marked answered -->
-                 <div v-if="getIsAnswered(i) && !!store.markedForReview[i]" class="absolute top-0 right-0 w-3 h-3 bg-purple-500 rounded-bl-lg"></div>
+                  <div v-if="getIsAnswered(i) && !!store.markedForReview[store.questions[i-1]?.question_id]" class="absolute top-0 right-0 w-3 h-3 bg-purple-500 rounded-bl-lg"></div>
                </button>
              </div>
           </div>
@@ -271,11 +271,11 @@ const localIsMarked = ref(false)
 
 const currentQuestion = computed(() => store.currentQuestion)
 
-// When question changes, sync local proxy with store memory
-watch(() => store.currentQuestionNumber, (newVal) => {
+// When question changes, sync localIsMarked from store using question_id
+watch(() => store.currentQuestionNumber, () => {
   if (currentQuestion.value) {
     localSelectedAnswer.value = store.answers[currentQuestion.value.question_id] ?? null
-    localIsMarked.value = !!store.markedForReview[newVal]
+    localIsMarked.value = !!store.markedForReview[currentQuestion.value.question_id]
   }
 })
 
@@ -346,7 +346,7 @@ onMounted(async () => {
   // Trigger initial proxy sync
   if (currentQuestion.value) {
     localSelectedAnswer.value = store.answers[currentQuestion.value.question_id] ?? null
-    localIsMarked.value = !!store.markedForReview[store.currentQuestionNumber]
+    localIsMarked.value = !!store.markedForReview[currentQuestion.value?.question_id]
   }
   
   loadingQuestions.value = false

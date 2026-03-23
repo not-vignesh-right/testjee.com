@@ -152,14 +152,14 @@ export const useExamSessionStore = defineStore('examSession', () => {
             answers.value = {}
             timeSpent.value = {}
 
-            // Build marked map so Vue reactivity is triggered correctly
+            // Build marked map keyed by question_id (reliable, no ambiguity with question_number)
             const freshMarked = {}
             questions.value.forEach(q => {
                 if (q.selected_answer) {
                     answers.value[q.question_id] = q.selected_answer
                 }
                 if (q.is_marked_for_review) {
-                    freshMarked[q.question_number] = true
+                    freshMarked[q.question_id] = true
                 }
                 if (q.time_spent_seconds) {
                     timeSpent.value[q.question_id] = q.time_spent_seconds
@@ -192,11 +192,11 @@ export const useExamSessionStore = defineStore('examSession', () => {
                 delete answers.value[questionId] // To Clear Response
             }
 
-            // Update markedForReview plain object — Vue tracks property reads/writes natively
+            // Key by question_id — always unique, no confusion with question_number or loop index
             if (isMarkedRef) {
-                markedForReview.value[question.question_number] = true
+                markedForReview.value[questionId] = true
             } else {
-                delete markedForReview.value[question.question_number]
+                delete markedForReview.value[questionId]
             }
 
             // Calculate active time spent dynamically before hitting API
@@ -240,7 +240,7 @@ export const useExamSessionStore = defineStore('examSession', () => {
                 input_question_number: prevQ.question_number,
                 input_selected_answer: answers.value[prevQ.question_id] || null,
                 input_time_spent_seconds: Math.floor(timeSpent.value[prevQ.question_id] || 0),
-                input_is_marked_for_review: !!markedForReview.value[prevQ.question_number]
+                input_is_marked_for_review: !!markedForReview.value[prevQ.question_id]
             }).then()
         }
 
