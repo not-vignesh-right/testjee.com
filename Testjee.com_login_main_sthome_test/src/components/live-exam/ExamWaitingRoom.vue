@@ -7,22 +7,24 @@
        <div class="absolute -bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-indigo-100 mix-blend-multiply filter blur-3xl opacity-50"></div>
     </div>
 
-    <!-- Mobile Block Overlay -->
-    <div v-if="isMobile" class="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center px-8 text-center">
-      <div class="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-        <svg class="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-        </svg>
+    <!-- Mobile Block Overlay (teleported to body to guarantee full coverage) -->
+    <Teleport to="body">
+      <div v-if="isMobile" class="fixed inset-0 bg-white flex flex-col items-center justify-center px-8 text-center" style="z-index:99999">
+        <div class="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <svg class="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <h1 class="text-2xl font-black text-gray-900 mb-3">Mobile Not Allowed</h1>
+        <p class="text-gray-500 text-base leading-relaxed max-w-sm">
+          This exam must be taken on a <strong class="text-gray-800">laptop or desktop computer</strong>.<br/>
+          Please switch to a desktop browser to continue.
+        </p>
+        <div class="mt-8 px-5 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold">
+          📵 Mobile &amp; Tablet access is not permitted
+        </div>
       </div>
-      <h1 class="text-2xl font-black text-gray-900 mb-3">Mobile Not Allowed</h1>
-      <p class="text-gray-500 text-base leading-relaxed max-w-sm">
-        This exam must be taken on a <strong class="text-gray-800">laptop or desktop computer</strong>.<br/>
-        Please switch to a desktop browser to continue.
-      </p>
-      <div class="mt-8 px-5 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold">
-        📵 Mobile &amp; Tablet access is not permitted
-      </div>
-    </div>
+    </Teleport>
 
     <!-- Main Card -->
     <div v-if="store.sessionDetails" class="max-w-3xl w-full bg-white rounded-2xl shadow-xl shadow-blue-900/5 overflow-hidden z-10 border border-gray-100">
