@@ -160,7 +160,7 @@
                 <div class="flex gap-3">
                    <button 
                      v-if="store.currentQuestionNumber < store.totalQuestions"
-                     @click="store.navigateToQuestion(store.currentQuestionNumber + 1)" 
+                     @click="saveAndNext()" 
                      class="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-sm transition-colors flex items-center gap-2"
                    >
                      Save & Next
@@ -292,18 +292,31 @@ const isTimerRed = computed(() => {
 })
 
 // Unified trigger to store 
+// NOTE: always pass the CURRENT localIsMarked so state is accurate.
 const handleAnswerChange = () => {
    if (!currentQuestion.value) return
    store.saveAnswer(currentQuestion.value.question_id, localSelectedAnswer.value, localIsMarked.value)
 }
 
+// toggleMarkForReview is the ONLY function that changes the mark state.
+// After toggling, it immediately saves to DB.
 const toggleMarkForReview = () => {
    localIsMarked.value = !localIsMarked.value
    handleAnswerChange()
 }
 
+// saveAndNext: save with CURRENT mark state, then navigate.
+// This preserves the user's intent: if they marked it, it stays marked after save.
+// If they want to unmark, they should click 'Mark for Review' again BEFORE saving.
+const saveAndNext = async () => {
+  await handleAnswerChange()
+  store.navigateToQuestion(store.currentQuestionNumber + 1)
+}
+
 const clearResponse = () => {
   localSelectedAnswer.value = null
+  // Clearing a response also clears the mark flag — makes logical sense.
+  localIsMarked.value = false
   handleAnswerChange()
 }
 

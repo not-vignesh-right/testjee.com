@@ -97,8 +97,10 @@
             <div class="p-4 md:p-5">
               <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                 <div v-for="q in questions" :key="q.index" 
-                     class="rounded-xl p-3.5 border transition-all duration-200 hover:shadow-sm"
-                     :class="getCardClass(q)">
+                     class="rounded-xl p-3.5 border transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer group"
+                     :class="getCardClass(q)"
+                     @click="goToDetail(q.question_id)"
+                   >
                   
                   <!-- Top row: Q number + time + status -->
                   <div class="flex items-center justify-between mb-2.5">
@@ -129,6 +131,15 @@
                       <span class="text-gray-400 text-xs">Ans:</span>
                       <span class="font-semibold text-green-600">{{ q.correct ?? '—' }}</span>
                     </div>
+                  </div>
+
+                  <!-- View Details CTA -->
+                  <div class="mt-2.5 pt-2.5 border-t border-current/10 flex items-center justify-end text-[10px] font-bold uppercase tracking-wide opacity-50 group-hover:opacity-100 transition-opacity"
+                       :class="q.isCorrect ? 'text-green-700' : q.chosen ? 'text-red-700' : 'text-gray-500'">
+                    View Details
+                    <svg class="w-3 h-3 ml-1 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
                   </div>
                 </div>
               </div>
@@ -162,10 +173,16 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useExamStore } from '../stores/examStore'
 
+const router = useRouter()
 const examStore = useExamStore()
 const lastResult = examStore.lastResult
+
+function goToDetail(questionId) {
+  if (questionId) router.push({ name: 'QuestionDetail', params: { id: questionId } })
+}
 
 // Generate exam label from result id
 const examLabel = computed(() => {

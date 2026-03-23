@@ -4,6 +4,7 @@ import StudentLayout from '../components/StudentLayout.vue'
 import Results from '../components/Results.vue'
 import Dashboard from '../components/Dashboard.vue'
 import ResultsDetails from '../components/ResultsDetails.vue'
+import QuestionDetail from '../components/QuestionDetail.vue'
 import ResetPassword from '../components/ResetPassword.vue'
 import WaitingApproval from '../components/WaitingApproval.vue'
 import PaymentPage from '../components/PaymentPage.vue'
@@ -44,6 +45,7 @@ const routes = [
       { path: '', redirect: 'dashboard' }, // Default redirect
       { path: 'dashboard', name: 'Dashboard', component: Dashboard },
       { path: 'details', name: 'ResultsDetails', component: ResultsDetails },
+      { path: 'details/:id', name: 'QuestionDetail', component: QuestionDetail },
       { path: 'settings', name: 'Settings', component: () => import('../components/Settings.vue') }
     ]
   },
