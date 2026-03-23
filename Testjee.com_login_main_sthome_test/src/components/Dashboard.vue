@@ -373,7 +373,6 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import { useExamStore } from '../stores/examStore'
 import { supabase } from '../lib/supabase'
-import emailjs from '@emailjs/browser'
 import { getRandomQuote } from '../data/quotes'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler } from 'chart.js'
@@ -665,26 +664,13 @@ async function sendRestoreRequest() {
   restoreMessage.value = ''
 
   try {
-    const studentName = authStore.studentProfile?.student_name || 'Student'
-    const studentEmail = authStore.studentProfile?.email_id || ''
-    const studentId = authStore.studentProfile?.student_id
-
-    const restoreLink = `https://login.testjee.com/admin-approve?action=restore&email=${encodeURIComponent(studentEmail)}&tests=${restoreTestCount.value}&name=${encodeURIComponent(studentName)}&sid=${studentId}`
-
-    const templateParams = {
-      student_name: studentName,
-      student_email: studentEmail,
-      student_mobile: `Student ID: ${studentId}`,
-      requested_tests: `${restoreTestCount.value} (Restore Request)`,
-      approve_link: restoreLink
+    // Set is_approved to false when requesting more tests so admin can re-approve after payment
+    if (authStore.studentProfile) {
+      await authStore.updateStudentProfile({ is_approved: false })
     }
-
-    await emailjs.send(
-      'service_testjee',
-      'template_approval',
-      templateParams,
-      'I9eXY3TayX67uR-3R'
-    )
+    
+    // Clear message
+    restoreMessage.value = ''
 
     // Redirect to the payment component to actually prompt UI payment
     // But since Dashboard requires auth, we can just push to the payment route.

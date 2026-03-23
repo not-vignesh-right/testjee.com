@@ -350,7 +350,6 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import { useAdminStore } from '../stores/adminStore'
-import emailjs from '@emailjs/browser'
 import { supabase } from '../lib/supabase'
 import logo from '../assets/logo_test_jee.png'
 import { getPriceDetails, PRESET_PACKAGES, EXAM_PRICE_TIERS } from '../data/pricing'
@@ -544,48 +543,7 @@ async function handleSignUp() {
       return
     }
 
-    // Always use production URL for the approval link (admin clicks this from their email)
-    const approveLink = `https://login.testjee.com/admin-approve?name=${encodeURIComponent(signUpData.value.name)}&email=${encodeURIComponent(signUpData.value.email)}&pwd=${btoa(signUpData.value.password)}&mobile=${encodeURIComponent(signUpData.value.mobile)}&tests=${signUpData.value.numberOfTests}`;
-
-    // Define your list of admin emails here
-    const adminEmails = [
-
-      'chinmaypanghri@gmail.com'
-      // 'another.admin@example.com' // Add more admins here
-    ]
-
-    console.log(`[TESTJEE] Sending approval emails to ${adminEmails.length} admins via EmailJS...`)
-
-    // Send an individual email to each admin in the list
-    const emailPromises = adminEmails.map(adminEmail => {
-      const templateParams = {
-        student_name: signUpData.value.name,
-        student_email: signUpData.value.email,
-        student_mobile: signUpData.value.mobile || 'Not provided',
-        requested_tests: signUpData.value.numberOfTests,
-        approve_link: approveLink,
-        admin_email: adminEmail
-      }
-      
-      return emailjs.send(
-        'service_testjee',
-        'template_approval',
-        templateParams,
-        'I9eXY3TayX67uR-3R'
-      )
-    })
-
-    // Wait for all emails to be sent
-    const results = await Promise.allSettled(emailPromises)
-    
-    // Log results for debugging
-    results.forEach((res, index) => {
-      if (res.status === 'fulfilled') {
-        console.log(`[TESTJEE] Email to ${adminEmails[index]} sent successfully.`)
-      } else {
-        console.error(`[TESTJEE] Failed to send email to ${adminEmails[index]}:`, res.reason)
-      }
-    })
+    // Clear form
 
     // Save the test count so AuthCallback can forward to payment after email verification
     localStorage.setItem('pendingPaymentTests', signUpData.value.numberOfTests.toString())

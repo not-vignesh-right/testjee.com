@@ -35,6 +35,27 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (error) throw error
 
+      // NEW: Create student record immediately so admin can see/approve it even before first login
+      if (data.user) {
+        console.log('[SignUp] Creating initial student record for approval:', data.user.id)
+        const { error: insertError } = await supabase
+          .from('students')
+          .insert({
+            student_name: name,
+            email_id: email.trim(),
+            mobile_number: mobile,
+            number_of_tests: numberOfTests,
+            supabase_user_id: data.user.id,
+            is_approved: false,
+            creation_date: new Date().toISOString(),
+            modification_date: new Date().toISOString()
+          })
+          
+        if (insertError) {
+          console.error('[SignUp] Error creating student record:', insertError)
+        }
+      }
+
       // Store in localStorage as backup
       localStorage.setItem('pendingStudentName', name)
       if (mobile) localStorage.setItem('pendingMobileNumber', mobile)

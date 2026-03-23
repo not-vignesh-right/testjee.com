@@ -211,7 +211,7 @@ export const useExamStore = defineStore('exam', () => {
         return
       }
 
-      // 1. Get previously seen question IDs for this student
+      // 1. Get previously CORRECTLY answered question IDs for this student
       let excludedQuestionIds = []
       try {
         const { data: pastResults, error: resultsError } = await supabase
@@ -221,17 +221,53 @@ export const useExamStore = defineStore('exam', () => {
 
         if (resultsError) {
           console.error('fetchExamData: Error fetching past results:', resultsError)
-        } else if (pastResults) {
-          excludedQuestionIds = pastResults
-            .flatMap(r => r.answers || [])
-            .map(a => a?.question_id)
-            .filter(id => id != null)
-
-          excludedQuestionIds = [...new Set(excludedQuestionIds)]
-          console.log(`fetchExamData: Found ${excludedQuestionIds.length} unique seen IDs`)
+        } else if (pastResults && pastResults.length > 0) {
+          const allAttemptedAnswers = pastResults.flatMap(r => r.answers || [])
+          const allAttemptedQuestionIds = [...new Set(allAttemptedAnswers.map(a => a?.question_id).filter(id => id != null))]
+          
+          if (allAttemptedQuestionIds.length > 0) {
+            console.log(`fetchExamData: Checking correctness for ${allAttemptedQuestionIds.length} attempted questions...`)
+            
+            // Fetch correct answers for these questions in batch
+            const { data: choicesData } = await supabase
+              .from('choices')
+              .select('question_id, correct_answer')
+              .in('question_id', allAttemptedQuestionIds)
+            
+            if (choicesData) {
+              const correctAnswersMap = Object.fromEntries(choicesData.map(c => [c.question_id, c.correct_answer]))
+              
+              // Only exclude questions where the student's answer was CORRECT
+              excludedQuestionIds = allAttemptedAnswers
+                .filter(a => {
+                  if (!a || !a.question_id || !a.answer) return false
+                  const correctAnswer = correctAnswersMap[a.question_id]
+                  if (correctAnswer === undefined) return false
+                  
+                  // Replicate correctness logic from results calculation
+                  let isCorrect = false
+                  const userAnswer = String(a.answer).trim()
+                  const targetAnswer = String(correctAnswer).trim()
+                  
+                  // Basic comparison for MCQs and Numericals
+                  // (Numeric values might have slight differences but we usually treat them as strings or exact floats)
+                  if (!isNaN(parseFloat(userAnswer)) && !isNaN(parseFloat(targetAnswer))) {
+                    isCorrect = parseFloat(userAnswer) === parseFloat(targetAnswer)
+                  } else {
+                    isCorrect = userAnswer.toLowerCase() === targetAnswer.toLowerCase()
+                  }
+                  
+                  return isCorrect
+                })
+                .map(a => a.question_id)
+              
+              excludedQuestionIds = [...new Set(excludedQuestionIds)]
+              console.log(`fetchExamData: Excluding ${excludedQuestionIds.length} CORRECTLY answered IDs`)
+            }
+          }
         }
       } catch (err) {
-        console.error('fetchExamData: Catch in past results:', err)
+        console.error('fetchExamData: Catch in past results processing:', err)
       }
 
       // 2. Fetch subjects info
