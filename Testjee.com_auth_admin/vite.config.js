@@ -13,11 +13,14 @@ export default defineConfig({
                 short_name: 'TESTJEE Admin',
                 description: 'TESTJEE Admin Dashboard for Student Management',
                 theme_color: '#ffffff',
+                start_url: '/admin-secure-panel-7x9q',
+                scope: '/',
+                display: 'standalone',
                 icons: [
                     {
-                        src: 'icon.svg',
+                        src: 'logo.png',
                         sizes: 'any',
-                        type: 'image/svg+xml'
+                        type: 'image/png'
                     }
                 ]
             }
