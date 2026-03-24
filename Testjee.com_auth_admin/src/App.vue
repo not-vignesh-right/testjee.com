@@ -27,6 +27,11 @@
               </svg>
             </button>
 
+            <button @click="testServerPush" class="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all" title="Test Server Push (Full Loop)" v-if="notificationPermission === 'granted' && !testingPush">
+              <svg class="w-5 h-5" :class="{ 'animate-pulse': testingPush }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+            </button>
             <button @click="refreshData" class="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Refresh Data">
               <svg class="w-5 h-5" :class="{ 'animate-spin': refreshing }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -175,6 +180,28 @@ provide('showToast', showToast)
 // Provide a refresh trigger
 const refreshTrigger = ref(0)
 provide('refreshTrigger', refreshTrigger)
+
+const testingPush = ref(false)
+
+async function testServerPush() {
+  if (notificationPermission.value !== 'granted') return
+  testingPush.value = true
+  try {
+    const res = await fetch('/api/test-push', { method: 'POST' })
+    const data = await res.json()
+    if (data.success) {
+      showToast('Server test sent! Wait 2-3 seconds.', 'success')
+    } else {
+      showToast(data.message || 'Server report: No active subscriptions.', 'error')
+      // Try to re-subscribe if it failed
+      await subscribeToPush()
+    }
+  } catch (err) {
+    showToast('Server test failed to send', 'error')
+  } finally {
+    testingPush.value = false
+  }
+}
 
 function refreshData() {
   refreshing.value = true
