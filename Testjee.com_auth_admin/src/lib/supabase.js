@@ -14,8 +14,12 @@ export const supabase = {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ endpoint, method, payload, headers })
                 })
-                const data = await res.json()
-                return { data: res.ok ? data : null, error: res.ok ? null : data }
+                const text = await res.text()
+                let data = null
+                try {
+                    if (text) data = JSON.parse(text)
+                } catch (e) { }
+                return { data: res.ok ? data : null, error: res.ok ? null : (data || text) }
             } catch (e) {
                 return { data: null, error: e }
             }
