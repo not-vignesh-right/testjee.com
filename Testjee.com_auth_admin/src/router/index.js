@@ -1,19 +1,21 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+const secretPath = '/admin-secure-panel-7x9q'
+
 const routes = [
     {
-        path: '/',
+        path: secretPath,
         name: 'Dashboard',
         component: () => import('../pages/DashboardPage.vue')
     },
     {
-        path: '/students/:id',
+        path: secretPath + '/students/:id',
         name: 'StudentDetail',
         component: () => import('../pages/StudentDetailPage.vue')
     },
     {
         path: '/:pathMatch(.*)*',
-        redirect: '/'
+        redirect: 'https://testjee.com' // Send unauthorized visitors away
     }
 ]
 

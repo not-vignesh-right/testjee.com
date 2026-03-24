@@ -4,11 +4,9 @@
     <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/60 shadow-sm">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
-          <router-link to="/" class="flex items-center gap-3 group">
-            <div class="w-9 h-9 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-md shadow-blue-200/50 group-hover:shadow-lg group-hover:shadow-blue-200/60 transition-shadow">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-              </svg>
+          <router-link :to="{ name: 'Dashboard' }" class="flex items-center gap-3 group">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center shadow-md shadow-blue-200/50 group-hover:shadow-lg group-hover:shadow-blue-200/60 transition-shadow overflow-hidden bg-white">
+              <img src="/logo.png" alt="TESTJEE Logo" class="w-full h-full object-cover" />
             </div>
             <div>
               <span class="text-lg font-bold text-gray-900 tracking-tight">TESTJEE</span>
@@ -92,7 +90,7 @@ async function requestNotification() {
       showToast('Notifications enabled!', 'success')
       new window.Notification('TESTJEE Admin', {
         body: 'Notifications are now enabled!',
-        icon: '/icon.svg'
+        icon: '/logo.png'
       })
     } else {
       showToast('Notification permission denied', 'error')
@@ -107,7 +105,7 @@ function testNotification() {
   
   new window.Notification('TESTJEE Admin', {
     body: 'This is a test notification from your app!',
-    icon: '/icon.svg'
+    icon: '/logo.png'
   })
   showToast('Test notification sent', 'success')
 }

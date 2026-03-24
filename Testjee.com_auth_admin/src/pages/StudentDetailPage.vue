@@ -1,7 +1,7 @@
 <template>
   <div class="animate-fade-in">
     <!-- Back button -->
-    <button @click="router.push('/')" class="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 text-sm font-medium transition-colors group">
+    <button @click="router.push({ name: 'Dashboard' })" class="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 text-sm font-medium transition-colors group">
       <svg class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
       Back to Dashboard
     </button>
