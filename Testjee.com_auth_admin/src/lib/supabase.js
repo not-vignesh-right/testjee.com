@@ -1,6 +1,4 @@
 export const SUPABASE_URL = 'https://testjee-supabase-proxy.vigneshbswork.workers.dev'
-// In Vite, environment variables exposed to the browser must start with VITE_
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwbnVta3Vmcm5yamVuc21nb3N0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIzMjQxNTQsImV4cCI6MjA2NzkwMDE1NH0.Gan0vhw4YvktYA-45OQGjO3RxmFGjxihBlzqtUnRuqo'
 
 // We completely bypass the @supabase/supabase-js library because it strictly
 // hard-errors in the browser if a service key ('sb_secret_...') is used. 
@@ -23,39 +21,71 @@ export const supabase = {
             }
         }
 
-        return {
-            select(query = '*') {
-                return {
-                    async eq(column, value) {
-                        return {
-                            async maybeSingle() {
-                                const res = await proxyRequest(`${tablePath}?select=${query}&${column}=eq.${value}`, 'GET')
-                                return { data: res.data ? res.data[0] || null : null, error: res.error }
-                            }
+        // Chainable query builder
+        function buildQuery(baseSelect = '*') {
+            let selectCols = baseSelect
+            let filters = []
+            let orderClause = null
+            let inClause = null
+            let singleRow = false
+
+            const builder = {
+                select(cols = '*') {
+                    selectCols = cols
+                    return builder
+                },
+                eq(column, value) {
+                    filters.push(`${column}=eq.${value}`)
+                    return builder
+                },
+                in(column, arrayValues) {
+                    const arrStr = arrayValues.join(',')
+                    inClause = `${column}=in.(${arrStr})`
+                    return builder
+                },
+                order(column, { ascending = true } = {}) {
+                    orderClause = `order=${column}.${ascending ? 'asc' : 'desc'}`
+                    return builder
+                },
+                maybeSingle() {
+                    singleRow = true
+                    return builder
+                },
+                async then(resolve, reject) {
+                    try {
+                        let qs = `select=${selectCols}`
+                        if (filters.length) qs += '&' + filters.join('&')
+                        if (inClause) qs += '&' + inClause
+                        if (orderClause) qs += '&' + orderClause
+                        const endpoint = `${tablePath}?${qs}`
+                        const res = await proxyRequest(endpoint, 'GET')
+                        if (singleRow) {
+                            resolve({ data: res.data ? (res.data[0] || null) : null, error: res.error })
+                        } else {
+                            resolve(res)
                         }
-                    },
-                    async in(column, arrayValues) {
-                        const arrStr = arrayValues.map(v => `"${v}"`).join(',')
-                        return proxyRequest(`${tablePath}?select=${query}&${column}=in.(${arrStr})`, 'GET')
-                    },
-                    async order(column, { ascending = true } = {}) {
-                        return proxyRequest(`${tablePath}?select=${query}&order=${column}.${ascending ? 'asc' : 'desc'}`, 'GET')
-                    },
-                    async then(resolve) {
-                        resolve(await proxyRequest(`${tablePath}?select=${query}`, 'GET'))
+                    } catch (e) {
+                        reject(e)
                     }
                 }
+            }
+            return builder
+        }
+
+        return {
+            select(cols = '*') {
+                return buildQuery(cols)
             },
             update(updates) {
                 return {
-                    async eq(column, value) {
+                    eq(column, value) {
                         return proxyRequest(`${tablePath}?${column}=eq.${value}`, 'PATCH', updates, { 'Prefer': 'return=representation' })
                     }
                 }
             },
             delete() {
                 return {
-                    async eq(column, value) {
+                    eq(column, value) {
                         return proxyRequest(`${tablePath}?${column}=eq.${value}`, 'DELETE')
                     }
                 }

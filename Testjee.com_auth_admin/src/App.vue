@@ -76,6 +76,63 @@ onMounted(() => {
   }
 })
 
+async function showPushNotification(title, body) {
+  const icon = '/logo-192.png'
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready
+      await reg.showNotification(title, { body, icon })
+    } else {
+      new window.Notification(title, { body, icon })
+    }
+  } catch (e) {
+    // Fallback for desktop
+    new window.Notification(title, { body, icon })
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
+}
+
+async function subscribeToPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const res = await fetch('/api/push-subscribe')
+    const { publicKey } = await res.json()
+    if (!publicKey) return
+
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    })
+
+    // Create a stable device ID
+    let deviceId = localStorage.getItem('testjee_admin_device_id')
+    if (!deviceId) {
+      deviceId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2)
+      localStorage.setItem('testjee_admin_device_id', deviceId)
+    }
+
+    await fetch('/api/push-subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription, deviceId })
+    })
+  } catch (err) {
+    console.error('Failed to subscribe to push:', err)
+  }
+}
+
 async function requestNotification() {
   if (!('Notification' in window)) {
     showToast('Notifications are not supported by your browser', 'error')
@@ -88,10 +145,8 @@ async function requestNotification() {
     
     if (permission === 'granted') {
       showToast('Notifications enabled!', 'success')
-      new window.Notification('TESTJEE Admin', {
-        body: 'Notifications are now enabled!',
-        icon: '/logo.png'
-      })
+      await subscribeToPush()
+      await showPushNotification('TESTJEE Admin', 'Notifications are now enabled!')
     } else {
       showToast('Notification permission denied', 'error')
     }
@@ -100,13 +155,9 @@ async function requestNotification() {
   }
 }
 
-function testNotification() {
+async function testNotification() {
   if (notificationPermission.value !== 'granted') return
-  
-  new window.Notification('TESTJEE Admin', {
-    body: 'This is a test notification from your app!',
-    icon: '/logo.png'
-  })
+  await showPushNotification('TESTJEE Admin', 'This is a test notification from your app!')
   showToast('Test notification sent', 'success')
 }
 
