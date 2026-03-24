@@ -17,6 +17,18 @@
           </router-link>
 
           <div class="flex items-center gap-3">
+            <!-- Notification Buttons -->
+            <button @click="requestNotification" class="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Enable Notifications" v-if="notificationPermission !== 'granted'">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+              </svg>
+            </button>
+            <button @click="testNotification" class="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all" title="Test Notification" v-if="notificationPermission === 'granted'">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+              </svg>
+            </button>
+
             <button @click="refreshData" class="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Refresh Data">
               <svg class="w-5 h-5" :class="{ 'animate-spin': refreshing }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -53,11 +65,52 @@
 </template>
 
 <script setup>
-import { ref, provide } from 'vue'
+import { ref, provide, onMounted } from 'vue'
 
 const refreshing = ref(false)
+const notificationPermission = ref('default')
 const toasts = ref([])
 let toastId = 0
+
+onMounted(() => {
+  if ('Notification' in window) {
+    notificationPermission.value = Notification.permission
+  }
+})
+
+async function requestNotification() {
+  if (!('Notification' in window)) {
+    showToast('Notifications are not supported by your browser', 'error')
+    return
+  }
+  
+  try {
+    const permission = await Notification.requestPermission()
+    notificationPermission.value = permission
+    
+    if (permission === 'granted') {
+      showToast('Notifications enabled!', 'success')
+      new window.Notification('TESTJEE Admin', {
+        body: 'Notifications are now enabled!',
+        icon: '/icon.svg'
+      })
+    } else {
+      showToast('Notification permission denied', 'error')
+    }
+  } catch (error) {
+    console.error('Error requesting notification permission:', error)
+  }
+}
+
+function testNotification() {
+  if (notificationPermission.value !== 'granted') return
+  
+  new window.Notification('TESTJEE Admin', {
+    body: 'This is a test notification from your app!',
+    icon: '/icon.svg'
+  })
+  showToast('Test notification sent', 'success')
+}
 
 function showToast(message, type = 'success') {
   const id = ++toastId
