@@ -37,7 +37,15 @@ export default async function handler(req, res) {
     }
 
     try {
-        const body = req.body
+        let body = req.body
+        if (typeof body === 'string') {
+            try {
+                body = JSON.parse(body)
+            } catch (e) {
+                console.error("Failed to parse body:", e)
+                return res.status(400).json({ error: 'Invalid JSON body' })
+            }
+        }
         const type = body.type // 'INSERT' or 'UPDATE'
         const record = body.record || body
         const oldRecord = body.old_record || {}

@@ -8,7 +8,7 @@
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
         </div>
-        <h2 class="text-2xl font-bold text-gray-800">Verifying your email...</h2>
+        <h2 class="text-2xl font-bold text-gray-800">Completing sign in...</h2>
         <p class="text-gray-600">Please wait while we set up your account.</p>
       </div>
       
@@ -65,15 +65,22 @@ onMounted(async () => {
     }
     
     // User is now verified, create/update student profile
-    await auth.fetchOrCreateStudent()
+    const student = await auth.fetchOrCreateStudent()
     
     loading.value = false
     
-    // After email verification, go to payment (test count was saved at signup)
-    const pendingTests = localStorage.getItem('pendingPaymentTests') || '5'
-    setTimeout(() => {
-      router.push({ path: '/payment', query: { tests: pendingTests } })
-    }, 1500)
+    if (student && student.is_approved) {
+      // Approved student goes directly to dashboard
+      setTimeout(() => {
+        router.push('/sthome/dashboard')
+      }, 1000)
+    } else {
+      // Unapproved/new student goes to payment first
+      const pendingTests = localStorage.getItem('pendingPaymentTests') || '5'
+      setTimeout(() => {
+        router.push({ path: '/payment', query: { tests: pendingTests } })
+      }, 1500)
+    }
     
   } catch (err) {
     loading.value = false

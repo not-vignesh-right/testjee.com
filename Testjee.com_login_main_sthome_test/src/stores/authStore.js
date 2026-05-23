@@ -88,6 +88,24 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // NEW: Sign In/Up with Google (OAuth)
+  async function signInWithGoogle() {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      })
+
+      if (error) throw error
+
+      return { success: true, data }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
   // NEW: Reset Password (send email)
   async function resetPassword(email) {
     try {
@@ -265,6 +283,7 @@ export const useAuthStore = defineStore('auth', () => {
     loadSession,
     signUpWithPassword,
     signInWithPassword,
+    signInWithGoogle,
     resetPassword,
     updatePassword,
     updateStudentProfile,

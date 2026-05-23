@@ -285,6 +285,42 @@
             {{ loading ? 'Processing...' : (isAdminMode ? 'Admin Login' : (isSignUpMode ? 'Continue to Payment →' : 'Sign In')) }}
           </button>
 
+          <!-- Divider & Google Sign-In Button -->
+          <div v-if="!isAdminMode" class="mt-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <span class="w-[35%] border-b border-gray-200"></span>
+              <span class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Or continue with</span>
+              <span class="w-[35%] border-b border-gray-200"></span>
+            </div>
+
+            <button
+              type="button"
+              @click="handleGoogleSignIn"
+              :disabled="loading"
+              class="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-bold py-3.5 px-4 rounded-xl shadow-sm hover:shadow transition-all duration-200 active:scale-95 disabled:opacity-70 disabled:active:scale-100"
+            >
+              <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                <path
+                  fill="#EA4335"
+                  d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.354 0 3.373 2.736 1.482 6.727l3.784 3.038Z"
+                />
+                <path
+                  fill="#4285F4"
+                  d="M23.455 12.273c0-.818-.073-1.609-.209-2.373H12v4.5h6.418a5.522 5.522 0 0 1-2.395 3.627l3.713 2.873c2.173-2 3.719-4.945 3.719-8.627Z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.266 14.235A7.072 7.072 0 0 1 4.909 12c0-.79.132-1.55.357-2.235L1.482 6.727A11.916 11.916 0 0 0 0 12c0 1.927.455 3.746 1.259 5.373l4.007-3.138Z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 24c3.24 0 5.973-1.073 7.964-2.918l-3.713-2.873c-1.03.69-2.337 1.109-4.25 1.109-3.273 0-6.055-2.209-7.045-5.182L.949 17.273A11.944 11.944 0 0 0 12 24Z"
+                />
+              </svg>
+              {{ isSignUpMode ? 'Sign Up with Google' : 'Sign In with Google' }}
+            </button>
+          </div>
+
           <!-- Don't have an account nudge -->
           <div v-if="!isAdminMode && !isSignUpMode" class="mt-6 text-center animate-fade-in" style="animation-delay: 800ms;">
             <p class="text-sm text-gray-500">
@@ -593,6 +629,29 @@ async function handleSignIn() {
     } else {
       showMessage(errorMsg, 'error')
     }
+  }
+}
+
+async function handleGoogleSignIn() {
+  loading.value = true
+  try {
+    // If they are on the sign-up tab, save their package choice
+    if (isSignUpMode.value) {
+      localStorage.setItem('pendingPaymentTests', signUpData.value.numberOfTests.toString())
+      localStorage.setItem('pendingNumberOfTests', signUpData.value.numberOfTests.toString())
+      if (signUpData.value.name) localStorage.setItem('pendingStudentName', signUpData.value.name)
+      if (signUpData.value.mobile) localStorage.setItem('pendingMobileNumber', signUpData.value.mobile)
+    }
+
+    const result = await authStore.signInWithGoogle()
+    if (!result.success) {
+      showMessage(result.error || 'Failed to initialize Google login', 'error')
+    }
+  } catch (error) {
+    console.error('Google Sign In error:', error)
+    showMessage(error.message || 'An error occurred during Google sign in', 'error')
+  } finally {
+    loading.value = false
   }
 }
 
