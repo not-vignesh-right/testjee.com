@@ -287,10 +287,10 @@
 
           <!-- Divider & Google Sign-In Button -->
           <div v-if="!isAdminMode" class="mt-5 space-y-4">
-            <div class="flex items-center justify-between">
-              <span class="w-[35%] border-b border-gray-200"></span>
-              <span class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Or continue with</span>
-              <span class="w-[35%] border-b border-gray-200"></span>
+            <div class="relative flex py-1 items-center">
+              <div class="flex-grow border-t border-gray-200/60"></div>
+              <span class="flex-shrink mx-4 text-gray-400 text-[10px] font-bold uppercase tracking-widest">or</span>
+              <div class="flex-grow border-t border-gray-200/60"></div>
             </div>
 
             <button
