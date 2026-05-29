@@ -13,7 +13,7 @@
     </div>
 
     <!-- Stats Row -->
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-8 animate-fadeIn" style="animation-delay:0.05s">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6 mb-8 animate-fadeIn" style="animation-delay:0.05s">
       <!-- Tests Remaining Card -->
       <div 
         class="stat-card group cursor-pointer transition-colors" 

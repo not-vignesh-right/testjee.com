@@ -160,7 +160,7 @@
           <!-- Student Sign Up Fields -->
           <div v-else class="space-y-4">
             <!-- Row 1: Name + Mobile (side by side) -->
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Full Name</label>
                 <div class="relative">
@@ -185,7 +185,7 @@
               </div>
             </div>
             <!-- Password + Confirm (side by side) -->
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Password</label>
                 <div class="relative">
@@ -222,7 +222,7 @@
              </div>
 
              <!-- Pricing Tiles -->
-             <div class="grid grid-cols-7 gap-1.5">
+             <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
                <button 
                  v-for="preset in PRESET_PACKAGES" 
                  :key="preset"

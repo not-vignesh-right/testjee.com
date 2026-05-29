@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-full pb-10">
+  <div class="min-h-full pb-10 px-4 sm:px-6 lg:px-8">
     <div class="max-w-4xl mx-auto">
       <!-- Header -->
       <div class="mb-8 animate-fade-in-up">

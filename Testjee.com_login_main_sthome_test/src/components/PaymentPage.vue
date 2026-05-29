@@ -10,7 +10,7 @@
     <div class="w-full max-w-4xl bg-white/80 backdrop-blur-xl rounded-3xl shadow-[0_8px_40px_rgb(0,0,0,0.06)] overflow-hidden relative z-10 flex flex-col md:flex-row border border-white/60 animate-fade-in-up">
       
       <!-- Left Side: Order Summary -->
-      <div class="md:w-5/12 bg-gradient-to-br from-gray-50 to-white p-8 md:p-10 border-r border-gray-100 flex flex-col justify-center">
+      <div class="md:w-5/12 bg-gradient-to-br from-gray-50 to-white p-8 md:p-10 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col justify-center">
         <div class="mb-8 animate-slide-in-left">
           <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-semibold mb-6 border border-blue-100">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>

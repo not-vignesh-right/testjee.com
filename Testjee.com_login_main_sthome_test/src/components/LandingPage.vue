@@ -1217,7 +1217,7 @@ const getParticleStyle = (n) => {
 }
 
 .footer-grid {
-  @apply grid md:grid-cols-4 gap-12 mb-12;
+  @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12 mb-12;
 }
 
 .footer-brand {

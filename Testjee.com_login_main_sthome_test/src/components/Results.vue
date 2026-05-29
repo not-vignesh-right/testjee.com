@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-full pb-10">
+  <div class="min-h-full pb-10 px-4 sm:px-6 lg:px-8">
     <div class="max-w-7xl mx-auto w-full">
       <!-- Title Section -->
       <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">

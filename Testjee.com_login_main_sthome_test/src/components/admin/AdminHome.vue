@@ -1,33 +1,6 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col font-sans">
-    <!-- Header -->
-    <header class="bg-white border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center gap-3">
-            <div class="bg-blue-600 p-2 rounded-lg">
-              <span class="text-white font-bold text-xl leading-none block">A</span>
-            </div>
-            <h1 class="text-xl font-bold text-gray-900 border-l pl-3 border-gray-300">
-              Welcome, {{ adminStore.adminProfile?.institute_name || 'Admin' }}!
-            </h1>
-          </div>
-          
-          <div class="flex items-center gap-4">
-            <span class="text-sm text-gray-500 hidden sm:inline-block">Logged in as {{ adminStore.adminProfile?.username }}</span>
-            <button 
-              @click="handleLogout"
-              class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
-    </header>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-    <!-- Main Content -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
       
       <!-- Loading State -->
       <div v-if="loading" class="flex justify-center items-center h-64">
@@ -124,9 +97,7 @@
           </div>
         </div>
 
-      </div>
-
-    </main>
+    </div>
   </div>
 </template>
 
@@ -160,8 +131,5 @@ onMounted(async () => {
   }
 })
 
-const handleLogout = () => {
-  adminStore.logout()
-  router.push('/')
-}
 </script>
+

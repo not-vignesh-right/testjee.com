@@ -377,7 +377,7 @@ const mobileMenuOpen = ref(false)
 }
 
 .founder-image-container {
-  @apply w-full md:w-80 h-64 md:h-80 flex-shrink-0;
+  @apply w-full md:w-80 h-56 sm:h-64 md:h-80 flex-shrink-0;
 }
 
 .founder-image {

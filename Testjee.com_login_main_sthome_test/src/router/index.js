@@ -11,6 +11,7 @@ import PaymentPage from '../components/PaymentPage.vue'
 
 // --- Live Exam Components ---
 // Admin
+import AdminLayout from '../components/admin/AdminLayout.vue'
 import ScheduleExam from '../components/admin/ScheduleExam.vue'
 import SessionCredentials from '../components/admin/SessionCredentials.vue'
 import AdminLiveSessions from '../components/admin/AdminLiveSessions.vue'
@@ -56,8 +57,10 @@ const routes = [
   // Admin Routes
   {
     path: '/admin',
+    component: AdminLayout,
     meta: { requiresAdminAuth: true },
     children: [
+      { path: '', redirect: 'home' }, // /admin → /admin/home
       { path: 'home', name: 'AdminHome', component: () => import('../components/admin/AdminHome.vue') },
       { path: 'sessions', name: 'AdminLiveSessions', component: AdminLiveSessions },
       { path: 'sessions/new', name: 'ScheduleExam', component: ScheduleExam },
