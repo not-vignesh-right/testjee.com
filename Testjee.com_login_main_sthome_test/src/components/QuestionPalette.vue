@@ -92,7 +92,8 @@ import { useExamStore } from '../stores/examStore'
 
 const examStore = useExamStore()
 
-const subjectOrder = ['Physics', 'Chemistry', 'Mathematics']
+// Subject order is driven by the active exam config (supports JEE, NEET, KCET dynamically)
+const subjectOrder = computed(() => examStore.examConfig?.subjects ?? [])
 
 const groupedBySubject = computed(() => {
   const groupsMap = new Map()
@@ -100,9 +101,10 @@ const groupedBySubject = computed(() => {
     if (!groupsMap.has(q.subject)) groupsMap.set(q.subject, [])
     groupsMap.get(q.subject).push({ question: q, index: i })
   })
+  const configOrder = subjectOrder.value
   const orderedSubjects = [...groupsMap.keys()].sort((a, b) => {
-    const ai = subjectOrder.indexOf(a)
-    const bi = subjectOrder.indexOf(b)
+    const ai = configOrder.indexOf(a)
+    const bi = configOrder.indexOf(b)
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
   })
   return orderedSubjects.map(s => ({ subject: s, items: groupsMap.get(s) }))

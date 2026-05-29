@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './authStore'
+import { EXAM_CONFIGS, getExamConfig } from '../data/examConfigs'
 
 export const useExamStore = defineStore('exam', () => {
   // State
@@ -11,18 +12,9 @@ export const useExamStore = defineStore('exam', () => {
   const questions = ref([])
   const currentQuestionIndex = ref(0)
   const userAnswers = ref({}) // Format: { questionId: chosenOptionId }
-  const draftAnswers = ref({}) // New: format { questionId: chosenOptionId } - highlighted but not saved
+  const draftAnswers = ref({}) // format { questionId: chosenOptionId } - highlighted but not saved
   const questionStatuses = ref({}) // Format: { questionId: { visited: true, answered: true, marked: false } })
-  const remainingTime = ref(180 * 60) // 3 hours in seconds
   const isFullScreen = ref(false)
-  const examTitle = ref('Test JEE Main - Full Test')
-  const subjectsOrder = ['Physics', 'Chemistry', 'Mathematics']
-  const subjectNameSynonyms = {
-    Physics: ['Physics'],
-    Chemistry: ['Chemistry'],
-    Mathematics: ['Mathematics', 'Maths', 'Math']
-  }
-  const numericAnswerLimitPerSubject = 5
   const numericDrafts = ref({})
   const timeSpent = ref({}) // {question_id: cumulative_time_in_seconds}
   const currentTimer = ref(null) // Interval ID for active timer
@@ -34,6 +26,14 @@ export const useExamStore = defineStore('exam', () => {
   const statistics = ref(null) // Aggregate statistics
   const isManuallySubmitting = ref(false) // Flag to prevent window blur cheating detection on manual submit
   const isSubmitting = ref(false) // Global lock to prevent duplicate async database writes
+
+  // --- Config-derived reactive getters ---
+  const examConfig = computed(() => getExamConfig(examType.value))
+  const examTitle = computed(() => examConfig.value.title)
+  const remainingTime = ref(getExamConfig('JEE_MAIN_FULL').durationSeconds) // Will be reset on setExamType
+  const subjectsOrder = computed(() => examConfig.value.subjects)
+  const subjectNameSynonyms = computed(() => examConfig.value.subjectNameSynonyms)
+  const numericAnswerLimitPerSubject = computed(() => examConfig.value.numericLimitPerSubject)
 
 
   // Getters
@@ -204,7 +204,8 @@ export const useExamStore = defineStore('exam', () => {
       const authStore = useAuthStore()
       if (!authStore.studentId) throw new Error('No student ID available')
 
-      console.log('fetchExamData: Starting...')
+      const cfg = examConfig.value
+      console.log(`fetchExamData: Starting for exam type ${examType.value}...`)
 
       if (questions.value.length > 0) {
         console.log('fetchExamData: Questions already loaded (e.g., from localStorage). Skipping fetch.')
@@ -224,43 +225,33 @@ export const useExamStore = defineStore('exam', () => {
         } else if (pastResults && pastResults.length > 0) {
           const allAttemptedAnswers = pastResults.flatMap(r => r.answers || [])
           const allAttemptedQuestionIds = [...new Set(allAttemptedAnswers.map(a => a?.question_id).filter(id => id != null))]
-          
+
           if (allAttemptedQuestionIds.length > 0) {
             console.log(`fetchExamData: Checking correctness for ${allAttemptedQuestionIds.length} attempted questions...`)
-            
-            // Fetch correct answers for these questions in batch
+
             const { data: choicesData } = await supabase
               .from('choices')
               .select('question_id, correct_answer')
               .in('question_id', allAttemptedQuestionIds)
-            
+
             if (choicesData) {
               const correctAnswersMap = Object.fromEntries(choicesData.map(c => [c.question_id, c.correct_answer]))
-              
-              // Only exclude questions where the student's answer was CORRECT
               excludedQuestionIds = allAttemptedAnswers
                 .filter(a => {
                   if (!a || !a.question_id || !a.answer) return false
                   const correctAnswer = correctAnswersMap[a.question_id]
                   if (correctAnswer === undefined) return false
-                  
-                  // Replicate correctness logic from results calculation
                   let isCorrect = false
                   const userAnswer = String(a.answer).trim()
                   const targetAnswer = String(correctAnswer).trim()
-                  
-                  // Basic comparison for MCQs and Numericals
-                  // (Numeric values might have slight differences but we usually treat them as strings or exact floats)
                   if (!isNaN(parseFloat(userAnswer)) && !isNaN(parseFloat(targetAnswer))) {
                     isCorrect = parseFloat(userAnswer) === parseFloat(targetAnswer)
                   } else {
                     isCorrect = userAnswer.toLowerCase() === targetAnswer.toLowerCase()
                   }
-                  
                   return isCorrect
                 })
                 .map(a => a.question_id)
-              
               excludedQuestionIds = [...new Set(excludedQuestionIds)]
               console.log(`fetchExamData: Excluding ${excludedQuestionIds.length} CORRECTLY answered IDs`)
             }
@@ -270,8 +261,9 @@ export const useExamStore = defineStore('exam', () => {
         console.error('fetchExamData: Catch in past results processing:', err)
       }
 
-      // 2. Fetch subjects info
-      const allSubjectNames = Array.from(new Set(Object.values(subjectNameSynonyms).flat()))
+      // 2. Fetch subjects info — pull all synonym names from config
+      const synonymsMap = cfg.subjectNameSynonyms
+      const allSubjectNames = Array.from(new Set(Object.values(synonymsMap).flat()))
       const { data: subjectsData, error: subjectsError } = await supabase
         .from('subjects')
         .select('subject_id, subject_name')
@@ -281,7 +273,7 @@ export const useExamStore = defineStore('exam', () => {
 
       const availableSubjects = (subjectsData || [])
       const lookupIdFor = (canonicalName) => {
-        const candidates = subjectNameSynonyms[canonicalName] || [canonicalName]
+        const candidates = synonymsMap[canonicalName] || [canonicalName]
         const found = availableSubjects.find(s => candidates.includes(s.subject_name))
         return found?.subject_id
       }
@@ -294,12 +286,25 @@ export const useExamStore = defineStore('exam', () => {
         return array
       }
 
+      // Helper to apply category filter. categoryId can be a number or array of numbers.
+      const applyCategoryFilter = (query, categoryIdConfig) => {
+        if (!categoryIdConfig) return query
+        if (Array.isArray(categoryIdConfig)) {
+          return query.in('category_id', categoryIdConfig)
+        }
+        return query.eq('category_id', categoryIdConfig)
+      }
+
+      const mcqTarget = cfg.questionsPerSubject.mcq
+      const numTarget = cfg.questionsPerSubject.numeric
+      const difficultyFilter = cfg.difficultyFilter // null or array like ['easy', 'medium']
+
       const assembledQuestions = []
 
-      for (const subjectName of subjectsOrder) {
+      for (const subjectName of cfg.subjects) {
         const subjectId = lookupIdFor(subjectName)
         if (!subjectId) {
-          console.warn(`fetchExamData: No ID for ${subjectName}`)
+          console.warn(`fetchExamData: No subject ID found for "${subjectName}"`)
           continue
         }
 
@@ -307,26 +312,32 @@ export const useExamStore = defineStore('exam', () => {
         let subjectNumericals = []
 
         // --- Fetch MCQs ---
+        const mcqFetchLimit = mcqTarget * 3 // Fetch extra for shuffle variety
         let mcqQuery = supabase
           .from('questions')
           .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name), choices(multi_choice, choice1, choice2, choice3, choice4, correct_answer)')
           .eq('subject_id', subjectId)
           .eq('question_type', 'multiple_choice')
 
+        mcqQuery = applyCategoryFilter(mcqQuery, cfg.categoryId)
+
+        if (difficultyFilter && difficultyFilter.length > 0) {
+          mcqQuery = mcqQuery.in('difficulty', difficultyFilter)
+        }
+
         if (excludedQuestionIds.length > 0) {
-          // Wrap with parentheses to satisfy PostgREST IN filter requirement
           mcqQuery = mcqQuery.not('question_id', 'in', `(${excludedQuestionIds.join(',')})`)
         }
 
-        const { data: mcqRows, error: mcqError } = await mcqQuery.limit(60)
+        const { data: mcqRows, error: mcqError } = await mcqQuery.limit(mcqFetchLimit)
         if (mcqError) {
           console.error(`fetchExamData: Error for ${subjectName} MCQs:`, mcqError)
         } else {
-          subjectMcqs = shuffleArray(mcqRows || []).slice(0, 20)
+          subjectMcqs = shuffleArray(mcqRows || []).slice(0, mcqTarget)
         }
 
-        // MCQ Fallback
-        if (subjectMcqs.length < 20) {
+        // MCQ Fallback (if exclusions reduced count below target)
+        if (subjectMcqs.length < mcqTarget) {
           const currentPickedIds = subjectMcqs.map(q => q.question_id)
           let fillQuery = supabase
             .from('questions')
@@ -334,47 +345,59 @@ export const useExamStore = defineStore('exam', () => {
             .eq('subject_id', subjectId)
             .eq('question_type', 'multiple_choice')
 
+          fillQuery = applyCategoryFilter(fillQuery, cfg.categoryId)
+
+          if (difficultyFilter && difficultyFilter.length > 0) {
+            fillQuery = fillQuery.in('difficulty', difficultyFilter)
+          }
+
           if (currentPickedIds.length > 0) {
             fillQuery = fillQuery.not('question_id', 'in', `(${currentPickedIds.join(',')})`)
           }
 
-          const { data: fillMcqs } = await fillQuery.limit(20 - subjectMcqs.length)
+          const { data: fillMcqs } = await fillQuery.limit(mcqTarget - subjectMcqs.length)
           if (fillMcqs) subjectMcqs.push(...fillMcqs)
         }
 
-        // --- Fetch Numericals ---
-        let numQuery = supabase
-          .from('questions')
-          .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
-          .eq('subject_id', subjectId)
-          .eq('question_type', 'numeric')
-
-        if (excludedQuestionIds.length > 0) {
-          numQuery = numQuery.not('question_id', 'in', `(${excludedQuestionIds.join(',')})`)
-        }
-
-        const { data: numRows, error: numError } = await numQuery.limit(20)
-        if (numError) {
-          console.error(`fetchExamData: Error for ${subjectName} Numericals:`, numError)
-        } else {
-          subjectNumericals = shuffleArray(numRows || []).slice(0, 5)
-        }
-
-        // Num Fallback
-        if (subjectNumericals.length < 5) {
-          const currentPickedIds = subjectNumericals.map(q => q.question_id)
-          let fillQuery = supabase
+        // --- Fetch Numericals (only if exam config has numeric questions) ---
+        if (cfg.hasNumeric && numTarget > 0) {
+          let numQuery = supabase
             .from('questions')
             .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
             .eq('subject_id', subjectId)
             .eq('question_type', 'numeric')
 
-          if (currentPickedIds.length > 0) {
-            fillQuery = fillQuery.not('question_id', 'in', `(${currentPickedIds.join(',')})`)
+          numQuery = applyCategoryFilter(numQuery, cfg.categoryId)
+
+          if (excludedQuestionIds.length > 0) {
+            numQuery = numQuery.not('question_id', 'in', `(${excludedQuestionIds.join(',')})`)
           }
 
-          const { data: fillNums } = await fillQuery.limit(5 - subjectNumericals.length)
-          if (fillNums) subjectNumericals.push(...fillNums)
+          const { data: numRows, error: numError } = await numQuery.limit(numTarget * 3)
+          if (numError) {
+            console.error(`fetchExamData: Error for ${subjectName} Numericals:`, numError)
+          } else {
+            subjectNumericals = shuffleArray(numRows || []).slice(0, numTarget)
+          }
+
+          // Num Fallback
+          if (subjectNumericals.length < numTarget) {
+            const currentPickedIds = subjectNumericals.map(q => q.question_id)
+            let fillQuery = supabase
+              .from('questions')
+              .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
+              .eq('subject_id', subjectId)
+              .eq('question_type', 'numeric')
+
+            fillQuery = applyCategoryFilter(fillQuery, cfg.categoryId)
+
+            if (currentPickedIds.length > 0) {
+              fillQuery = fillQuery.not('question_id', 'in', `(${currentPickedIds.join(',')})`)
+            }
+
+            const { data: fillNums } = await fillQuery.limit(numTarget - subjectNumericals.length)
+            if (fillNums) subjectNumericals.push(...fillNums)
+          }
         }
 
         const transform = (row) => ({
@@ -437,7 +460,8 @@ export const useExamStore = defineStore('exam', () => {
     sessionId.value = null
     sessionStartTime.value = null
     lastResult.value = null
-    remainingTime.value = 180 * 60
+    // Reset time from config so resuming after a different exam type is correct
+    remainingTime.value = examConfig.value.durationSeconds
     currentQuestionIndex.value = 0
     numericDrafts.value = {}
     timeSpent.value = {}
@@ -458,7 +482,8 @@ export const useExamStore = defineStore('exam', () => {
         const answeredNumericForSubject = questions.value
           .filter(q => q.subject === question.subject && q.question_type === 'numeric' && userAnswers.value[q.id])
           .length
-        if (answeredNumericForSubject >= numericAnswerLimitPerSubject) {
+        // Use config-driven limit
+        if (answeredNumericForSubject >= numericAnswerLimitPerSubject.value) {
           return { success: false, reason: 'numeric_limit_reached' }
         }
       }
@@ -564,8 +589,11 @@ export const useExamStore = defineStore('exam', () => {
         userAnswers.value[currentQuestionId] = draftAnswers.value[currentQuestionId]
       }
 
-      // Build answers array (fixed length 75)
-      const answersArray = Array(75).fill(null).map((_, i) => {
+      const cfg = examConfig.value
+      const totalQCount = questions.value.length
+
+      // Build answers array (dynamic length based on exam config)
+      const answersArray = Array(totalQCount).fill(null).map((_, i) => {
         const question = questions.value[i]
         if (!question) return null
         const answer = userAnswers.value[question.id] || null
@@ -586,10 +614,10 @@ export const useExamStore = defineStore('exam', () => {
 
       if (choicesError) throw choicesError
 
-      // Calculate score
+      // Calculate score using config-driven marking scheme
       const correctById = Object.fromEntries((choicesData || []).map(c => [c.question_id, c.correct_answer]))
       const score = answersArray.reduce((total, a) => {
-        if (!a || !a.answer) return total
+        if (!a || !a.answer) return total + cfg.marking.unattempted
         const question = questions.value.find(q => q.id === a.question_id)
         const correctAnswer = correctById[a.question_id]
         let userAnswer = a.answer
@@ -603,7 +631,7 @@ export const useExamStore = defineStore('exam', () => {
           isCorrect = userAnswer === correctAnswer
         }
 
-        return total + (isCorrect ? 4 : -1)
+        return total + (isCorrect ? cfg.marking.correct : cfg.marking.incorrect)
       }, 0)
 
       // Mark session as submitted
@@ -896,9 +924,11 @@ export const useExamStore = defineStore('exam', () => {
     }
   }
 
-  // Set exam type
+  // Set exam type — also resets timer to the new exam's duration
   const setExamType = (type) => {
     examType.value = type
+    // Sync remaining time to new exam's duration (will be overridden by initializeSession if resuming)
+    remainingTime.value = getExamConfig(type).durationSeconds
   }
 
   return {
@@ -913,7 +943,8 @@ export const useExamStore = defineStore('exam', () => {
     questionStatuses,
     remainingTime,
     isFullScreen,
-    examTitle,
+    examTitle,    // Now a computed ref driven by config
+    examConfig,   // Expose full config for components that need it
     numericDrafts,
     timeSpent,
     currentTimer,

@@ -12,7 +12,7 @@
       <div class="bg-gray-50 border border-gray-200 rounded-xl p-6 mb-6 h-[50vh] overflow-y-auto custom-scrollbar text-sm text-gray-700 space-y-4">
         <h3 class="font-bold text-lg text-gray-900 border-b pb-2">General Instructions:</h3>
         <ol class="list-decimal pl-5 space-y-2">
-          <li>Total duration of examination is <strong>180 minutes</strong> (3 hours).</li>
+          <li>Total duration of examination is <strong>{{ durationText }}</strong>.</li>
           <li>The clock will be set at the server. The countdown timer in the top right corner of screen will display the remaining time available for you to complete the examination. When the timer reaches zero, the examination will end by itself. You will not be required to end or submit your examination.</li>
           <li>The Question Palette displayed on the right side of screen will show the status of each question using one of the following symbols:
             <ul class="mt-2 space-y-2 list-none pl-0">
@@ -117,10 +117,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useExamStore } from '../stores/examStore'
 
+const examStore = useExamStore()
 const emit = defineEmits(['start'])
 const hasReadInstructions = ref(false)
+
+// Compute human-readable duration from seconds
+const durationText = computed(() => {
+  const secs = examStore.examConfig?.durationSeconds ?? 180 * 60
+  const mins = Math.round(secs / 60)
+  const hrs = Math.floor(mins / 60)
+  const remainMins = mins % 60
+  if (hrs > 0 && remainMins > 0) return `${mins} minutes (${hrs} hour${hrs > 1 ? 's' : ''} ${remainMins} minutes)`
+  if (hrs > 0) return `${mins} minutes (${hrs} hour${hrs > 1 ? 's' : ''})`
+  return `${mins} minutes`
+})
 
 onMounted(() => {
   // Request full screen as soon as instructions load

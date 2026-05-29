@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard-page px-6 py-6 md:px-10 md:py-8">
+  <div class="dashboard-page px-6 py-6 md:px-10 md:py-8" @click="closeKcetDropdown">
 
     <!-- Greeting Row -->
     <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-2 animate-fadeIn">
@@ -78,62 +78,220 @@
       </div>
     </div>
 
-    <!-- Main Content: Start Exam CTA + Profile -->
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8 animate-fadeIn" style="animation-delay:0.1s">
+    <!-- Exam Cards Row: JEE + NEET + KCET -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 animate-fadeIn" style="animation-delay:0.1s">
 
-      <!-- Start Exam CTA — 3/5 width -->
-      <div class="lg:col-span-3 exam-cta-card group">
-        <div class="absolute inset-0 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 rounded-2xl"></div>
-        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-cyan-400/30 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-        <!-- decorative circles -->
-        <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
-        <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-white/5 rounded-full blur-2xl"></div>
+      <!-- JEE Main Card (Blue) -->
+      <div class="exam-card exam-card-jee group">
+        <div class="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-500 rounded-2xl"></div>
+        <div class="absolute inset-0 bg-gradient-to-br from-transparent to-indigo-600/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <div class="absolute -top-10 -right-10 w-36 h-36 bg-white/10 rounded-full blur-2xl"></div>
+        <div class="absolute -bottom-8 -left-8 w-28 h-28 bg-cyan-300/10 rounded-full blur-2xl"></div>
 
-        <div class="relative z-10 flex flex-col justify-between h-full">
-          <div>
-            <span class="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-xs font-bold rounded-full mb-4 tracking-wide uppercase">JEE Main Pattern</span>
-            <h2 class="text-3xl md:text-4xl font-bold text-white mb-3">Start Mock Test</h2>
-            <p class="text-blue-100 text-base md:text-lg leading-relaxed mb-6">Full-length JEE Main paper with 75 questions across Physics, Chemistry & Mathematics.</p>
-          </div>
-          <div class="flex flex-wrap items-center gap-4">
-            <button @click="showExamModal = true" class="px-8 py-3.5 bg-white text-blue-600 font-bold text-base rounded-xl hover:bg-blue-50 transition-all transform hover:scale-[1.03] active:scale-95 shadow-xl flex items-center gap-2">
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
-              Start Exam
-            </button>
-            <div class="flex items-center gap-4 text-blue-100 text-sm font-medium">
-              <span class="flex items-center gap-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                3 Hours
-              </span>
-              <span class="flex items-center gap-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                75 Qs
-              </span>
-              <span class="flex items-center gap-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                +4 / −1
-              </span>
+        <div class="relative z-10 flex flex-col h-full">
+          <div class="flex items-start justify-between mb-4">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-[11px] font-bold rounded-full tracking-wider uppercase">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+              NTA Pattern
+            </span>
+            <div class="flex gap-1.5">
+              <span class="text-[10px] font-bold px-2 py-0.5 bg-white/15 text-white/90 rounded-full">+4</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 bg-red-500/30 text-white/90 rounded-full">-1</span>
             </div>
           </div>
+
+          <h2 class="text-2xl font-bold text-white mb-1">JEE Main</h2>
+          <p class="text-blue-100/80 text-sm leading-relaxed mb-5 flex-1">Full-length mock covering Physics, Chemistry &amp; Mathematics. NTA-exact interface.</p>
+
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-3 text-blue-100 text-xs font-semibold">
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                3 Hours
+              </span>
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                75 Qs
+              </span>
+              <span>PCM</span>
+            </div>
+            <button @click="confirmExamStart('JEE_MAIN_FULL')"
+              class="flex items-center gap-2 px-5 py-2.5 bg-white text-blue-600 font-bold text-sm rounded-xl hover:bg-blue-50 transition-all transform hover:scale-[1.04] active:scale-95 shadow-lg">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              Start
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Score Trend Chart — 2/5 width -->
-      <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-200/80 shadow-sm p-6 hover:shadow-md transition-shadow duration-300">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-bold text-gray-800">Score Trend</h3>
-          <span class="text-xs text-gray-400 font-medium">{{ examHistory.length }} exam{{ examHistory.length !== 1 ? 's' : '' }}</span>
-        </div>
-        <div v-if="examHistory.length >= 1" class="h-52">
-          <Line :data="chartData" :options="chartOptions" />
-        </div>
-        <div v-else class="flex flex-col items-center justify-center h-52 text-center">
-          <svg class="w-10 h-10 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-          <p class="text-gray-400 text-sm">Take exams to see your score trend</p>
+      <!-- NEET UG Card (Emerald Green) -->
+      <div class="exam-card exam-card-neet group">
+        <div class="absolute inset-0 bg-gradient-to-br from-emerald-600 via-green-500 to-teal-500 rounded-2xl"></div>
+        <div class="absolute inset-0 bg-gradient-to-br from-transparent to-green-700/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <div class="absolute -top-10 -right-10 w-36 h-36 bg-white/10 rounded-full blur-2xl"></div>
+        <div class="absolute -bottom-8 -left-8 w-28 h-28 bg-teal-300/10 rounded-full blur-2xl"></div>
+
+        <div class="relative z-10 flex flex-col h-full">
+          <div class="flex items-start justify-between mb-4">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-[11px] font-bold rounded-full tracking-wider uppercase">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
+              Medical Pattern
+            </span>
+            <div class="flex gap-1.5">
+              <span class="text-[10px] font-bold px-2 py-0.5 bg-white/15 text-white/90 rounded-full">+4</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 bg-red-500/30 text-white/90 rounded-full">-1</span>
+            </div>
+          </div>
+
+          <h2 class="text-2xl font-bold text-white mb-1">NEET UG</h2>
+          <p class="text-green-100/80 text-sm leading-relaxed mb-5 flex-1">Full-length mock covering Physics, Chemistry, Botany &amp; Zoology. PCB pattern.</p>
+
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-3 text-green-100 text-xs font-semibold">
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                3h 20m
+              </span>
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                180 Qs
+              </span>
+              <span>PCB</span>
+            </div>
+            <button @click="confirmExamStart('NEET_UG_FULL')"
+              class="flex items-center gap-2 px-5 py-2.5 bg-white text-emerald-600 font-bold text-sm rounded-xl hover:bg-green-50 transition-all transform hover:scale-[1.04] active:scale-95 shadow-lg">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              Start
+            </button>
+          </div>
         </div>
       </div>
+
+      <!-- KCET Card (Amber/Gold) — special subject dropdown -->
+      <div class="exam-card exam-card-kcet group">
+        <div class="absolute inset-0 bg-gradient-to-br from-amber-500 via-yellow-500 to-orange-400 rounded-2xl"></div>
+        <div class="absolute inset-0 bg-gradient-to-br from-transparent to-orange-600/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <div class="absolute -top-10 -right-10 w-36 h-36 bg-white/10 rounded-full blur-2xl"></div>
+        <div class="absolute -bottom-8 -left-8 w-28 h-28 bg-yellow-200/10 rounded-full blur-2xl"></div>
+
+        <div class="relative z-10 flex flex-col h-full">
+          <div class="flex items-start justify-between mb-4">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-[11px] font-bold rounded-full tracking-wider uppercase">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+              Karnataka State
+            </span>
+            <span class="text-[10px] font-bold px-2 py-0.5 bg-green-400/30 text-white rounded-full">No -ve</span>
+          </div>
+
+          <h2 class="text-2xl font-bold text-white mb-1">KCET</h2>
+          <p class="text-yellow-100/80 text-sm leading-relaxed mb-4 flex-1">Single-subject exam. Select your subject below and start. No negative marking!</p>
+
+          <!-- Subject Dropdown — unique to KCET (custom styled, teleported to body to escape overflow:hidden) -->
+          <div class="mb-4">
+            <label class="text-yellow-100/70 text-[11px] font-semibold uppercase tracking-widest mb-2 block">Select Subject</label>
+            <div class="relative" @click.stop>
+              <!-- Trigger button -->
+              <button
+                ref="kcetTriggerRef"
+                type="button"
+                @click="openKcetDropdown"
+                class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-white/40 bg-white/15 hover:bg-white/25 backdrop-blur-sm transition-all duration-200 cursor-pointer"
+              >
+                <div class="flex items-center gap-2.5">
+                  <div class="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                    <span class="text-white text-[11px] font-black">
+                      {{ kcetSubject === 'KCET_PHYSICS' ? 'Ph' : kcetSubject === 'KCET_CHEMISTRY' ? 'Ch' : 'Ma' }}
+                    </span>
+                  </div>
+                  <span class="text-white font-bold text-sm">
+                    {{ kcetSubject === 'KCET_PHYSICS' ? 'Physics' : kcetSubject === 'KCET_CHEMISTRY' ? 'Chemistry' : 'Mathematics' }}
+                  </span>
+                </div>
+                <svg
+                  class="w-4 h-4 text-white/80 transition-transform duration-200"
+                  :class="kcetDropdownOpen ? 'rotate-180' : ''"
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+
+              <!-- Teleported dropdown — renders at body level to escape card's overflow:hidden -->
+              <Teleport to="body">
+                <div
+                  v-show="kcetDropdownOpen"
+                  class="kcet-dropdown-panel"
+                  :style="kcetDropdownStyle"
+                  @click.stop
+                >
+                  <div class="bg-white rounded-2xl border border-amber-100 overflow-hidden" style="box-shadow: 0 12px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(245,158,11,0.12);">
+                    <button
+                      v-for="opt in kcetOptions"
+                      :key="opt.value"
+                      type="button"
+                      @click="kcetSubject = opt.value; kcetDropdownOpen = false"
+                      class="w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-150 border-b border-gray-100/80 last:border-0"
+                      :class="kcetSubject === opt.value
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'text-gray-700 hover:bg-orange-50 hover:text-amber-700'"
+                    >
+                      <div
+                        class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[11px] font-black transition-colors"
+                        :class="kcetSubject === opt.value ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'"
+                      >
+                        {{ opt.abbr }}
+                      </div>
+                      <div class="flex-1">
+                        <div class="font-bold text-sm">{{ opt.label }}</div>
+                        <div class="text-[10px] text-gray-400 font-medium">{{ opt.desc }}</div>
+                      </div>
+                      <svg v-if="kcetSubject === opt.value" class="w-4 h-4 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </Teleport>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-3 text-yellow-100 text-xs font-semibold">
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                80 Mins
+              </span>
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                60 Qs
+              </span>
+              <span>+1 / 0</span>
+            </div>
+            <button @click="confirmExamStart(kcetSubject)"
+              class="flex items-center gap-2 px-5 py-2.5 bg-white text-amber-600 font-bold text-sm rounded-xl hover:bg-amber-50 transition-all transform hover:scale-[1.04] active:scale-95 shadow-lg">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              Start
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
 
+    <!-- Score Trend Chart: full row below cards -->
+    <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-6 mb-8 hover:shadow-md transition-shadow duration-300 animate-fadeIn" style="animation-delay:0.12s">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-gray-800">Score Trend</h3>
+        <span class="text-xs text-gray-400 font-medium">{{ examHistory.length }} exam{{ examHistory.length !== 1 ? 's' : '' }}</span>
+      </div>
+      <div v-if="examHistory.length >= 1" class="h-40">
+        <Line :data="chartData" :options="chartOptions" />
+      </div>
+      <div v-else class="flex flex-col items-center justify-center h-40 text-center">
+        <svg class="w-10 h-10 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        <p class="text-gray-400 text-sm">Take exams to see your score trend</p>
+      </div>
+    </div>
     <!-- Exam History -->
     <div class="animate-fadeIn" style="animation-delay:0.15s">
       <div class="flex items-center justify-between mb-5">
@@ -167,7 +325,7 @@
             <div class="flex items-center gap-4 min-w-0">
               <div class="exam-number">{{ index + 1 }}</div>
               <div class="min-w-0">
-                <p class="font-semibold text-gray-900 text-sm">JEE Main Mock Test</p>
+                <p class="font-semibold text-gray-900 text-sm">{{ getExamTypeLabel(exam.session?.exam_type) }}</p>
                 <p class="text-xs text-gray-400 mt-0.5">{{ formatDate(exam.session?.start_time) }}</p>
               </div>
             </div>
@@ -178,7 +336,7 @@
               </div>
               <div class="text-center">
                 <p class="text-xs text-gray-400">Attempted</p>
-                <p class="text-sm font-bold text-gray-800">{{ countAttempted(exam.answers) }}/75</p>
+                <p class="text-sm font-bold text-gray-800">{{ countAttempted(exam.answers) }}/{{ exam.answers?.length ?? '—' }}</p>
               </div>
               <div class="text-center">
                 <p class="text-xs text-gray-400">Duration</p>
@@ -197,44 +355,6 @@
       </div>
     </div>
 
-    <!-- Exam Type Modal -->
-    <div v-if="showExamModal" class="fixed inset-0 z-50 overflow-y-auto" style="animation: fadeIn 0.2s ease-out">
-      <div class="flex items-center justify-center min-h-screen px-4">
-        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" @click="showExamModal = false"></div>
-        <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" style="animation: slideUp 0.3s ease-out">
-          <h3 class="text-xl font-bold text-gray-900 mb-1">Start New Exam</h3>
-          <p class="text-sm text-gray-500 mb-5">Choose the type of exam:</p>
-
-          <button @click="confirmExamStart('JEE_MAIN_FULL')" class="w-full flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50/50 transition-all group mb-3">
-            <div class="flex items-center gap-3">
-              <div class="p-2.5 bg-blue-100 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-              </div>
-              <div class="text-left">
-                <p class="font-bold text-gray-900">Full Mock Test</p>
-                <p class="text-xs text-gray-500">75 Qs • 3 Hours • PCM</p>
-              </div>
-            </div>
-            <svg class="w-4 h-4 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-          </button>
-
-          <button class="w-full flex items-center justify-between p-4 border border-gray-200 rounded-xl opacity-50 cursor-not-allowed mb-4">
-            <div class="flex items-center gap-3">
-              <div class="p-2.5 bg-purple-100 text-purple-600 rounded-lg">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-              </div>
-              <div class="text-left">
-                <p class="font-bold text-gray-900">Subject Wise</p>
-                <p class="text-xs text-gray-500">Physics, Chem, or Maths</p>
-              </div>
-            </div>
-            <span class="text-[10px] font-bold px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full uppercase">Soon</span>
-          </button>
-
-          <button @click="showExamModal = false" class="w-full py-2.5 text-sm font-semibold text-gray-600 hover:text-gray-900 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Confirm Start Modal -->
     <div v-if="showConfirmModal" class="fixed inset-0 z-[60] overflow-y-auto" style="animation: fadeIn 0.2s ease-out">
@@ -396,6 +516,34 @@ const restoreLoading = ref(false)
 const restoreMessage = ref('')
 const restoreMessageType = ref('')
 const isStartingExam = ref(false)
+const kcetSubject = ref('KCET_PHYSICS') // KCET subject dropdown default
+const kcetDropdownOpen = ref(false)
+const kcetTriggerRef = ref(null)  // template ref on the trigger button
+const kcetDropdownStyle = ref({}) // fixed positioning style for teleported panel
+
+// Compute and apply fixed position based on trigger button rect
+function openKcetDropdown() {
+  kcetDropdownOpen.value = !kcetDropdownOpen.value
+  if (kcetDropdownOpen.value && kcetTriggerRef.value) {
+    const rect = kcetTriggerRef.value.getBoundingClientRect()
+    kcetDropdownStyle.value = {
+      position: 'fixed',
+      top: `${rect.bottom + 8}px`,
+      left: `${rect.left}px`,
+      width: `${rect.width}px`,
+      zIndex: 9999,
+    }
+  }
+}
+
+const kcetOptions = [
+  { value: 'KCET_PHYSICS',     label: 'Physics',     abbr: 'Ph', desc: 'Mechanics, Waves, Optics & more' },
+  { value: 'KCET_CHEMISTRY',   label: 'Chemistry',   abbr: 'Ch', desc: 'Organic, Inorganic & Physical' },
+  { value: 'KCET_MATHEMATICS', label: 'Mathematics', abbr: 'Ma', desc: 'Calculus, Algebra, Trigonometry' },
+]
+
+// Close KCET dropdown when clicking outside
+function closeKcetDropdown() { kcetDropdownOpen.value = false }
 
 const isCustomPackage = ref(false)
 const pricingDetails = computed(() => getPriceDetails(restoreTestCount.value))
@@ -524,11 +672,17 @@ onMounted(async () => {
   lastQuoteIdx = index
   quoteTimer = setInterval(rotateQuote, 8000)
 
+  // Close KCET dropdown on scroll/resize so teleported panel stays aligned
+  window.addEventListener('scroll', closeKcetDropdown, true)
+  window.addEventListener('resize', closeKcetDropdown)
+
   await fetchExamHistory()
 })
 
 onUnmounted(() => {
   if (quoteTimer) clearInterval(quoteTimer)
+  window.removeEventListener('scroll', closeKcetDropdown, true)
+  window.removeEventListener('resize', closeKcetDropdown)
 })
 
 async function fetchExamHistory() {
@@ -600,17 +754,27 @@ function getScoreColor(score) {
   return 'text-red-500'
 }
 
+// Map exam_type stored in DB to a human-readable label
+function getExamTypeLabel(examType) {
+  const map = {
+    'JEE_MAIN_FULL': 'JEE Main Mock Test',
+    'NEET_UG_FULL': 'NEET UG Mock Test',
+    'KCET_PHYSICS': 'KCET Physics',
+    'KCET_CHEMISTRY': 'KCET Chemistry',
+    'KCET_MATHEMATICS': 'KCET Mathematics',
+  }
+  return map[examType] || examType || 'Mock Test'
+}
+
 function confirmExamStart(examType) {
   const testsRemaining = authStore.studentProfile?.number_of_tests || 0
   if (testsRemaining <= 0) {
-    showExamModal.value = false
     showRestoreModal.value = true
     restoreMessage.value = ''
     return
   }
-  
+
   selectedExamType.value = examType
-  showExamModal.value = false
   showConfirmModal.value = true
 }
 
@@ -817,7 +981,40 @@ async function viewDetails(exam) {
   flex-shrink: 0;
 }
 
-/* Start Exam CTA */
+/* Exam Cards (JEE, NEET, KCET) */
+.exam-card {
+  position: relative;
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+  min-height: 240px;
+  overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+.exam-card-jee {
+  box-shadow: 0 6px 30px rgba(37, 99, 235, 0.2);
+}
+.exam-card-jee:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(37, 99, 235, 0.3);
+}
+.exam-card-neet {
+  box-shadow: 0 6px 30px rgba(5, 150, 105, 0.2);
+}
+.exam-card-neet:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(5, 150, 105, 0.3);
+}
+.exam-card-kcet {
+  box-shadow: 0 6px 30px rgba(245, 158, 11, 0.2);
+}
+.exam-card-kcet:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(245, 158, 11, 0.3);
+}
+
+/* Legacy Start Exam CTA (kept for safety) */
 .exam-cta-card {
   position: relative;
   border-radius: 1rem;

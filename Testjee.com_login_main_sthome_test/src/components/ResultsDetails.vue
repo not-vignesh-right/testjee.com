@@ -16,8 +16,8 @@
                 <div class="flex items-center gap-2 mb-1">
                   <span class="px-2.5 py-0.5 bg-white/20 backdrop-blur-sm text-white text-[10px] font-bold rounded-full uppercase tracking-wider">Performance Review</span>
                 </div>
-                <h1 class="text-2xl md:text-3xl font-bold text-white">JEE Main Mock Test {{ examLabel }}</h1>
-                <p class="text-blue-100 text-sm mt-1">Score: <span class="font-bold text-white">{{ lastResult.score }}</span> / 300</p>
+                <h1 class="text-2xl md:text-3xl font-bold text-white">{{ examConfig.shortLabel }} Mock Test {{ examLabel }}</h1>
+                <p class="text-blue-100 text-sm mt-1">Score: <span class="font-bold text-white">{{ lastResult.score }}</span> / {{ examConfig.maxScore }}</p>
               </div>
               <router-link 
                 to="/sthome/dashboard"
@@ -179,6 +179,20 @@ import { useExamStore } from '../stores/examStore'
 const router = useRouter()
 const examStore = useExamStore()
 const lastResult = examStore.lastResult
+
+// Derive exam config from the stored exam type in the result session
+const examConfig = computed(() => {
+  const EXAM_CONFIG_MAP = {
+    'JEE_MAIN_FULL': { shortLabel: 'JEE Main', maxScore: 300 },
+    'NEET_UG_FULL': { shortLabel: 'NEET UG', maxScore: 720 },
+    'KCET_PHYSICS': { shortLabel: 'KCET Physics', maxScore: 60 },
+    'KCET_CHEMISTRY': { shortLabel: 'KCET Chemistry', maxScore: 60 },
+    'KCET_MATHEMATICS': { shortLabel: 'KCET Mathematics', maxScore: 60 },
+  }
+  // Try to get exam type from the result session or from the live examStore
+  const examType = lastResult?.examType || examStore.examType
+  return EXAM_CONFIG_MAP[examType] ?? { shortLabel: 'JEE Main', maxScore: 300 }
+})
 
 function goToDetail(questionId) {
   if (questionId) router.push({ name: 'QuestionDetail', params: { id: questionId } })
