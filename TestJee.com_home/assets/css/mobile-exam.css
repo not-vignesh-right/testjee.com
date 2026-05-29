@@ -55,35 +55,31 @@
     }
 }
 
-/* Floating button to open palette - DISABLED */
-.palette-toggle-btn {
-    display: none !important;
-}
-
+/* Floating button to open palette - ENABLED */
 @media screen and (max-width: 1024px) {
     .palette-toggle-btn {
         display: flex !important;
         position: fixed !important;
         bottom: 24px !important;
         right: 24px !important;
-        width: 64px !important;
-        height: 64px !important;
+        width: 56px !important;
+        height: 56px !important;
         border-radius: 50% !important;
-        background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%) !important;
+        background: linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%) !important;
         color: white !important;
         border: none !important;
-        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4) !important;
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3) !important;
         z-index: 9998 !important;
         align-items: center !important;
         justify-content: center !important;
-        font-size: 28px !important;
+        font-size: 24px !important;
         cursor: pointer !important;
-        transition: all 0.3s ease !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
 
     .palette-toggle-btn:hover {
         transform: scale(1.05) !important;
-        box-shadow: 0 12px 32px rgba(102, 126, 234, 0.5) !important;
+        box-shadow: 0 12px 32px rgba(59, 130, 246, 0.4) !important;
     }
 
     .palette-toggle-btn:active {
@@ -91,11 +87,7 @@
     }
 }
 
-/* Overlay when palette is open - DISABLED */
-.palette-overlay {
-    display: none !important;
-}
-
+/* Overlay when palette is open - ENABLED */
 @media screen and (max-width: 1024px) {
     .palette-overlay {
         position: fixed !important;
@@ -103,7 +95,8 @@
         left: 0 !important;
         width: 100% !important;
         height: 100% !important;
-        background: rgba(0, 0, 0, 0.6) !important;
+        background: rgba(15, 23, 42, 0.6) !important;
+        backdrop-filter: blur(4px) !important;
         z-index: 9997 !important;
         opacity: 0 !important;
         visibility: hidden !important;
@@ -117,11 +110,7 @@
     }
 }
 
-/* Close button inside palette - DISABLED */
-.palette-close-btn {
-    display: none !important;
-}
-
+/* Close button inside palette - ENABLED */
 @media screen and (max-width: 1024px) {
     .palette-close-btn {
         display: flex !important;

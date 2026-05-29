@@ -86,13 +86,18 @@
 
 <body>
     <!-- Navigation -->
-    <header class="fixed top-0 inset-x-0 z-50 nav-blur">
+    <header class="fixed top-0 inset-x-0 z-50 nav-blur" id="about-header">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
             <a href="/" class="flex items-center gap-2.5 group rounded-xl">
                 <img src="/assets/img/logo_test_jee.png" class="h-10 transition-transform group-hover:scale-105"
                     alt="TestJEE" />
                 <span class="logo-text text-lg sm:text-xl tracking-tight">TestJEE</span>
             </a>
+
+            <button onclick="toggleMenu()" aria-label="Toggle menu" class="md:hidden w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100/80 text-gray-600 hover:bg-blue-50 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 transition-all">
+                <svg id="menu-icon-open" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                <svg id="menu-icon-close" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
 
             <nav
                 class="hidden md:flex items-center gap-0.5 bg-white/70 border border-gray-200/70 shadow-sm shadow-blue-500/5 p-1 rounded-2xl">
@@ -108,7 +113,21 @@
                     class="nav-link px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:text-blue-700 hover:bg-white transition-all">Contact</a>
             </nav>
 
-            <a href="/index.html#/login" class="btn-primary hidden sm:inline-flex">Get Started</a>
+            <a href="/index.html#/login" class="btn-primary hidden md:flex">Get Started</a>
+        </div>
+
+        <!-- Mobile Dropdown Menu -->
+        <div id="mobile-menu" class="hidden md:hidden px-4 sm:px-6 pb-4">
+            <div class="glass rounded-2xl p-2 bg-white shadow-xl border border-gray-100">
+                <a href="/index.html" class="nav-link flex items-center px-4 py-3 rounded-xl text-gray-700 hover:bg-blue-50 hover:text-blue-600 font-medium">Home</a>
+                <a href="/index.html#/exams" class="nav-link flex items-center px-4 py-3 rounded-xl text-gray-700 hover:bg-blue-50 hover:text-blue-600 font-medium">Exams</a>
+                <a href="/index.html#/features" class="nav-link flex items-center px-4 py-3 rounded-xl text-gray-700 hover:bg-blue-50 hover:text-blue-600 font-medium">Features</a>
+                <a href="/about.html" class="nav-link flex items-center px-4 py-3 rounded-xl text-blue-600 bg-blue-50 font-medium">About</a>
+                <a href="/index.html#/contact" class="nav-link flex items-center px-4 py-3 rounded-xl text-gray-700 hover:bg-blue-50 hover:text-blue-600 font-medium">Contact</a>
+                <div class="border-t border-gray-100 mt-2 pt-2">
+                    <a href="/index.html#/login" class="btn-primary w-full text-center justify-center">Get Started</a>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -369,6 +388,23 @@
             </div>
         </div>
     </footer>
+    <script>
+        function toggleMenu() {
+            const menu = document.getElementById('mobile-menu');
+            const openIcon = document.getElementById('menu-icon-open');
+            const closeIcon = document.getElementById('menu-icon-close');
+            
+            if (menu.classList.contains('hidden')) {
+                menu.classList.remove('hidden');
+                openIcon.classList.add('hidden');
+                closeIcon.classList.remove('hidden');
+            } else {
+                menu.classList.add('hidden');
+                openIcon.classList.remove('hidden');
+                closeIcon.classList.add('hidden');
+            }
+        }
+    </script>
 </body>
 
 </html>
