@@ -270,7 +270,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import logo from '../assets/logo_test_jee.png'
+import logo from '../assets/logo_test_jee_original.png'
 import founderImage from '../assets/founder-mishra.jpg'
 import vigneshImage from '../assets/developer-vignesh.png'
 import chinmayImage from '../assets/chinmay.jpg'

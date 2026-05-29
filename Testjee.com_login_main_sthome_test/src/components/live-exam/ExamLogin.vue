@@ -22,10 +22,11 @@
     <div class="sm:mx-auto sm:w-full sm:max-w-md">
        <div class="flex justify-center flex-col items-center">
          <!-- Brand -->
-          <div class="font-bold text-3xl text-gray-900 tracking-tight flex items-center gap-2 mb-2">
-            <span class="bg-blue-600 text-white rounded-lg px-2 py-1 shadow-sm font-black">T</span>
-            TestJEE <span class="text-blue-600 font-light">Live Exam</span>
-          </div>
+          <img
+            :src="logo"
+            alt="TestJEE"
+            class="h-16 w-auto object-contain mb-2"
+          />
           <p class="text-gray-500 font-medium text-sm">Secure Examination Portal</p>
        </div>
     </div>
@@ -43,6 +44,35 @@
           <div v-if="errorMsg" class="bg-red-50 text-red-700 p-3 rounded-lg text-sm font-medium border border-red-200 text-center flex items-center justify-center gap-2 animate-shake">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             {{ errorMsg }}
+          </div>
+
+          <!-- SQL Ambiguity Developer Helper -->
+          <div v-if="isSqlAmbiguityError" class="bg-slate-905 text-slate-100 rounded-xl p-5 border border-slate-800 shadow-xl mt-2 animate-fade-in text-left">
+            <div class="flex items-center gap-2 text-red-400 font-bold text-sm mb-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+              <span>Supabase SQL Ambiguity Error Detected</span>
+            </div>
+            <p class="text-slate-300 text-xs mb-4 leading-relaxed">
+              The RPC function <code class="bg-slate-800 px-1 py-0.5 rounded text-red-300 font-mono text-[11px]">student_exam_login</code> in your Supabase dashboard contains a join query with an ambiguous reference to <code>temp_student_id</code>.
+            </p>
+            <div class="mb-3">
+              <div class="flex justify-between items-center bg-slate-800 px-3 py-1.5 rounded-t-lg border-b border-slate-700">
+                <span class="text-[10px] uppercase font-mono text-slate-400 font-bold">SQL Fix Script</span>
+                <button 
+                  type="button" 
+                  @click="copySqlToClipboard" 
+                  class="text-xs flex items-center gap-1.5 font-bold transition-all px-2.5 py-1 rounded"
+                  :class="copiedSql ? 'text-green-400 bg-green-950/40 border border-green-800' : 'text-blue-400 hover:text-blue-300 bg-slate-700 border border-slate-600'"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 002 2h2a2 2 0 002-2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                  <span>{{ copiedSql ? 'Copied!' : 'Copy SQL' }}</span>
+                </button>
+              </div>
+              <pre class="bg-slate-900 p-3 rounded-b-lg text-[10px] font-mono overflow-x-auto max-h-48 border border-slate-750 text-red-200">{{ sqlFixSnippet }}</pre>
+            </div>
+            <div class="text-[10px] text-slate-400 leading-relaxed">
+              💡 <strong>How to apply:</strong> Go to your <strong>Supabase Dashboard</strong> &rarr; <strong>SQL Editor</strong> &rarr; Paste this script &rarr; Click <strong>Run</strong>. Then refresh this page and log in!
+            </div>
           </div>
 
           <!-- Step 1: Initial Login Form -->
@@ -147,6 +177,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useExamSessionStore } from '../../stores/examSessionStore'
 import { supabase } from '../../lib/supabase'
+import logo from '../../assets/logo_test_jee_original.png'
 
 const router = useRouter()
 const route = useRoute()
@@ -154,6 +185,69 @@ const examStore = useExamSessionStore()
 
 const loading = ref(false)
 const errorMsg = ref('')
+
+const isSqlAmbiguityError = ref(false)
+const sqlFixSnippet = ref(`-- Supabase SQL Editor Fix for ambiguous column "temp_student_id"
+-- Copy and run this script in your Supabase SQL Editor:
+
+CREATE OR REPLACE FUNCTION public.student_exam_login(
+  input_session_code text,
+  input_username text
+)
+RETURNS TABLE(
+  student_session_id integer,
+  temp_student_id integer,
+  live_session_id integer,
+  status text,
+  session_name text,
+  scheduled_start_time timestamp with time zone,
+  scheduled_end_time timestamp with time zone,
+  duration_minutes integer,
+  student_name text,
+  roll_number text,
+  has_filled_details boolean,
+  session_status text,
+  can_start boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    ses.student_session_id,
+    ts.temp_student_id,
+    les.live_session_id,
+    ses.status::text,
+    les.session_name::text,
+    les.scheduled_start_time,
+    les.scheduled_end_time,
+    les.duration_minutes,
+    ts.student_name::text,
+    ts.roll_number::text,
+    (ts.student_name IS NOT NULL AND ts.student_name <> '' AND ts.roll_number IS NOT NULL AND ts.roll_number <> '')::boolean AS has_filled_details,
+    les.status::text AS session_status,
+    (les.status = 'live')::boolean AS can_start
+  FROM public.live_exam_sessions les
+  JOIN public.temp_students ts ON ts.admin_test_id = les.admin_test_id
+  LEFT JOIN public.student_exam_sessions ses ON ses.temp_student_id = ts.temp_student_id AND ses.live_session_id = les.live_session_id
+  WHERE les.session_code = input_session_code
+    AND ts.username = input_username;
+END;
+$$;`)
+
+const copiedSql = ref(false)
+const copySqlToClipboard = async () => {
+  try {
+    await navigator.clipboard.writeText(sqlFixSnippet.value)
+    copiedSql.value = true
+    setTimeout(() => {
+      copiedSql.value = false
+    }, 3000)
+  } catch (err) {
+    console.error('Failed to copy text', err)
+  }
+}
 
 const needsDetails = ref(false)
 
@@ -169,6 +263,7 @@ const detailsForm = ref({
 
 const handleLogin = async () => {
   errorMsg.value = ''
+  isSqlAmbiguityError.value = false
   loading.value = true
   
   try {
@@ -179,6 +274,9 @@ const handleLogin = async () => {
     
     if (!res.success) {
       errorMsg.value = res.error || 'Invalid session code or credentials.'
+      if (res.error && (res.error.includes('temp_student_id') || res.error.toLowerCase().includes('ambiguous'))) {
+        isSqlAmbiguityError.value = true
+      }
       loading.value = false
       return
     }

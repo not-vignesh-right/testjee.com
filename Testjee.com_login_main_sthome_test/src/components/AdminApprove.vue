@@ -53,7 +53,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { supabase } from '../lib/supabase'
-import logo from '../assets/logo_test_jee.png'
+import logo from '../assets/logo_test_jee_original.png'
 
 const route = useRoute()
 

@@ -176,28 +176,15 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkDevice)
 })
 
-const startStatusPolling = () => {
-  pollInterval.value = setInterval(async () => {
-     if (canStartExam.value) {
-       clearInterval(pollInterval.value) // stop polling once live
-       return
-     }
-     
-     // Soft check DB status to see if admin forced live
-     const { data } = await supabase.rpc('student_exam_login', {
-       input_session_code: route.params.sessionCode,
-       input_username: '', // Empty means skip core auth, just returning pure session meta
-       input_password: ''
-     }).select('status, session_status, can_start')
-     // NOTE: Because student_exam_login strictly requires UN & PW for auth,
-     // we'll actually query the public live_exam_sessions table directly 
-     // securely if possible, OR we just re-run the login function silently utilizing stored creds
-  }, 10000)
-}
-
-// Override poll logic: Better to just re-trigger store validation if we had password,
-// For this waiting room, we check table directly assuming RLS allows read of status by session code
+// We poll the status safely by checking the live_exam_sessions table directly
 const checkStatusSafely = async () => {
+  if (canStartExam.value) {
+    if (pollInterval.value) {
+      clearInterval(pollInterval.value)
+      pollInterval.value = null
+    }
+    return
+  }
   try {
     const { data } = await supabase
       .from('live_exam_sessions')
@@ -205,14 +192,24 @@ const checkStatusSafely = async () => {
       .eq('session_code', route.params.sessionCode)
       .single()
       
-    if (data && data.status === 'live') {
+    if (data && data.status === 'live' && store.sessionDetails) {
       store.sessionDetails.sessionStatus = 'live'
       store.sessionDetails.canStart = true
+      if (pollInterval.value) {
+        clearInterval(pollInterval.value)
+        pollInterval.value = null
+      }
     }
   } catch(e) {}
 }
 
-pollInterval.value = setInterval(checkStatusSafely, 5000)
+const startStatusPolling = () => {
+  if (pollInterval.value) clearInterval(pollInterval.value)
+  // Call once immediately
+  checkStatusSafely()
+  // Set interval to poll status every 5 seconds
+  pollInterval.value = setInterval(checkStatusSafely, 5000)
+}
 
 const startCountdownTimers = () => {
   countdownInterval.value = setInterval(() => {

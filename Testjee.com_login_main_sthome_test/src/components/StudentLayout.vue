@@ -164,7 +164,7 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
-import logo from '../assets/logo_test_jee.png'
+import logo from '../assets/logo_test_jee_original.png'
 
 const router = useRouter()
 const route = useRoute()

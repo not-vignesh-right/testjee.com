@@ -387,7 +387,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import { useAdminStore } from '../stores/adminStore'
 import { supabase } from '../lib/supabase'
-import logo from '../assets/logo_test_jee.png'
+import logo from '../assets/logo_test_jee_original.png'
 import { getPriceDetails, PRESET_PACKAGES, EXAM_PRICE_TIERS } from '../data/pricing'
 
 const router = useRouter()

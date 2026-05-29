@@ -13,12 +13,11 @@
               class="flex items-center gap-2.5 shrink-0 group"
               title="Admin Home"
             >
-              <div class="bg-blue-600 p-2 rounded-lg group-hover:bg-blue-700 transition-colors">
-                <span class="text-white font-bold text-base leading-none block">A</span>
-              </div>
-              <span class="hidden sm:block font-bold text-gray-900 text-lg leading-tight group-hover:text-blue-600 transition-colors">
-                Admin
-              </span>
+              <img
+                :src="logo"
+                alt="TestJEE Logo"
+                class="h-9 w-auto object-contain"
+              />
             </button>
 
             <!-- Breadcrumb separator + page title -->
@@ -119,6 +118,7 @@
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAdminStore } from '../../stores/adminStore'
+import logo from '../../assets/logo_test_jee_original.png'
 
 const router = useRouter()
 const route = useRoute()
