@@ -96,62 +96,38 @@ Currently, the student exam UI is heavily hardcoded around the **JEE Main NTA pa
 
 ---
 
-## 5. Step-by-Step Migration Plan to Support Multiple Exams
+## 5. Completed Implementation of Multiple Exams (NEET & KCET)
 
-To build out these new exams elegantly without breaking the existing codebase, we will generalize `examStore.js` and the exam layouts in a backward-compatible way.
+We have successfully migrated the application to fully support dynamic, config-driven mock tests for JEE Main, NEET UG, and KCET. The implementation has been integrated into the student portal without breaking any legacy features.
 
-### Phase 1: Database Support (Database Schema Updates)
-1.  **Add `exam_type` support to `questions` table:**
-    Currently, questions are associated with `subject_id` and `topic_id`. We need a way to filter questions based on whether they are for `JEE`, `NEET`, or `KCET`.
-2.  **Add `exam_type` constraints or classifications to `subjects` table:**
-    *   Botany and Zoology should be grouped under Biology or classified specifically as NEET subjects.
+### 🛠️ Architecture & Code Layout of the Solution
 
-### Phase 2: Refactoring the Pinia Store (`examStore.js`)
-Currently, `examStore.js` has hardcoded values. We will refactor it to load configurations dynamically based on the active `examType`:
-
-```javascript
-// Dynamic Configuration Map for Exam Types
-const EXAM_CONFIGS = {
-  JEE_MAIN_FULL: {
-    title: 'Test JEE Main - Full Test',
-    subjects: ['Physics', 'Chemistry', 'Mathematics'],
-    durationSeconds: 180 * 60, // 3 hours
-    totalQuestions: 75,
-    marking: { correct: 4, incorrect: -1 },
-    hasNumeric: true,
-    numericLimitPerSubject: 5
-  },
-  NEET_UG_FULL: {
-    title: 'Test NEET UG - Full Test',
-    subjects: ['Physics', 'Chemistry', 'Botany', 'Zoology'],
-    durationSeconds: 200 * 60, // 3 hours 20 mins
-    totalQuestions: 180, // or 200 with optional questions
-    marking: { correct: 4, incorrect: -1 },
-    hasNumeric: false
-  },
-  KCET_PCM_MATHS: {
-    title: 'Test KCET - Mathematics',
-    subjects: ['Mathematics'],
-    durationSeconds: 80 * 60, // 80 minutes
-    totalQuestions: 60,
-    marking: { correct: 1, incorrect: 0 }, // NO NEGATIVE MARKING!
-    hasNumeric: false
-  }
-}
+```mermaid
+graph TD
+    Dashboard[Dashboard.vue <br> Premium Exam Selector Cards] -->|Reads Config| Configs[examConfigs.js <br> Exam Specifications]
+    Dashboard -->|Triggers Exam| Store[examStore.js <br> Pinia Store]
+    Store -->|Fetches Dynamic Questions| Supabase[(Supabase Database)]
+    Dashboard -->|Teleports Dropdown| Body[document.body <br> KCET Custom Dropdown]
 ```
 
-*   **Dynamic Data Fetching:** Update `fetchExamData()` to query questions using the configured subjects and types for the selected exam.
-*   **Dynamic Score Calculation:** Update `submitExam()` to compute scores using `marking.correct` and `marking.incorrect` instead of hardcoding `+4` and `-1`.
+#### 1. Configuration-Driven Exams (`examConfigs.js`)
+We introduced a brand new config file [examConfigs.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/data/examConfigs.js) which houses the specifications for each exam type:
+- **`JEE_MAIN`**: 3 Subjects (Physics, Chemistry, Maths), 75 questions, +4/-1 marking scheme, 180 min duration.
+- **`NEET_UG`**: 4 Subjects (Physics, Chemistry, Botany, Zoology), 180 questions (selected dynamically from Category ID 2), +4/-1 marking scheme, 200 min duration.
+- **`KCET`**: Subject-wise individual paper sessions (e.g., Mathematics, Physics, Chemistry), 60 questions, +1/0 marking scheme (No Negative Marking!), 80 min duration.
 
-### Phase 3: Adapting the Exam Layout UI (`ExamLayout.vue`)
-*   **Subject Navigation Tabs:** Ensure that when NEET is loaded, it shows 4 tabs (Physics, Chemistry, Botany, Zoology) rather than the hardcoded 3 JEE tabs.
-*   **No Negative Marking warnings:** For KCET, adjust user guidance/modals to remind them that there is no negative marking, encouraging them to attempt all questions.
+#### 2. Intelligent, Dynamic Question Fetching
+- **NEET UG**: Fetches questions where `category_id = 2`. The syllabus for Physics and Chemistry is shared with JEE, but botany and zoology are fetched directly under the NEET category to construct the 180-question mock test.
+- **KCET**: Since specific KCET-only questions were not present, we use a smart fallback strategy:
+  - For **Physics** and **Chemistry**, questions are merged from both `category_id = 1` (JEE) and `category_id = 2` (NEET).
+  - For **Mathematics**, we query JEE questions (`category_id = 1`) but filter exclusively for **Easy and Medium difficulty** to accurately match the KCET exam standard.
 
-### Phase 4: Updating the Student Dashboard (`Dashboard.vue`)
-*   Add a gorgeous, premium modal/selector that lets approved students choose which exam type they wish to start (JEE, NEET, or KCET) depending on their course enrollment.
-*   Ensure that the "Start Mock Test" CTA updates its metadata display (Time, Questions, Marking) dynamically!
+#### 3. Stunning, Premium UI Cards in `Dashboard.vue`
+The dashboard cards have been redesigned to feel incredibly premium and lively:
+- Modern CSS gradients, subtle hover micro-animations, and translucent backdrop-blur filters.
+- **KCET Custom Teleported Dropdown**: KCET requires selecting a specific subject paper session. Because the exam cards use `overflow: hidden` (to clip decorative glowing background circles), a native or absolutely-positioned absolute menu gets cut off. We implemented a custom Vue 3 `<Teleport to="body">` dropdown positioned using `getBoundingClientRect()` relative coordinates. It opens elegantly, resists clipping issues, and automatically closes on outside click or page scroll.
 
 ---
 
-**Last Updated:** May 2026
-**Authors:** chinmaypanghri & chinmay402z
+**Last Updated:** May 2026  
+**Authors:** chinmaypanghri & chinmay402z & Antigravity AI
