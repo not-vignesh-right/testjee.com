@@ -176,7 +176,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkDevice)
 })
 
-// We poll the status safely by checking the live_exam_sessions table directly
+// We poll the status safely by calling the secure student_exam_login RPC (immune to RLS select restrictions)
 const checkStatusSafely = async () => {
   if (canStartExam.value) {
     if (pollInterval.value) {
@@ -186,13 +186,30 @@ const checkStatusSafely = async () => {
     return
   }
   try {
-    const { data } = await supabase
-      .from('live_exam_sessions')
-      .select('status')
-      .eq('session_code', route.params.sessionCode)
-      .single()
+    const username = sessionStorage.getItem('student_username')
+    let isLive = false
+
+    if (username) {
+      // Security definer RPC bypasses RLS policies cleanly!
+      const { data } = await supabase.rpc('student_exam_login', {
+        input_session_code: route.params.sessionCode,
+        input_username: username
+      })
+      if (data && data.length > 0) {
+        const info = data[0]
+        isLive = info.session_status === 'live' || info.can_start
+      }
+    } else {
+      // Fallback: Read directly from table (might be blocked by RLS depending on setup)
+      const { data } = await supabase
+        .from('live_exam_sessions')
+        .select('status')
+        .eq('session_code', route.params.sessionCode)
+        .single()
+      isLive = data && data.status === 'live'
+    }
       
-    if (data && data.status === 'live' && store.sessionDetails) {
+    if (isLive && store.sessionDetails) {
       store.sessionDetails.sessionStatus = 'live'
       store.sessionDetails.canStart = true
       if (pollInterval.value) {

@@ -188,8 +188,10 @@ const errorMsg = ref('')
 
 const isSqlAmbiguityError = ref(false)
 const sqlFixSnippet = ref(`-- Supabase SQL Editor Fix for ambiguous column "temp_student_id"
--- Copy and run this script in your Supabase SQL Editor:
+-- First, drop the existing function to avoid "cannot change return type of existing function" (error 42P13):
+DROP FUNCTION IF EXISTS public.student_exam_login(text, text);
 
+-- Copy and run this script in your Supabase SQL Editor:
 CREATE OR REPLACE FUNCTION public.student_exam_login(
   input_session_code text,
   input_username text
@@ -281,6 +283,9 @@ const handleLogin = async () => {
       return
     }
     
+    // Save student credentials to sessionStorage to allow secure status polling later
+    sessionStorage.setItem('student_username', loginForm.value.username.trim())
+
     // Check if details are needed
     if (!examStore.sessionDetails.hasFilledDetails) {
       needsDetails.value = true

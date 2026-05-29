@@ -11,6 +11,17 @@
     <!-- Main Live Interface -->
     <div v-else-if="sessionMeta">
       
+      <!-- Back Button to standard sessions list -->
+      <div class="mb-4">
+        <button 
+          @click="router.push('/admin/sessions?noRedirect=true')"
+          class="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors bg-white px-3.5 py-2 rounded-xl border border-gray-200 shadow-sm"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          Back to Sessions List
+        </button>
+      </div>
+
       <!-- Top Monitor Strip -->
       <div class="bg-gray-900 rounded-2xl shadow-xl overflow-hidden mb-6 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-800 text-white">
         

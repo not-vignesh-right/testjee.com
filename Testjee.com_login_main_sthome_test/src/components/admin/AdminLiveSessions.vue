@@ -174,11 +174,12 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../../lib/supabase'
 import { useAdminStore } from '../../stores/adminStore'
 
 const router = useRouter()
+const route = useRoute()
 const adminStore = useAdminStore()
 const loading = ref(true)
 const rawSessions = ref([])
@@ -207,6 +208,16 @@ const fetchSessions = async () => {
 
 onMounted(async () => {
   await fetchSessions()
+  
+  // If there is an active live session, and we are not explicitly bypassing the redirection,
+  // automatically redirect straight to the live monitor page!
+  if (route.query.noRedirect !== 'true') {
+    const liveSession = rawSessions.value.find(s => s.status === 'live')
+    if (liveSession) {
+      router.replace(`/admin/sessions/${liveSession.live_session_id}/monitor`)
+      return
+    }
+  }
   
   // Set up polling interval to keep stats fresh without hard reload
   pollInterval.value = setInterval(() => {
