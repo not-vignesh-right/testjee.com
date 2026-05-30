@@ -8,7 +8,7 @@ This document outlines the detailed system architecture, explains how to run eac
 
 The repository is structured as a **Multi-Repository Monorepo Layout** consisting of three independent applications that communicate through a shared database (Supabase) and proxy configurations:
 
-```mermaid
+```mermaid 
 graph TD
     User([End User]) -->|HTTPS| Home[1. TestJee.com_home <br> Marketing Web - Static HTML/JS]
     User -->|Attempts Exam| Student[2. Testjee.com_login_main_sthome_test <br> Student Portal - Vue 3/Vite]
