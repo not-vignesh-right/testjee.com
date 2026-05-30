@@ -1,8 +1,8 @@
 # TestJEE — Workspace Architecture & Understanding Report
 
 This document outlines the detailed system architecture, explains how to run each component, addresses the development environment issues you encountered, and presents a strategic plan for implementing the upcoming **NEET** and **KCET** exam UIs.
-
----
+ 
+--- 
 
 ## 1. System Architecture & Directory Breakdown
 
