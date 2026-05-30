@@ -292,10 +292,10 @@ export const useExamStore = defineStore('exam', () => {
       if (subjectsError) throw subjectsError
 
       const availableSubjects = (subjectsData || [])
-      const lookupIdFor = (canonicalName) => {
+      const lookupIdsFor = (canonicalName) => {
         const candidates = synonymsMap[canonicalName] || [canonicalName]
-        const found = availableSubjects.find(s => candidates.includes(s.subject_name))
-        return found?.subject_id
+        const found = availableSubjects.filter(s => candidates.includes(s.subject_name))
+        return found.map(s => s.subject_id)
       }
 
       const shuffleArray = (array) => {
@@ -322,9 +322,9 @@ export const useExamStore = defineStore('exam', () => {
       const assembledQuestions = []
 
       for (const subjectName of cfg.subjects) {
-        const subjectId = lookupIdFor(subjectName)
-        if (!subjectId) {
-          console.warn(`fetchExamData: No subject ID found for "${subjectName}"`)
+        const subjectIds = lookupIdsFor(subjectName)
+        if (!subjectIds || subjectIds.length === 0) {
+          console.warn(`fetchExamData: No subject IDs found for "${subjectName}"`)
           continue
         }
 
@@ -334,64 +334,31 @@ export const useExamStore = defineStore('exam', () => {
         let subjectMcqs = []
         let subjectNumericals = []
 
-        // --- Helper: build a base MCQ query for this subject ---
-        const buildMcqQuery = (excludeIds) => {
-          let q = supabase
-            .from('questions')
-            .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name), choices(multi_choice, choice1, choice2, choice3, choice4, correct_answer)')
-            .eq('subject_id', subjectId)
-            .eq('question_type', 'multiple_choice')
+        // Partition target counts evenly among the mapped subjectIds (e.g. 30 Botany, 30 Zoology for KCET Biology)
+        const subIdsCount = subjectIds.length
+        for (let i = 0; i < subIdsCount; i++) {
+          const subId = subjectIds[i]
+          
+          const subMcqTarget = Math.floor(mcqTarget / subIdsCount) + (i < (mcqTarget % subIdsCount) ? 1 : 0)
+          const subNumTarget = Math.floor(numTarget / subIdsCount) + (i < (numTarget % subIdsCount) ? 1 : 0)
 
-          q = applyCategoryFilter(q, cfg.categoryId)
+          if (subMcqTarget <= 0 && subNumTarget <= 0) continue
 
-          if (difficultyFilter && difficultyFilter.length > 0) {
-            q = q.in('difficulty', difficultyFilter)
-          }
-
-          if (subjectTopicIds && subjectTopicIds.length > 0) {
-            q = q.in('topic_id', subjectTopicIds)
-          }
-
-          if (excludeIds && excludeIds.length > 0) {
-            q = q.not('question_id', 'in', `(${excludeIds.join(',')})`)
-          }
-          return q
-        }
-
-        // --- Fetch MCQs (category-scoped exclusion first) ---
-        const mcqFetchLimit = mcqTarget * 3 // Fetch extra for shuffle variety
-        const { data: mcqRows, error: mcqError } = await buildMcqQuery(excludedQuestionIds).limit(mcqFetchLimit)
-        if (mcqError) {
-          console.error(`fetchExamData: Error for ${subjectName} MCQs:`, mcqError)
-        } else {
-          subjectMcqs = shuffleArray(mcqRows || []).slice(0, mcqTarget)
-        }
-
-        // MCQ Fallback 1: if category-scoped exclusion left us short, try cross-category exclusion
-        if (subjectMcqs.length < mcqTarget && allCorrectlyAnsweredIds.length > excludedQuestionIds.length) {
-          const currentPickedIds = subjectMcqs.map(q => q.question_id)
-          const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
-          const { data: fillMcqs } = await buildMcqQuery(skipIds).limit(mcqTarget - subjectMcqs.length)
-          if (fillMcqs) subjectMcqs.push(...fillMcqs)
-        }
-
-        // MCQ Fallback 2: pool completely exhausted — allow previously answered questions (student has seen them all)
-        if (subjectMcqs.length < mcqTarget) {
-          const currentPickedIds = subjectMcqs.map(q => q.question_id)
-          const { data: fillMcqs } = await buildMcqQuery(currentPickedIds).limit(mcqTarget - subjectMcqs.length)
-          if (fillMcqs) subjectMcqs.push(...fillMcqs)
-        }
-
-        // --- Fetch Numericals (only if exam config has numeric questions) ---
-        if (cfg.hasNumeric && numTarget > 0) {
-          const buildNumQuery = (excludeIds) => {
+          // --- Helper: build a base MCQ query for this specific subjectId ---
+          const buildMcqQueryForId = (excludeIds, useCategory = true) => {
             let q = supabase
               .from('questions')
-              .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
-              .eq('subject_id', subjectId)
-              .eq('question_type', 'numeric')
+              .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name), choices(multi_choice, choice1, choice2, choice3, choice4, correct_answer)')
+              .eq('subject_id', subId)
+              .eq('question_type', 'multiple_choice')
 
-            q = applyCategoryFilter(q, cfg.categoryId)
+            if (useCategory) {
+              q = applyCategoryFilter(q, cfg.categoryId)
+            }
+
+            if (difficultyFilter && difficultyFilter.length > 0) {
+              q = q.in('difficulty', difficultyFilter)
+            }
 
             if (subjectTopicIds && subjectTopicIds.length > 0) {
               q = q.in('topic_id', subjectTopicIds)
@@ -403,26 +370,109 @@ export const useExamStore = defineStore('exam', () => {
             return q
           }
 
-          const { data: numRows, error: numError } = await buildNumQuery(excludedQuestionIds).limit(numTarget * 3)
-          if (numError) {
-            console.error(`fetchExamData: Error for ${subjectName} Numericals:`, numError)
-          } else {
-            subjectNumericals = shuffleArray(numRows || []).slice(0, numTarget)
+          let subMcqs = []
+
+          // MCQ Phase 1: Target category + unattempted/correctly-scoped exclusions
+          const mcqFetchLimit = subMcqTarget * 3
+          const { data: mcqRows, error: mcqError } = await buildMcqQueryForId(excludedQuestionIds).limit(mcqFetchLimit)
+          if (!mcqError && mcqRows) {
+            subMcqs = shuffleArray(mcqRows).slice(0, subMcqTarget)
           }
 
-          // Num Fallback 1: cross-category exclusion
-          if (subjectNumericals.length < numTarget && allCorrectlyAnsweredIds.length > excludedQuestionIds.length) {
-            const currentPickedIds = subjectNumericals.map(q => q.question_id)
+          // MCQ Fallback 1: Target category + cross-category exclusion
+          if (subMcqs.length < subMcqTarget && allCorrectlyAnsweredIds.length > excludedQuestionIds.length) {
+            const currentPickedIds = subMcqs.map(q => q.question_id)
             const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
-            const { data: fillNums } = await buildNumQuery(skipIds).limit(numTarget - subjectNumericals.length)
-            if (fillNums) subjectNumericals.push(...fillNums)
+            const { data: fillMcqs } = await buildMcqQueryForId(skipIds).limit(subMcqTarget - subMcqs.length)
+            if (fillMcqs) subMcqs.push(...fillMcqs)
           }
 
-          // Num Fallback 2: pool exhausted
-          if (subjectNumericals.length < numTarget) {
-            const currentPickedIds = subjectNumericals.map(q => q.question_id)
-            const { data: fillNums } = await buildNumQuery(currentPickedIds).limit(numTarget - subjectNumericals.length)
-            if (fillNums) subjectNumericals.push(...fillNums)
+          // MCQ Fallback 2: Borrow from OTHER categories (Interdependence) + cross-category exclusion
+          if (subMcqs.length < subMcqTarget) {
+            const currentPickedIds = subMcqs.map(q => q.question_id)
+            const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
+            const { data: fillMcqs } = await buildMcqQueryForId(skipIds, false).limit(subMcqTarget - subMcqs.length)
+            if (fillMcqs) subMcqs.push(...fillMcqs)
+          }
+
+          // MCQ Fallback 3: Target category + allow repeats (pool exhausted)
+          if (subMcqs.length < subMcqTarget) {
+            const currentPickedIds = subMcqs.map(q => q.question_id)
+            const { data: fillMcqs } = await buildMcqQueryForId(currentPickedIds).limit(subMcqTarget - subMcqs.length)
+            if (fillMcqs) subMcqs.push(...fillMcqs)
+          }
+
+          // MCQ Fallback 4: Borrow from OTHER categories + allow repeats
+          if (subMcqs.length < subMcqTarget) {
+            const currentPickedIds = subMcqs.map(q => q.question_id)
+            const { data: fillMcqs } = await buildMcqQueryForId(currentPickedIds, false).limit(subMcqTarget - subMcqs.length)
+            if (fillMcqs) subMcqs.push(...fillMcqs)
+          }
+
+          subjectMcqs.push(...subMcqs)
+
+          // --- Fetch Numericals (only if config has numeric) ---
+          if (cfg.hasNumeric && subNumTarget > 0) {
+            const buildNumQueryForId = (excludeIds, useCategory = true) => {
+              let q = supabase
+                .from('questions')
+                .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
+                .eq('subject_id', subId)
+                .eq('question_type', 'numeric')
+
+              if (useCategory) {
+                q = applyCategoryFilter(q, cfg.categoryId)
+              }
+
+              if (subjectTopicIds && subjectTopicIds.length > 0) {
+                q = q.in('topic_id', subjectTopicIds)
+              }
+
+              if (excludeIds && excludeIds.length > 0) {
+                q = q.not('question_id', 'in', `(${excludeIds.join(',')})`)
+              }
+              return q
+            }
+
+            let subNums = []
+
+            // Num Phase 1: Target category + exclusions
+            const { data: numRows, error: numError } = await buildNumQueryForId(excludedQuestionIds).limit(subNumTarget * 3)
+            if (!numError && numRows) {
+              subNums = shuffleArray(numRows).slice(0, subNumTarget)
+            }
+
+            // Num Fallback 1: Target category + cross-category exclusion
+            if (subNums.length < subNumTarget && allCorrectlyAnsweredIds.length > excludedQuestionIds.length) {
+              const currentPickedIds = subNums.map(q => q.question_id)
+              const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
+              const { data: fillNums } = await buildNumQueryForId(skipIds).limit(subNumTarget - subNums.length)
+              if (fillNums) subNums.push(...fillNums)
+            }
+
+            // Num Fallback 2: Borrow from OTHER categories + cross-category exclusion
+            if (subNums.length < subNumTarget) {
+              const currentPickedIds = subNums.map(q => q.question_id)
+              const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
+              const { data: fillNums } = await buildNumQueryForId(skipIds, false).limit(subNumTarget - subNums.length)
+              if (fillNums) subNums.push(...fillNums)
+            }
+
+            // Num Fallback 3: Target category + allow repeats
+            if (subNums.length < subNumTarget) {
+              const currentPickedIds = subNums.map(q => q.question_id)
+              const { data: fillNums } = await buildNumQueryForId(currentPickedIds).limit(subNumTarget - subNums.length)
+              if (fillNums) subNums.push(...fillNums)
+            }
+
+            // Num Fallback 4: Borrow from OTHER categories + allow repeats
+            if (subNums.length < subNumTarget) {
+              const currentPickedIds = subNums.map(q => q.question_id)
+              const { data: fillNums } = await buildNumQueryForId(currentPickedIds, false).limit(subNumTarget - subNums.length)
+              if (fillNums) subNums.push(...fillNums)
+            }
+
+            subjectNumericals.push(...subNums)
           }
         }
 

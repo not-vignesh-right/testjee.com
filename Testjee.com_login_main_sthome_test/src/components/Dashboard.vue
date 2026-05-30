@@ -200,11 +200,11 @@
                 <div class="flex items-center gap-2.5">
                   <div class="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
                     <span class="text-white text-[11px] font-black">
-                      {{ kcetSubject === 'KCET_PHYSICS' ? 'Ph' : kcetSubject === 'KCET_CHEMISTRY' ? 'Ch' : 'Ma' }}
+                      {{ kcetOptions.find(o => o.value === kcetSubject)?.abbr || 'Ph' }}
                     </span>
                   </div>
                   <span class="text-white font-bold text-sm">
-                    {{ kcetSubject === 'KCET_PHYSICS' ? 'Physics' : kcetSubject === 'KCET_CHEMISTRY' ? 'Chemistry' : 'Mathematics' }}
+                    {{ kcetOptions.find(o => o.value === kcetSubject)?.label || 'Physics' }}
                   </span>
                 </div>
                 <svg
@@ -404,30 +404,23 @@
               </svg>
             </button>
 
-            <!-- Topic Wise — only for JEE and NEET; KCET shows a "coming soon" badge -->
+            <!-- Topic Wise -->
             <button
-              @click="!selectedExamType?.startsWith('KCET') && selectMode('topic')"
-              :class="[
-                'w-full group flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left',
-                selectedExamType?.startsWith('KCET')
-                  ? 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60'
-                  : 'hover:border-purple-400 hover:bg-purple-50 hover:shadow-md border-gray-200 bg-gray-50 cursor-pointer'
-              ]"
+              @click="selectMode('topic')"
+              class="w-full group flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left hover:border-purple-400 hover:bg-purple-50 hover:shadow-md border-gray-200 bg-gray-50 cursor-pointer"
             >
-              <div class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md transition-transform"
-                :class="selectedExamType?.startsWith('KCET') ? 'bg-gray-200' : 'bg-gradient-to-br from-purple-500 to-pink-500 group-hover:scale-110'">
-                <svg class="w-5 h-5" :class="selectedExamType?.startsWith('KCET') ? 'text-gray-400' : 'text-white'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md transition-transform bg-gradient-to-br from-purple-500 to-pink-500 group-hover:scale-110">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
                   <p class="font-bold text-gray-900 text-sm">Topic Wise</p>
-                  <span v-if="selectedExamType?.startsWith('KCET')" class="text-[10px] font-bold px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded-full">SOON</span>
                 </div>
                 <p class="text-xs text-gray-500 mt-0.5">{{ getModeDescription(selectedExamType, 'topic') }}</p>
               </div>
-              <svg v-if="!selectedExamType?.startsWith('KCET')" class="w-5 h-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
               </svg>
             </button>
@@ -807,24 +800,34 @@ async function fetchTopicsForExam(examTypeKey) {
       .select('subject_id, subject_name')
       .in('subject_name', allSubjectNames)
     if (!subjectsData) return
-    // Build canonical name → subject_id map
-    const lookupIdFor = (canonicalName) => {
+    // Build canonical name → subject_ids map (can return multiple IDs, e.g. botany + zoology for biology)
+    const lookupIdsFor = (canonicalName) => {
       const candidates = synonymsMap[canonicalName] || [canonicalName]
-      const found = subjectsData.find(s => candidates.includes(s.subject_name))
-      return found?.subject_id
+      const found = subjectsData.filter(s => candidates.includes(s.subject_name))
+      return found.map(s => s.subject_id)
     }
     // Fetch topics for each subject
     const result = {}
     for (const subjectName of cfg.subjects) {
-      const subjectId = lookupIdFor(subjectName)
-      if (!subjectId) continue
-      const { data: topicRows } = await supabase
-        .from('topics')
-        .select('topic_id, topic_name, class')
-        .eq('subject_id', subjectId)
-        .order('class')
-        .order('topic_name')
-      result[subjectName] = topicRows ?? []
+      const subjectIds = lookupIdsFor(subjectName)
+      if (!subjectIds || subjectIds.length === 0) continue
+      
+      const allTopicRows = []
+      for (const subjectId of subjectIds) {
+        const { data: topicRows } = await supabase
+          .from('topics')
+          .select('topic_id, topic_name, class')
+          .eq('subject_id', subjectId)
+        if (topicRows) allTopicRows.push(...topicRows)
+      }
+      
+      // Sort combined topics by class then by name
+      allTopicRows.sort((a, b) => {
+        if (a.class !== b.class) return (a.class || 0) - (b.class || 0)
+        return (a.topic_name || '').localeCompare(b.topic_name || '')
+      })
+      
+      result[subjectName] = allTopicRows
     }
     topicsBySubject.value = result
     // Initialize selections (all unselected by default)
@@ -860,6 +863,7 @@ const kcetOptions = [
   { value: 'KCET_PHYSICS',     label: 'Physics',     abbr: 'Ph', desc: 'Mechanics, Waves, Optics & more' },
   { value: 'KCET_CHEMISTRY',   label: 'Chemistry',   abbr: 'Ch', desc: 'Organic, Inorganic & Physical' },
   { value: 'KCET_MATHEMATICS', label: 'Mathematics', abbr: 'Ma', desc: 'Calculus, Algebra, Trigonometry' },
+  { value: 'KCET_BIOLOGY',     label: 'Biology',     abbr: 'Bi', desc: 'Botany & Zoology' },
 ]
 
 // Close KCET dropdown when clicking outside
@@ -1082,6 +1086,7 @@ function getExamTypeLabel(examType) {
     'KCET_PHYSICS': 'KCET Physics',
     'KCET_CHEMISTRY': 'KCET Chemistry',
     'KCET_MATHEMATICS': 'KCET Mathematics',
+    'KCET_BIOLOGY': 'KCET Biology',
   }
   return map[examType] || examType || 'Mock Test'
 }
@@ -1106,12 +1111,12 @@ function getModeDescription(examType, mode) {
       KCET_PHYSICS: '60 Qs · 80 mins · Physics',
       KCET_CHEMISTRY: '60 Qs · 80 mins · Chemistry',
       KCET_MATHEMATICS: '60 Qs · 80 mins · Mathematics',
+      KCET_BIOLOGY: '60 Qs · 80 mins · Biology',
     }
     return map[examType] || 'Full randomised mock test'
   }
   if (mode === 'topic') {
-    if (examType?.startsWith('KCET')) return 'Coming soon for KCET'
-    return 'Choose specific topics per subject'
+    return 'Choose specific topics'
   }
   return ''
 }
@@ -1170,46 +1175,72 @@ async function startTopicWiseExam() {
       .select('subject_id, subject_name')
       .in('subject_name', allSubjectNames)
 
-    const lookupIdFor = (canonicalName) => {
+    const lookupIdsFor = (canonicalName) => {
       const candidates = synonymsMap[canonicalName] || [canonicalName]
-      const found = (subjectsData || []).find(s => candidates.includes(s.subject_name))
-      return found?.subject_id
+      const found = (subjectsData || []).filter(s => candidates.includes(s.subject_name))
+      return found.map(s => s.subject_id)
     }
 
     const errors = []
     for (const subj of cfg.subjects) {
-      const subjectId = lookupIdFor(subj)
+      const subjectIds = lookupIdsFor(subj)
       const topicIds = topicFilterMap[subj]
       if (!topicIds || topicIds.length === 0) {
         errors.push(`${subj}: No topics selected.`)
         continue
       }
-      if (!subjectId) continue
+      if (!subjectIds || subjectIds.length === 0) continue
 
-      // Count MCQs available for this subject + selected topics
-      let countQuery = supabase
-        .from('questions')
-        .select('question_id', { count: 'exact', head: true })
-        .eq('subject_id', subjectId)
-        .eq('question_type', 'multiple_choice')
-        .in('topic_id', topicIds)
-      if (Array.isArray(cfg.categoryId)) {
-        countQuery = countQuery.in('category_id', cfg.categoryId)
-      } else if (cfg.categoryId) {
-        countQuery = countQuery.eq('category_id', cfg.categoryId)
-      }
-      if (cfg.difficultyFilter?.length) {
-        countQuery = countQuery.in('difficulty', cfg.difficultyFilter)
-      }
-      const { count, error: countErr } = await countQuery
-      if (countErr) {
-        console.error(`Validation count error for ${subj}:`, countErr)
-        continue
-      }
       const required = cfg.questionsPerSubject.mcq
-      if ((count ?? 0) < required) {
+      let totalAvailable = 0
+
+      for (const subjectId of subjectIds) {
+        // Count MCQs available for this subjectId + selected topics
+        let countQuery = supabase
+          .from('questions')
+          .select('question_id', { count: 'exact', head: true })
+          .eq('subject_id', subjectId)
+          .eq('question_type', 'multiple_choice')
+          .in('topic_id', topicIds)
+        if (Array.isArray(cfg.categoryId)) {
+          countQuery = countQuery.in('category_id', cfg.categoryId)
+        } else if (cfg.categoryId) {
+          countQuery = countQuery.eq('category_id', cfg.categoryId)
+        }
+        if (cfg.difficultyFilter?.length) {
+          countQuery = countQuery.in('difficulty', cfg.difficultyFilter)
+        }
+        
+        let { count, error: countErr } = await countQuery
+        if (countErr) {
+          console.error(`Validation count error for ${subj} (ID: ${subjectId}):`, countErr)
+          continue
+        }
+
+        let countVal = count ?? 0
+
+        // Borrowing fallback: count across all categories if primary category is short
+        const requiredPerSubId = Math.ceil(required / subjectIds.length)
+        if (countVal < requiredPerSubId) {
+          let borrowQuery = supabase
+            .from('questions')
+            .select('question_id', { count: 'exact', head: true })
+            .eq('subject_id', subjectId)
+            .eq('question_type', 'multiple_choice')
+            .in('topic_id', topicIds)
+          if (cfg.difficultyFilter?.length) {
+            borrowQuery = borrowQuery.in('difficulty', cfg.difficultyFilter)
+          }
+          const { count: borrowCount } = await borrowQuery
+          countVal = borrowCount ?? 0
+        }
+
+        totalAvailable += countVal
+      }
+
+      if (totalAvailable < required) {
         errors.push(
-          `${subj}: Only ${count ?? 0} question${(count ?? 0) !== 1 ? 's' : ''} available for selected topics (need ${required}).`
+          `${subj}: Only ${totalAvailable} question${totalAvailable !== 1 ? 's' : ''} available for selected topics (need ${required}).`
         )
       }
     }

@@ -147,6 +147,32 @@ export const EXAM_CONFIGS = {
     numericLimitPerSubject: 0,
     difficultyFilter: ['easy', 'medium'], // Only easy/medium for KCET Math from JEE pool
   },
+
+  KCET_BIOLOGY: {
+    title: 'KCET - Biology',
+    shortLabel: 'KCET Biology',
+    // KCET Biology: fetch from NEET (cat 2) questions (Botany and Zoology)
+    categoryId: 2,
+    subjects: ['Biology'],
+    subjectNameSynonyms: {
+      Biology: ['Botany', 'Zoology', 'Biology', 'Botany (Biology)', 'Zoology (Biology)'],
+    },
+    questionsPerSubject: {
+      mcq: 60,
+      numeric: 0,
+    },
+    totalQuestions: 60,
+    durationSeconds: 80 * 60,
+    marking: {
+      correct: 1,
+      incorrect: 0,
+      unattempted: 0,
+    },
+    maxScore: 60,
+    hasNumeric: false,
+    numericLimitPerSubject: 0,
+    difficultyFilter: null,
+  },
 }
 
 /**
