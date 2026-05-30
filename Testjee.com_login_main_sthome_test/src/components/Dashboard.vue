@@ -356,36 +356,241 @@
     </div>
 
 
-    <!-- Confirm Start Modal -->
-    <div v-if="showConfirmModal" class="fixed inset-0 z-[60] overflow-y-auto" style="animation: fadeIn 0.2s ease-out">
-      <div class="flex items-center justify-center min-h-screen px-4">
-        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showConfirmModal = false"></div>
-        <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center" style="animation: slideUp 0.3s ease-out">
-          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
-            <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
+    <!-- ══════════════════════════════════════════════════════════
+         STEP 1 — MODE SELECTION MODAL
+         Appears when student clicks "Start" on any exam card.
+         ══════════════════════════════════════════════════════════ -->
+    <div v-if="showModeModal" class="fixed inset-0 z-[60] overflow-y-auto" style="animation: fadeIn 0.2s ease-out">
+      <div class="flex items-center justify-center min-h-screen px-4 py-8">
+        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showModeModal = false"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" style="animation: slideUp 0.3s ease-out">
+
+          <!-- Header -->
+          <div class="px-7 pt-7 pb-5">
+            <div class="flex items-center gap-3 mb-1">
+              <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg font-black"
+                :class="{
+                  'bg-gradient-to-br from-blue-500 to-cyan-500': selectedExamType?.startsWith('JEE'),
+                  'bg-gradient-to-br from-emerald-500 to-teal-500': selectedExamType?.startsWith('NEET'),
+                  'bg-gradient-to-br from-amber-500 to-orange-400': selectedExamType?.startsWith('KCET'),
+                }">
+                {{ selectedExamType?.startsWith('JEE') ? '📐' : selectedExamType?.startsWith('NEET') ? '🧬' : '📋' }}
+              </div>
+              <div>
+                <h3 class="text-xl font-black text-gray-900 leading-tight">Start New Exam</h3>
+                <p class="text-xs text-gray-400 font-medium">{{ getExamTypeLabel(selectedExamType) }}</p>
+              </div>
+            </div>
+            <p class="text-sm text-gray-500 mt-3">Choose the type of exam:</p>
           </div>
-          <h3 class="text-lg leading-6 font-bold text-gray-900 mb-2">Ready to Start?</h3>
-          <div class="mt-2 text-sm text-gray-500 space-y-2 mb-6 text-left bg-red-50 p-4 rounded-lg border border-red-100">
-            <p class="text-red-800 font-bold mb-1">STRICT SECURITY ENFORCED:</p>
-            <p>• 🖥️ <strong>Laptop / Desktop only.</strong> Mobile phones and tablets are not permitted for this exam.</p>
-            <p>• Ensure you have a <strong>stable internet connection</strong> and sit in a calm environment before starting.</p>
-            <p>• The exam will immediately lock into <strong>full-screen mode</strong>.</p>
-            <p>• <strong>WARNING:</strong> Your test will be <strong>IMMEDIATELY AUTO-SUBMITTED</strong> if you exit full-screen, switch tabs, or open other applications. No exceptions.</p>
-          </div>
-          <div class="flex flex-col sm:flex-row gap-3">
-            <button @click="showConfirmModal = false" :disabled="isStartingExam" class="w-full sm:w-1/2 justify-center rounded-xl border border-gray-300 px-4 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors disabled:opacity-50">Cancel</button>
-            <button @click="startExam(selectedExamType)" :disabled="isStartingExam" class="w-full sm:w-1/2 justify-center rounded-xl border border-transparent px-4 py-3 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none shadow-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-75">
-              <span v-if="isStartingExam" class="flex items-center gap-2">
-                <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Starting...
-              </span>
-              <template v-else>
-                <span>Yes, Start Exam</span>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-              </template>
+
+          <!-- Mode Cards -->
+          <div class="px-7 pb-6 space-y-3">
+            <!-- Full Mock Test -->
+            <button @click="selectMode('full')"
+              class="w-full group flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left hover:border-blue-400 hover:bg-blue-50 hover:shadow-md border-gray-200 bg-gray-50"
+            >
+              <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-md group-hover:scale-110 transition-transform">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-gray-900 text-sm">Full Mock Test</p>
+                <p class="text-xs text-gray-500 mt-0.5">{{ getModeDescription(selectedExamType, 'full') }}</p>
+              </div>
+              <svg class="w-5 h-5 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
             </button>
+
+            <!-- Topic Wise — only for JEE and NEET; KCET shows a "coming soon" badge -->
+            <button
+              @click="!selectedExamType?.startsWith('KCET') && selectMode('topic')"
+              :class="[
+                'w-full group flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left',
+                selectedExamType?.startsWith('KCET')
+                  ? 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60'
+                  : 'hover:border-purple-400 hover:bg-purple-50 hover:shadow-md border-gray-200 bg-gray-50 cursor-pointer'
+              ]"
+            >
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md transition-transform"
+                :class="selectedExamType?.startsWith('KCET') ? 'bg-gray-200' : 'bg-gradient-to-br from-purple-500 to-pink-500 group-hover:scale-110'">
+                <svg class="w-5 h-5" :class="selectedExamType?.startsWith('KCET') ? 'text-gray-400' : 'text-white'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <p class="font-bold text-gray-900 text-sm">Topic Wise</p>
+                  <span v-if="selectedExamType?.startsWith('KCET')" class="text-[10px] font-bold px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded-full">SOON</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-0.5">{{ getModeDescription(selectedExamType, 'topic') }}</p>
+              </div>
+              <svg v-if="!selectedExamType?.startsWith('KCET')" class="w-5 h-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Cancel -->
+          <div class="px-7 pb-7">
+            <button @click="showModeModal = false" class="w-full py-2.5 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         STEP 2 — TOPIC WISE CONFIGURATION MODAL
+         ══════════════════════════════════════════════════════════ -->
+    <div v-if="showTopicModal" class="fixed inset-0 z-[70] overflow-y-auto" style="animation: fadeIn 0.2s ease-out">
+      <div class="flex items-center justify-center min-h-screen px-4 py-8">
+        <div class="fixed inset-0 bg-gray-900/70 backdrop-blur-sm" @click="showTopicModal = false"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden" style="animation: slideUp 0.3s ease-out; max-height: 90vh; display: flex; flex-direction: column;">
+
+          <!-- Modal Header -->
+          <div class="px-7 pt-7 pb-4 shrink-0">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-3">
+                <button @click="showTopicModal = false; showModeModal = true" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                  <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                  </svg>
+                </button>
+                <div>
+                  <h3 class="text-lg font-black text-gray-900 leading-tight">Topic Wise Exam</h3>
+                  <p class="text-xs text-gray-400 font-medium">{{ getExamTypeLabel(selectedExamType) }}</p>
+                </div>
+              </div>
+              <button @click="showTopicModal = false" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2 ml-11">Select topics for each subject. Only questions from selected topics will appear.</p>
+          </div>
+
+          <!-- Subject Tabs -->
+          <div class="px-7 shrink-0">
+            <div class="flex gap-1 p-1 bg-gray-100 rounded-xl">
+              <button
+                v-for="subj in topicSubjects"
+                :key="subj"
+                @click="activeTopicSubject = subj"
+                class="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all duration-200"
+                :class="activeTopicSubject === subj
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'"
+              >
+                {{ subj.length > 5 ? subj.slice(0, 4) + '.' : subj }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Topics List (scrollable) -->
+          <div class="flex-1 overflow-y-auto px-7 py-4 min-h-0">
+            <!-- Loading -->
+            <div v-if="topicsLoading" class="flex flex-col items-center justify-center py-12 text-gray-400">
+              <svg class="animate-spin h-8 w-8 mb-3" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <p class="text-sm">Loading topics...</p>
+            </div>
+
+            <template v-else-if="activeTopicSubject && topicsBySubject[activeTopicSubject]">
+              <!-- Select All row -->
+              <div class="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
+                <label class="flex items-center gap-2.5 cursor-pointer group">
+                  <div
+                    class="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer"
+                    :class="isAllSelectedForSubject(activeTopicSubject) ? 'bg-indigo-500 border-indigo-500' : 'border-gray-300 group-hover:border-indigo-400'"
+                    @click="toggleSelectAll(activeTopicSubject)"
+                  >
+                    <svg v-if="isAllSelectedForSubject(activeTopicSubject)" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <svg v-else-if="isSomeSelectedForSubject(activeTopicSubject)" class="w-3 h-3 text-indigo-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/>
+                    </svg>
+                  </div>
+                  <span class="text-sm font-semibold text-gray-700">Select All {{ activeTopicSubject }}</span>
+                </label>
+                <span class="text-xs font-medium text-gray-400">
+                  {{ selectedTopics[activeTopicSubject]?.size || 0 }} / {{ topicsBySubject[activeTopicSubject]?.length || 0 }} selected
+                </span>
+              </div>
+
+              <!-- Individual topics grouped by class -->
+              <div v-for="classGroup in ['11', '12']" :key="classGroup" class="mb-4">
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Class {{ classGroup }}</p>
+                <div class="space-y-1">
+                  <label
+                    v-for="topic in getTopicsForSubjectAndClass(activeTopicSubject, classGroup)"
+                    :key="topic.topic_id"
+                    class="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer group transition-all"
+                    :class="isTopicSelected(activeTopicSubject, topic.topic_id) ? 'bg-indigo-50' : 'hover:bg-gray-50'"
+                  >
+                    <div
+                      class="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all"
+                      :class="isTopicSelected(activeTopicSubject, topic.topic_id) ? 'bg-indigo-500 border-indigo-500' : 'border-gray-300 group-hover:border-indigo-400'"
+                      @click="toggleTopic(activeTopicSubject, topic.topic_id)"
+                    >
+                      <svg v-if="isTopicSelected(activeTopicSubject, topic.topic_id)" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                      </svg>
+                    </div>
+                    <span class="text-sm text-gray-700" :class="isTopicSelected(activeTopicSubject, topic.topic_id) ? 'font-semibold text-indigo-800' : ''">
+                      {{ topic.topic_name }}
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Footer: Validation Error + Start Button -->
+          <div class="px-7 pb-7 pt-4 border-t border-gray-100 shrink-0">
+            <!-- Validation error -->
+            <div v-if="topicValidationError" class="flex items-start gap-2 mb-4 p-3 rounded-xl bg-red-50 border border-red-100">
+              <svg class="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+              </svg>
+              <p class="text-xs text-red-700 font-medium">{{ topicValidationError }}</p>
+            </div>
+
+            <!-- Summary of selected questions -->
+            <div class="flex items-center justify-between mb-4 text-xs text-gray-500">
+              <span>Topics selected across all subjects:</span>
+              <span class="font-bold text-gray-800">{{ totalTopicsSelected }} topic{{ totalTopicsSelected !== 1 ? 's' : '' }}</span>
+            </div>
+
+            <div class="flex gap-3">
+              <button @click="showTopicModal = false" class="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button
+                @click="startTopicWiseExam"
+                :disabled="isValidatingTopics || totalTopicsSelected === 0"
+                class="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all flex items-center justify-center gap-2 shadow-md"
+                :class="totalTopicsSelected > 0 && !isValidatingTopics
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 hover:shadow-lg'
+                  : 'bg-gray-300 cursor-not-allowed'"
+              >
+                <svg v-if="isValidatingTopics" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                </svg>
+                {{ isValidatingTopics ? 'Checking...' : 'Check &amp; Start' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -498,6 +703,7 @@ import { getRandomQuote } from '../data/quotes'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler } from 'chart.js'
 import { getPriceDetails, PRESET_PACKAGES, EXAM_PRICE_TIERS } from '../data/pricing'
+import { EXAM_CONFIGS } from '../data/examConfigs'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler)
 
@@ -507,8 +713,8 @@ const authStore = useAuthStore()
 const studentProfile = computed(() => authStore.studentProfile)
 const examHistory = ref([])
 const loading = ref(true)
-const showExamModal = ref(false)
-const showConfirmModal = ref(false)
+const showModeModal = ref(false)    // Step 1: Full Mock vs Topic Wise
+const showTopicModal = ref(false)   // Step 2: Topic selection UI
 const selectedExamType = ref(null)
 const showRestoreModal = ref(false)
 const restoreTestCount = ref(3)
@@ -520,6 +726,120 @@ const kcetSubject = ref('KCET_PHYSICS') // KCET subject dropdown default
 const kcetDropdownOpen = ref(false)
 const kcetTriggerRef = ref(null)  // template ref on the trigger button
 const kcetDropdownStyle = ref({}) // fixed positioning style for teleported panel
+
+// ─── Topic Wise state ─────────────────────────────────────────────────────────
+const topicsBySubject = ref({})    // { SubjectName: [{ topic_id, topic_name, class }] }
+const selectedTopics = ref({})     // { SubjectName: Set<topic_id> }
+const activeTopicSubject = ref('') // currently visible subject tab
+const topicsLoading = ref(false)
+const topicValidationError = ref('')
+const isValidatingTopics = ref(false)
+
+const topicSubjects = computed(() => {
+  if (!selectedExamType.value) return []
+  const cfg = EXAM_CONFIGS[selectedExamType.value]
+  return cfg?.subjects ?? []
+})
+
+const totalTopicsSelected = computed(() => {
+  let count = 0
+  for (const subj of topicSubjects.value) {
+    count += selectedTopics.value[subj]?.size ?? 0
+  }
+  return count
+})
+
+function isTopicSelected(subj, topicId) {
+  return selectedTopics.value[subj]?.has(topicId) ?? false
+}
+
+function isAllSelectedForSubject(subj) {
+  const topics = topicsBySubject.value[subj]
+  if (!topics || topics.length === 0) return false
+  return (selectedTopics.value[subj]?.size ?? 0) === topics.length
+}
+
+function isSomeSelectedForSubject(subj) {
+  const size = selectedTopics.value[subj]?.size ?? 0
+  return size > 0 && !isAllSelectedForSubject(subj)
+}
+
+function toggleTopic(subj, topicId) {
+  if (!selectedTopics.value[subj]) selectedTopics.value[subj] = new Set()
+  if (selectedTopics.value[subj].has(topicId)) {
+    selectedTopics.value[subj].delete(topicId)
+  } else {
+    selectedTopics.value[subj].add(topicId)
+  }
+  // Trigger Vue reactivity on the Set
+  selectedTopics.value = { ...selectedTopics.value }
+  topicValidationError.value = ''
+}
+
+function toggleSelectAll(subj) {
+  const topics = topicsBySubject.value[subj] ?? []
+  if (isAllSelectedForSubject(subj)) {
+    selectedTopics.value[subj] = new Set()
+  } else {
+    selectedTopics.value[subj] = new Set(topics.map(t => t.topic_id))
+  }
+  selectedTopics.value = { ...selectedTopics.value }
+  topicValidationError.value = ''
+}
+
+function getTopicsForSubjectAndClass(subj, classNum) {
+  return (topicsBySubject.value[subj] ?? []).filter(t => t.class === classNum)
+}
+
+async function fetchTopicsForExam(examTypeKey) {
+  topicsLoading.value = true
+  topicsBySubject.value = {}
+  selectedTopics.value = {}
+  topicValidationError.value = ''
+  try {
+    const cfg = EXAM_CONFIGS[examTypeKey]
+    if (!cfg) return
+    // Collect all subject names (via synonyms) to look up subject_ids
+    const synonymsMap = cfg.subjectNameSynonyms
+    const allSubjectNames = Array.from(new Set(Object.values(synonymsMap).flat()))
+    const { data: subjectsData } = await supabase
+      .from('subjects')
+      .select('subject_id, subject_name')
+      .in('subject_name', allSubjectNames)
+    if (!subjectsData) return
+    // Build canonical name → subject_id map
+    const lookupIdFor = (canonicalName) => {
+      const candidates = synonymsMap[canonicalName] || [canonicalName]
+      const found = subjectsData.find(s => candidates.includes(s.subject_name))
+      return found?.subject_id
+    }
+    // Fetch topics for each subject
+    const result = {}
+    for (const subjectName of cfg.subjects) {
+      const subjectId = lookupIdFor(subjectName)
+      if (!subjectId) continue
+      const { data: topicRows } = await supabase
+        .from('topics')
+        .select('topic_id, topic_name, class')
+        .eq('subject_id', subjectId)
+        .order('class')
+        .order('topic_name')
+      result[subjectName] = topicRows ?? []
+    }
+    topicsBySubject.value = result
+    // Initialize selections (all unselected by default)
+    const initSel = {}
+    for (const subj of cfg.subjects) initSel[subj] = new Set()
+    selectedTopics.value = initSel
+    // Default active tab
+    if (cfg.subjects.length > 0) activeTopicSubject.value = cfg.subjects[0]
+  } catch (err) {
+    console.error('fetchTopicsForExam error:', err)
+  } finally {
+    topicsLoading.value = false
+  }
+}
+// ─── End Topic Wise state ───────────────────────────────────────────────────────
 
 // Compute and apply fixed position based on trigger button rect
 function openKcetDropdown() {
@@ -775,52 +1095,141 @@ function confirmExamStart(examType) {
   }
 
   selectedExamType.value = examType
-  showConfirmModal.value = true
+  showModeModal.value = true
 }
 
-async function startExam(examType) {
-  if (isStartingExam.value) return
-  isStartingExam.value = true
+function getModeDescription(examType, mode) {
+  if (mode === 'full') {
+    const map = {
+      JEE_MAIN_FULL: '75 Qs · 3 Hours · PCM',
+      NEET_UG_FULL: '180 Qs · 3h 20m · PCBZ',
+      KCET_PHYSICS: '60 Qs · 80 mins · Physics',
+      KCET_CHEMISTRY: '60 Qs · 80 mins · Chemistry',
+      KCET_MATHEMATICS: '60 Qs · 80 mins · Mathematics',
+    }
+    return map[examType] || 'Full randomised mock test'
+  }
+  if (mode === 'topic') {
+    if (examType?.startsWith('KCET')) return 'Coming soon for KCET'
+    return 'Choose specific topics per subject'
+  }
+  return ''
+}
+
+async function selectMode(mode) {
+  showModeModal.value = false
+  if (mode === 'full') {
+    // Full mock test — route straight to exam
+    startExam(selectedExamType.value)
+  } else {
+    // Topic wise — open topic selector
+    showTopicModal.value = true
+    await fetchTopicsForExam(selectedExamType.value)
+  }
+}
+
+function startExam(examType) {
+  // NOTE: Test count decrement has moved to ExamInstructions.vue
+  // (so Cancel on instructions page doesn't waste a test)
+  const examStore = useExamStore()
+  examStore.resetExamState()
+  examStore.setExamType(examType || 'JEE_MAIN_FULL')
+  examStore.setTopicFilter(null) // Full mock test: no topic filter
+  router.push('/exam')
+}
+
+async function startTopicWiseExam() {
+  if (isValidatingTopics.value) return
+  topicValidationError.value = ''
+
+  const examStore = useExamStore()
+  const cfg = EXAM_CONFIGS[selectedExamType.value]
+  if (!cfg) return
+
+  // Build topic filter map: { SubjectName: [topicId, ...] }
+  const topicFilterMap = {}
+  let totalSelections = 0
+  for (const subj of cfg.subjects) {
+    const ids = [...(selectedTopics.value[subj] ?? [])]
+    topicFilterMap[subj] = ids
+    totalSelections += ids.length
+  }
+
+  if (totalSelections === 0) {
+    topicValidationError.value = 'Please select at least one topic to continue.'
+    return
+  }
+
+  isValidatingTopics.value = true
   try {
-    const examStore = useExamStore()
+    // Validate: for each subject, count available questions across selected topics
+    const synonymsMap = cfg.subjectNameSynonyms
+    const allSubjectNames = Array.from(new Set(Object.values(synonymsMap).flat()))
+    const { data: subjectsData } = await supabase
+      .from('subjects')
+      .select('subject_id, subject_name')
+      .in('subject_name', allSubjectNames)
 
-    // Check if student has tests remaining
-    const testsRemaining = authStore.studentProfile?.number_of_tests || 0
-    if (testsRemaining <= 0) {
-      showConfirmModal.value = false
-      showRestoreModal.value = true
-      restoreMessage.value = ''
+    const lookupIdFor = (canonicalName) => {
+      const candidates = synonymsMap[canonicalName] || [canonicalName]
+      const found = (subjectsData || []).find(s => candidates.includes(s.subject_name))
+      return found?.subject_id
+    }
+
+    const errors = []
+    for (const subj of cfg.subjects) {
+      const subjectId = lookupIdFor(subj)
+      const topicIds = topicFilterMap[subj]
+      if (!topicIds || topicIds.length === 0) {
+        errors.push(`${subj}: No topics selected.`)
+        continue
+      }
+      if (!subjectId) continue
+
+      // Count MCQs available for this subject + selected topics
+      let countQuery = supabase
+        .from('questions')
+        .select('question_id', { count: 'exact', head: true })
+        .eq('subject_id', subjectId)
+        .eq('question_type', 'multiple_choice')
+        .in('topic_id', topicIds)
+      if (Array.isArray(cfg.categoryId)) {
+        countQuery = countQuery.in('category_id', cfg.categoryId)
+      } else if (cfg.categoryId) {
+        countQuery = countQuery.eq('category_id', cfg.categoryId)
+      }
+      if (cfg.difficultyFilter?.length) {
+        countQuery = countQuery.in('difficulty', cfg.difficultyFilter)
+      }
+      const { count, error: countErr } = await countQuery
+      if (countErr) {
+        console.error(`Validation count error for ${subj}:`, countErr)
+        continue
+      }
+      const required = cfg.questionsPerSubject.mcq
+      if ((count ?? 0) < required) {
+        errors.push(
+          `${subj}: Only ${count ?? 0} question${(count ?? 0) !== 1 ? 's' : ''} available for selected topics (need ${required}).`
+        )
+      }
+    }
+
+    if (errors.length > 0) {
+      topicValidationError.value = errors.join(' | ')
       return
     }
 
-    // Decrement the number of tests in Supabase
-    const { error } = await supabase
-      .from('students')
-      .update({
-        number_of_tests: testsRemaining - 1,
-        modification_date: new Date().toISOString()
-      })
-      .eq('student_id', authStore.studentProfile.student_id)
-
-    if (error) {
-      console.error('Failed to decrement test count:', error)
-      alert('Something went wrong. Please try again.')
-      return
-    }
-
-    // Update local profile to reflect the change
-    authStore.studentProfile.number_of_tests = testsRemaining - 1
-    console.log(`[TESTJEE] Tests remaining: ${testsRemaining - 1}`)
-
-    examStore.resetExamState() // Clear old submission state
-    examStore.setExamType(examType || 'JEE_MAIN_FULL')
-    showConfirmModal.value = false
+    // All good — start the exam
+    showTopicModal.value = false
+    examStore.resetExamState()
+    examStore.setExamType(selectedExamType.value)
+    examStore.setTopicFilter(topicFilterMap)
     router.push('/exam')
   } catch (err) {
-    console.error('Error decrementing tests:', err)
-    alert('Something went wrong. Please try again.')
+    console.error('startTopicWiseExam error:', err)
+    topicValidationError.value = 'Validation failed. Please try again.'
   } finally {
-    isStartingExam.value = false
+    isValidatingTopics.value = false
   }
 }
 

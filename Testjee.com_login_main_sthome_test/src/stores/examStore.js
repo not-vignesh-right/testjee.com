@@ -26,6 +26,7 @@ export const useExamStore = defineStore('exam', () => {
   const statistics = ref(null) // Aggregate statistics
   const isManuallySubmitting = ref(false) // Flag to prevent window blur cheating detection on manual submit
   const isSubmitting = ref(false) // Global lock to prevent duplicate async database writes
+  const topicFilter = ref(null) // null = full mock; { [subjectName]: topicId[] } = topic-wise
 
   // --- Config-derived reactive getters ---
   const examConfig = computed(() => getExamConfig(examType.value))
@@ -213,7 +214,11 @@ export const useExamStore = defineStore('exam', () => {
       }
 
       // 1. Get previously CORRECTLY answered question IDs for this student
-      let excludedQuestionIds = []
+      // Strategy: Primary exclusion is scoped to questions in the SAME category as this exam.
+      // This means a JEE-answered Physics question won't block NEET Physics (different category).
+      // If the category-scoped pool is still too small, we fall back to ALL correctly answered IDs.
+      let excludedQuestionIds = []        // category-scoped (primary)
+      let allCorrectlyAnsweredIds = []    // cross-category (fallback)
       try {
         const { data: pastResults, error: resultsError } = await supabase
           .from('results')
@@ -229,31 +234,46 @@ export const useExamStore = defineStore('exam', () => {
           if (allAttemptedQuestionIds.length > 0) {
             console.log(`fetchExamData: Checking correctness for ${allAttemptedQuestionIds.length} attempted questions...`)
 
+            // Fetch correct answers + category_id for cross-category scoping
             const { data: choicesData } = await supabase
               .from('choices')
               .select('question_id, correct_answer')
               .in('question_id', allAttemptedQuestionIds)
 
+            // Also fetch category_id for each attempted question
+            const { data: questionMeta } = await supabase
+              .from('questions')
+              .select('question_id, category_id')
+              .in('question_id', allAttemptedQuestionIds)
+
+            const categoryById = Object.fromEntries((questionMeta || []).map(q => [q.question_id, q.category_id]))
+
             if (choicesData) {
               const correctAnswersMap = Object.fromEntries(choicesData.map(c => [c.question_id, c.correct_answer]))
-              excludedQuestionIds = allAttemptedAnswers
-                .filter(a => {
-                  if (!a || !a.question_id || !a.answer) return false
-                  const correctAnswer = correctAnswersMap[a.question_id]
-                  if (correctAnswer === undefined) return false
-                  let isCorrect = false
-                  const userAnswer = String(a.answer).trim()
-                  const targetAnswer = String(correctAnswer).trim()
-                  if (!isNaN(parseFloat(userAnswer)) && !isNaN(parseFloat(targetAnswer))) {
-                    isCorrect = parseFloat(userAnswer) === parseFloat(targetAnswer)
-                  } else {
-                    isCorrect = userAnswer.toLowerCase() === targetAnswer.toLowerCase()
-                  }
-                  return isCorrect
-                })
-                .map(a => a.question_id)
-              excludedQuestionIds = [...new Set(excludedQuestionIds)]
-              console.log(`fetchExamData: Excluding ${excludedQuestionIds.length} CORRECTLY answered IDs`)
+
+              const correctlyAnsweredAnswers = allAttemptedAnswers.filter(a => {
+                if (!a || !a.question_id || !a.answer) return false
+                const correctAnswer = correctAnswersMap[a.question_id]
+                if (correctAnswer === undefined) return false
+                const userAnswer = String(a.answer).trim()
+                const targetAnswer = String(correctAnswer).trim()
+                if (!isNaN(parseFloat(userAnswer)) && !isNaN(parseFloat(targetAnswer))) {
+                  return parseFloat(userAnswer) === parseFloat(targetAnswer)
+                }
+                return userAnswer.toLowerCase() === targetAnswer.toLowerCase()
+              })
+
+              allCorrectlyAnsweredIds = [...new Set(correctlyAnsweredAnswers.map(a => a.question_id))]
+
+              // Primary: only exclude questions from the SAME category as current exam
+              const examCategories = Array.isArray(cfg.categoryId) ? cfg.categoryId : [cfg.categoryId]
+              excludedQuestionIds = [...new Set(
+                correctlyAnsweredAnswers
+                  .filter(a => examCategories.includes(categoryById[a.question_id]))
+                  .map(a => a.question_id)
+              )]
+
+              console.log(`fetchExamData: Category-scoped exclusion: ${excludedQuestionIds.length} IDs. All-category backup: ${allCorrectlyAnsweredIds.length} IDs`)
             }
           }
         }
@@ -308,94 +328,100 @@ export const useExamStore = defineStore('exam', () => {
           continue
         }
 
+        // Topic filter (topic-wise mode): if topicFilter has entries for this subject, restrict to those topic IDs
+        const subjectTopicIds = topicFilter.value?.[subjectName] ?? null
+
         let subjectMcqs = []
         let subjectNumericals = []
 
-        // --- Fetch MCQs ---
+        // --- Helper: build a base MCQ query for this subject ---
+        const buildMcqQuery = (excludeIds) => {
+          let q = supabase
+            .from('questions')
+            .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name), choices(multi_choice, choice1, choice2, choice3, choice4, correct_answer)')
+            .eq('subject_id', subjectId)
+            .eq('question_type', 'multiple_choice')
+
+          q = applyCategoryFilter(q, cfg.categoryId)
+
+          if (difficultyFilter && difficultyFilter.length > 0) {
+            q = q.in('difficulty', difficultyFilter)
+          }
+
+          if (subjectTopicIds && subjectTopicIds.length > 0) {
+            q = q.in('topic_id', subjectTopicIds)
+          }
+
+          if (excludeIds && excludeIds.length > 0) {
+            q = q.not('question_id', 'in', `(${excludeIds.join(',')})`)
+          }
+          return q
+        }
+
+        // --- Fetch MCQs (category-scoped exclusion first) ---
         const mcqFetchLimit = mcqTarget * 3 // Fetch extra for shuffle variety
-        let mcqQuery = supabase
-          .from('questions')
-          .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name), choices(multi_choice, choice1, choice2, choice3, choice4, correct_answer)')
-          .eq('subject_id', subjectId)
-          .eq('question_type', 'multiple_choice')
-
-        mcqQuery = applyCategoryFilter(mcqQuery, cfg.categoryId)
-
-        if (difficultyFilter && difficultyFilter.length > 0) {
-          mcqQuery = mcqQuery.in('difficulty', difficultyFilter)
-        }
-
-        if (excludedQuestionIds.length > 0) {
-          mcqQuery = mcqQuery.not('question_id', 'in', `(${excludedQuestionIds.join(',')})`)
-        }
-
-        const { data: mcqRows, error: mcqError } = await mcqQuery.limit(mcqFetchLimit)
+        const { data: mcqRows, error: mcqError } = await buildMcqQuery(excludedQuestionIds).limit(mcqFetchLimit)
         if (mcqError) {
           console.error(`fetchExamData: Error for ${subjectName} MCQs:`, mcqError)
         } else {
           subjectMcqs = shuffleArray(mcqRows || []).slice(0, mcqTarget)
         }
 
-        // MCQ Fallback (if exclusions reduced count below target)
+        // MCQ Fallback 1: if category-scoped exclusion left us short, try cross-category exclusion
+        if (subjectMcqs.length < mcqTarget && allCorrectlyAnsweredIds.length > excludedQuestionIds.length) {
+          const currentPickedIds = subjectMcqs.map(q => q.question_id)
+          const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
+          const { data: fillMcqs } = await buildMcqQuery(skipIds).limit(mcqTarget - subjectMcqs.length)
+          if (fillMcqs) subjectMcqs.push(...fillMcqs)
+        }
+
+        // MCQ Fallback 2: pool completely exhausted — allow previously answered questions (student has seen them all)
         if (subjectMcqs.length < mcqTarget) {
           const currentPickedIds = subjectMcqs.map(q => q.question_id)
-          let fillQuery = supabase
-            .from('questions')
-            .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name), choices(multi_choice, choice1, choice2, choice3, choice4, correct_answer)')
-            .eq('subject_id', subjectId)
-            .eq('question_type', 'multiple_choice')
-
-          fillQuery = applyCategoryFilter(fillQuery, cfg.categoryId)
-
-          if (difficultyFilter && difficultyFilter.length > 0) {
-            fillQuery = fillQuery.in('difficulty', difficultyFilter)
-          }
-
-          if (currentPickedIds.length > 0) {
-            fillQuery = fillQuery.not('question_id', 'in', `(${currentPickedIds.join(',')})`)
-          }
-
-          const { data: fillMcqs } = await fillQuery.limit(mcqTarget - subjectMcqs.length)
+          const { data: fillMcqs } = await buildMcqQuery(currentPickedIds).limit(mcqTarget - subjectMcqs.length)
           if (fillMcqs) subjectMcqs.push(...fillMcqs)
         }
 
         // --- Fetch Numericals (only if exam config has numeric questions) ---
         if (cfg.hasNumeric && numTarget > 0) {
-          let numQuery = supabase
-            .from('questions')
-            .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
-            .eq('subject_id', subjectId)
-            .eq('question_type', 'numeric')
+          const buildNumQuery = (excludeIds) => {
+            let q = supabase
+              .from('questions')
+              .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
+              .eq('subject_id', subjectId)
+              .eq('question_type', 'numeric')
 
-          numQuery = applyCategoryFilter(numQuery, cfg.categoryId)
+            q = applyCategoryFilter(q, cfg.categoryId)
 
-          if (excludedQuestionIds.length > 0) {
-            numQuery = numQuery.not('question_id', 'in', `(${excludedQuestionIds.join(',')})`)
+            if (subjectTopicIds && subjectTopicIds.length > 0) {
+              q = q.in('topic_id', subjectTopicIds)
+            }
+
+            if (excludeIds && excludeIds.length > 0) {
+              q = q.not('question_id', 'in', `(${excludeIds.join(',')})`)
+            }
+            return q
           }
 
-          const { data: numRows, error: numError } = await numQuery.limit(numTarget * 3)
+          const { data: numRows, error: numError } = await buildNumQuery(excludedQuestionIds).limit(numTarget * 3)
           if (numError) {
             console.error(`fetchExamData: Error for ${subjectName} Numericals:`, numError)
           } else {
             subjectNumericals = shuffleArray(numRows || []).slice(0, numTarget)
           }
 
-          // Num Fallback
+          // Num Fallback 1: cross-category exclusion
+          if (subjectNumericals.length < numTarget && allCorrectlyAnsweredIds.length > excludedQuestionIds.length) {
+            const currentPickedIds = subjectNumericals.map(q => q.question_id)
+            const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
+            const { data: fillNums } = await buildNumQuery(skipIds).limit(numTarget - subjectNumericals.length)
+            if (fillNums) subjectNumericals.push(...fillNums)
+          }
+
+          // Num Fallback 2: pool exhausted
           if (subjectNumericals.length < numTarget) {
             const currentPickedIds = subjectNumericals.map(q => q.question_id)
-            let fillQuery = supabase
-              .from('questions')
-              .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
-              .eq('subject_id', subjectId)
-              .eq('question_type', 'numeric')
-
-            fillQuery = applyCategoryFilter(fillQuery, cfg.categoryId)
-
-            if (currentPickedIds.length > 0) {
-              fillQuery = fillQuery.not('question_id', 'in', `(${currentPickedIds.join(',')})`)
-            }
-
-            const { data: fillNums } = await fillQuery.limit(numTarget - subjectNumericals.length)
+            const { data: fillNums } = await buildNumQuery(currentPickedIds).limit(numTarget - subjectNumericals.length)
             if (fillNums) subjectNumericals.push(...fillNums)
           }
         }
@@ -460,11 +486,16 @@ export const useExamStore = defineStore('exam', () => {
     sessionId.value = null
     sessionStartTime.value = null
     lastResult.value = null
+    topicFilter.value = null // Reset topic filter for fresh exam
     // Reset time from config so resuming after a different exam type is correct
     remainingTime.value = examConfig.value.durationSeconds
     currentQuestionIndex.value = 0
     numericDrafts.value = {}
     timeSpent.value = {}
+  }
+
+  const setTopicFilter = (filter) => {
+    topicFilter.value = filter // null for full mock, { SubjectName: [topicId, ...] } for topic-wise
   }
 
   const selectDraftAnswer = (questionId, answer) => {
@@ -932,6 +963,9 @@ export const useExamStore = defineStore('exam', () => {
   }
 
   return {
+    // Topic filter
+    topicFilter,
+    setTopicFilter,
     // State
     sessionId,
     sessionStartTime,
@@ -981,5 +1015,6 @@ export const useExamStore = defineStore('exam', () => {
     fetchStudentResults,
     setExamType,
     isManuallySubmitting
+    // Note: topicFilter and setTopicFilter already exported above
   }
 })

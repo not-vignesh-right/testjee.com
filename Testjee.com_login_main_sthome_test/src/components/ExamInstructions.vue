@@ -95,21 +95,29 @@
         <div class="flex justify-between items-center">
           <button 
             @click="$router.push('/sthome/dashboard')"
-            class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+            :disabled="isDecrementing"
+            class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           
-          <button 
-            @click="startExam"
-            :disabled="!hasReadInstructions"
-            class="px-8 py-3 rounded-lg font-bold text-white shadow-lg transition-all"
-            :class="hasReadInstructions 
-              ? 'bg-blue-600 hover:bg-blue-700 cursor-pointer transform hover:scale-[1.02]' 
-              : 'bg-gray-400 cursor-not-allowed opacity-70'"
-          >
-            I am ready to begin
-          </button>
+          <div class="flex flex-col items-end gap-2">
+            <p v-if="decrementError" class="text-xs text-red-600 font-medium">⚠️ {{ decrementError }}</p>
+            <button 
+              @click="startExam"
+              :disabled="!hasReadInstructions || isDecrementing"
+              class="px-8 py-3 rounded-lg font-bold text-white shadow-lg transition-all flex items-center gap-2"
+              :class="hasReadInstructions && !isDecrementing
+                ? 'bg-blue-600 hover:bg-blue-700 cursor-pointer transform hover:scale-[1.02]' 
+                : 'bg-gray-400 cursor-not-allowed opacity-70'"
+            >
+              <svg v-if="isDecrementing" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {{ isDecrementing ? 'Starting...' : 'I am ready to begin' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -119,10 +127,17 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useExamStore } from '../stores/examStore'
+import { useAuthStore } from '../stores/authStore'
+import { useRouter } from 'vue-router'
+import { supabase } from '../lib/supabase'
 
 const examStore = useExamStore()
+const authStore = useAuthStore()
+const router = useRouter()
 const emit = defineEmits(['start'])
 const hasReadInstructions = ref(false)
+const isDecrementing = ref(false)
+const decrementError = ref('')
 
 // Compute human-readable duration from seconds
 const durationText = computed(() => {
@@ -147,9 +162,41 @@ onMounted(() => {
   }
 })
 
-function startExam() {
-  if (hasReadInstructions.value) {
+async function startExam() {
+  if (!hasReadInstructions.value || isDecrementing.value) return
+  isDecrementing.value = true
+  decrementError.value = ''
+
+  try {
+    const testsRemaining = authStore.studentProfile?.number_of_tests || 0
+    if (testsRemaining <= 0) {
+      decrementError.value = 'You have no tests remaining. Please purchase more.'
+      return
+    }
+
+    // Decrement now — student is actually starting the exam
+    const { error } = await supabase
+      .from('students')
+      .update({
+        number_of_tests: testsRemaining - 1,
+        modification_date: new Date().toISOString()
+      })
+      .eq('student_id', authStore.studentProfile.student_id)
+
+    if (error) {
+      console.error('Failed to decrement test count:', error)
+      decrementError.value = 'Something went wrong. Please try again.'
+      return
+    }
+
+    // Update local profile
+    authStore.studentProfile.number_of_tests = testsRemaining - 1
     emit('start')
+  } catch (err) {
+    console.error('Error decrementing tests:', err)
+    decrementError.value = 'Something went wrong. Please try again.'
+  } finally {
+    isDecrementing.value = false
   }
 }
 </script>
