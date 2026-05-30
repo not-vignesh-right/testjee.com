@@ -1,11 +1,12 @@
 node_modules/
-dist/
-.env
-.DS_Store
-.vscode/
-.idea/
-*.log
-.agents/
-.claude/
-.gemini/
- 
+ dist/
+ .env
+ .DS_Store
+ .vscode/
+ .idea/
+ *.log
+ .agents/
+ .claude/
+ .gemini/
++.cursor/
++.kiro/
