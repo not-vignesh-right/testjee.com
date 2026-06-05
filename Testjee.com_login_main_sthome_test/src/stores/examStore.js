@@ -169,7 +169,7 @@ export const useExamStore = defineStore('exam', () => {
         .insert({
           student_id: authStore.studentId,
           exam_type: examType.value,
-          total_duration_seconds: 180 * 60, // 3 hours
+          total_duration_seconds: examConfig.value.durationSeconds,
           is_submitted: false
         })
         .select()
