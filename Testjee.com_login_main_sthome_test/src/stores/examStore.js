@@ -240,12 +240,13 @@ export const useExamStore = defineStore('exam', () => {
               .select('question_id, correct_answer')
               .in('question_id', allAttemptedQuestionIds)
 
-            // Also fetch category_id for each attempted question
+            // Also fetch category_id, topic_id, and image_url for each attempted question
             const { data: questionMeta } = await supabase
               .from('questions')
-              .select('question_id, category_id')
+              .select('question_id, category_id, topic_id, image_url')
               .in('question_id', allAttemptedQuestionIds)
 
+            const metaById = Object.fromEntries((questionMeta || []).map(q => [q.question_id, q]))
             const categoryById = Object.fromEntries((questionMeta || []).map(q => [q.question_id, q.category_id]))
 
             if (choicesData) {
@@ -263,17 +264,60 @@ export const useExamStore = defineStore('exam', () => {
                 return userAnswer.toLowerCase() === targetAnswer.toLowerCase()
               })
 
-              allCorrectlyAnsweredIds = [...new Set(correctlyAnsweredAnswers.map(a => a.question_id))]
+              const initialCorrectIds = [...new Set(correctlyAnsweredAnswers.map(a => a.question_id))]
+
+              // Find equivalent questions with the same image_url and topic_id
+              const correctImageUrls = [...new Set(
+                initialCorrectIds
+                  .map(id => metaById[id]?.image_url)
+                  .filter(url => url && url.trim() !== '')
+              )]
+
+              let equivalentQuestions = []
+              if (correctImageUrls.length > 0) {
+                const { data: eqData, error: eqErr } = await supabase
+                  .from('questions')
+                  .select('question_id, image_url, topic_id, category_id')
+                  .in('image_url', correctImageUrls)
+                if (!eqErr && eqData) {
+                  equivalentQuestions = eqData
+                }
+              }
+
+              // Create a set of keys "image_url_topic_id" for all correctly attempted questions
+              const correctKeySet = new Set(
+                initialCorrectIds
+                  .map(id => {
+                    const meta = metaById[id]
+                    return meta && meta.image_url ? `${meta.image_url.trim()}_${meta.topic_id}` : null
+                  })
+                  .filter(Boolean)
+              )
+
+              const additionalCorrectIds = []
+              for (const eqQ of equivalentQuestions) {
+                if (eqQ.image_url) {
+                  const key = `${eqQ.image_url.trim()}_${eqQ.topic_id}`
+                  if (correctKeySet.has(key)) {
+                    additionalCorrectIds.push(eqQ.question_id)
+                    // Ensure the category mapping is available for category-scoped exclusion check
+                    if (categoryById[eqQ.question_id] === undefined) {
+                      categoryById[eqQ.question_id] = eqQ.category_id
+                    }
+                  }
+                }
+              }
+
+              allCorrectlyAnsweredIds = [...new Set([...initialCorrectIds, ...additionalCorrectIds])]
 
               // Primary: only exclude questions from the SAME category as current exam
               const examCategories = Array.isArray(cfg.categoryId) ? cfg.categoryId : [cfg.categoryId]
               excludedQuestionIds = [...new Set(
-                correctlyAnsweredAnswers
-                  .filter(a => examCategories.includes(categoryById[a.question_id]))
-                  .map(a => a.question_id)
+                allCorrectlyAnsweredIds
+                  .filter(id => examCategories.includes(categoryById[id]))
               )]
 
-              console.log(`fetchExamData: Category-scoped exclusion: ${excludedQuestionIds.length} IDs. All-category backup: ${allCorrectlyAnsweredIds.length} IDs`)
+              console.log(`fetchExamData: Scoped exclusion: ${excludedQuestionIds.length} IDs (original correct: ${initialCorrectIds.length}, equivalents found: ${additionalCorrectIds.length}). All-category backup: ${allCorrectlyAnsweredIds.length} IDs`)
             }
           }
         }
@@ -320,6 +364,22 @@ export const useExamStore = defineStore('exam', () => {
       const difficultyFilter = cfg.difficultyFilter // null or array like ['easy', 'medium']
 
       const assembledQuestions = []
+      const currentExamImageUrls = new Set()
+
+      // Helper to select questions with unique image URLs
+      const addUniqueQuestions = (sourceRows, targetArray, limit) => {
+        for (const row of sourceRows) {
+          if (targetArray.length >= limit) break
+          const imgUrl = row.image_url
+          if (imgUrl && imgUrl.trim() !== '') {
+            if (currentExamImageUrls.has(imgUrl)) {
+              continue // Skip duplicate image
+            }
+            currentExamImageUrls.add(imgUrl)
+          }
+          targetArray.push(row)
+        }
+      }
 
       for (const subjectName of cfg.subjects) {
         const subjectIds = lookupIdsFor(subjectName)
@@ -373,40 +433,64 @@ export const useExamStore = defineStore('exam', () => {
           let subMcqs = []
 
           // MCQ Phase 1: Target category + unattempted/correctly-scoped exclusions
-          const mcqFetchLimit = subMcqTarget * 3
+          const mcqFetchLimit = Math.max(subMcqTarget * 5, 50)
           const { data: mcqRows, error: mcqError } = await buildMcqQueryForId(excludedQuestionIds).limit(mcqFetchLimit)
           if (!mcqError && mcqRows) {
-            subMcqs = shuffleArray(mcqRows).slice(0, subMcqTarget)
+            addUniqueQuestions(shuffleArray(mcqRows), subMcqs, subMcqTarget)
           }
 
           // MCQ Fallback 1: Target category + cross-category exclusion
           if (subMcqs.length < subMcqTarget && allCorrectlyAnsweredIds.length > excludedQuestionIds.length) {
             const currentPickedIds = subMcqs.map(q => q.question_id)
             const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
-            const { data: fillMcqs } = await buildMcqQueryForId(skipIds).limit(subMcqTarget - subMcqs.length)
-            if (fillMcqs) subMcqs.push(...fillMcqs)
+            const { data: fillMcqs } = await buildMcqQueryForId(skipIds).limit(Math.max((subMcqTarget - subMcqs.length) * 5, 50))
+            if (fillMcqs) {
+              addUniqueQuestions(shuffleArray(fillMcqs), subMcqs, subMcqTarget)
+            }
           }
 
           // MCQ Fallback 2: Borrow from OTHER categories (Interdependence) + cross-category exclusion
           if (subMcqs.length < subMcqTarget) {
             const currentPickedIds = subMcqs.map(q => q.question_id)
             const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
-            const { data: fillMcqs } = await buildMcqQueryForId(skipIds, false).limit(subMcqTarget - subMcqs.length)
-            if (fillMcqs) subMcqs.push(...fillMcqs)
+            const { data: fillMcqs } = await buildMcqQueryForId(skipIds, false).limit(Math.max((subMcqTarget - subMcqs.length) * 5, 50))
+            if (fillMcqs) {
+              addUniqueQuestions(shuffleArray(fillMcqs), subMcqs, subMcqTarget)
+            }
           }
 
           // MCQ Fallback 3: Target category + allow repeats (pool exhausted)
           if (subMcqs.length < subMcqTarget) {
             const currentPickedIds = subMcqs.map(q => q.question_id)
-            const { data: fillMcqs } = await buildMcqQueryForId(currentPickedIds).limit(subMcqTarget - subMcqs.length)
-            if (fillMcqs) subMcqs.push(...fillMcqs)
+            const { data: fillMcqs } = await buildMcqQueryForId(currentPickedIds).limit(Math.max((subMcqTarget - subMcqs.length) * 5, 50))
+            if (fillMcqs) {
+              addUniqueQuestions(shuffleArray(fillMcqs), subMcqs, subMcqTarget)
+              if (subMcqs.length < subMcqTarget) {
+                for (const row of shuffleArray(fillMcqs)) {
+                  if (subMcqs.length >= subMcqTarget) break
+                  if (!subMcqs.some(q => q.question_id === row.question_id)) {
+                    subMcqs.push(row)
+                  }
+                }
+              }
+            }
           }
 
           // MCQ Fallback 4: Borrow from OTHER categories + allow repeats
           if (subMcqs.length < subMcqTarget) {
             const currentPickedIds = subMcqs.map(q => q.question_id)
-            const { data: fillMcqs } = await buildMcqQueryForId(currentPickedIds, false).limit(subMcqTarget - subMcqs.length)
-            if (fillMcqs) subMcqs.push(...fillMcqs)
+            const { data: fillMcqs } = await buildMcqQueryForId(currentPickedIds, false).limit(Math.max((subMcqTarget - subMcqs.length) * 5, 50))
+            if (fillMcqs) {
+              addUniqueQuestions(shuffleArray(fillMcqs), subMcqs, subMcqTarget)
+              if (subMcqs.length < subMcqTarget) {
+                for (const row of shuffleArray(fillMcqs)) {
+                  if (subMcqs.length >= subMcqTarget) break
+                  if (!subMcqs.some(q => q.question_id === row.question_id)) {
+                    subMcqs.push(row)
+                  }
+                }
+              }
+            }
           }
 
           subjectMcqs.push(...subMcqs)
@@ -437,39 +521,63 @@ export const useExamStore = defineStore('exam', () => {
             let subNums = []
 
             // Num Phase 1: Target category + exclusions
-            const { data: numRows, error: numError } = await buildNumQueryForId(excludedQuestionIds).limit(subNumTarget * 3)
+            const { data: numRows, error: numError } = await buildNumQueryForId(excludedQuestionIds).limit(Math.max(subNumTarget * 5, 50))
             if (!numError && numRows) {
-              subNums = shuffleArray(numRows).slice(0, subNumTarget)
+              addUniqueQuestions(shuffleArray(numRows), subNums, subNumTarget)
             }
 
             // Num Fallback 1: Target category + cross-category exclusion
             if (subNums.length < subNumTarget && allCorrectlyAnsweredIds.length > excludedQuestionIds.length) {
               const currentPickedIds = subNums.map(q => q.question_id)
               const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
-              const { data: fillNums } = await buildNumQueryForId(skipIds).limit(subNumTarget - subNums.length)
-              if (fillNums) subNums.push(...fillNums)
+              const { data: fillNums } = await buildNumQueryForId(skipIds).limit(Math.max((subNumTarget - subNums.length) * 5, 50))
+              if (fillNums) {
+                addUniqueQuestions(shuffleArray(fillNums), subNums, subNumTarget)
+              }
             }
 
             // Num Fallback 2: Borrow from OTHER categories + cross-category exclusion
             if (subNums.length < subNumTarget) {
               const currentPickedIds = subNums.map(q => q.question_id)
               const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
-              const { data: fillNums } = await buildNumQueryForId(skipIds, false).limit(subNumTarget - subNums.length)
-              if (fillNums) subNums.push(...fillNums)
+              const { data: fillNums } = await buildNumQueryForId(skipIds, false).limit(Math.max((subNumTarget - subNums.length) * 5, 50))
+              if (fillNums) {
+                addUniqueQuestions(shuffleArray(fillNums), subNums, subNumTarget)
+              }
             }
 
             // Num Fallback 3: Target category + allow repeats
             if (subNums.length < subNumTarget) {
               const currentPickedIds = subNums.map(q => q.question_id)
-              const { data: fillNums } = await buildNumQueryForId(currentPickedIds).limit(subNumTarget - subNums.length)
-              if (fillNums) subNums.push(...fillNums)
+              const { data: fillNums } = await buildNumQueryForId(currentPickedIds).limit(Math.max((subNumTarget - subNums.length) * 5, 50))
+              if (fillNums) {
+                addUniqueQuestions(shuffleArray(fillNums), subNums, subNumTarget)
+                if (subNums.length < subNumTarget) {
+                  for (const row of shuffleArray(fillNums)) {
+                    if (subNums.length >= subNumTarget) break
+                    if (!subNums.some(q => q.question_id === row.question_id)) {
+                      subNums.push(row)
+                    }
+                  }
+                }
+              }
             }
 
             // Num Fallback 4: Borrow from OTHER categories + allow repeats
             if (subNums.length < subNumTarget) {
               const currentPickedIds = subNums.map(q => q.question_id)
-              const { data: fillNums } = await buildNumQueryForId(currentPickedIds, false).limit(subNumTarget - subNums.length)
-              if (fillNums) subNums.push(...fillNums)
+              const { data: fillNums } = await buildNumQueryForId(currentPickedIds, false).limit(Math.max((subNumTarget - subNums.length) * 5, 50))
+              if (fillNums) {
+                addUniqueQuestions(shuffleArray(fillNums), subNums, subNumTarget)
+                if (subNums.length < subNumTarget) {
+                  for (const row of shuffleArray(fillNums)) {
+                    if (subNums.length >= subNumTarget) break
+                    if (!subNums.some(q => q.question_id === row.question_id)) {
+                      subNums.push(row)
+                    }
+                  }
+                }
+              }
             }
 
             subjectNumericals.push(...subNums)
