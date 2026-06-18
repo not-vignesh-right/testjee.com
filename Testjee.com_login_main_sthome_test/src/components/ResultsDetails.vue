@@ -346,8 +346,10 @@ onMounted(async () => {
         topic:   q.topics?.topic_name    || 'Not specified',
         question_type: q.question_type
       }
-      if (q.choices?.correct_answer) {
-        correctById[q.question_id] = q.choices.correct_answer
+      // Supabase can return choices as an object (one-to-one) or array (one-to-many)
+      const choicesObj = Array.isArray(q.choices) ? q.choices[0] : q.choices
+      if (choicesObj?.correct_answer) {
+        correctById[q.question_id] = choicesObj.correct_answer
       }
     })
 

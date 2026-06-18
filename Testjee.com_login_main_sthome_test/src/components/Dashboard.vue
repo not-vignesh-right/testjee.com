@@ -1738,8 +1738,10 @@ async function viewDetails(exam) {
         subject: q.subjects?.subject_name || 'Unknown',
         question_type: q.question_type
       }
-      if (q.choices && q.choices.correct_answer) {
-        correctById[q.question_id] = q.choices.correct_answer
+      // Supabase can return choices as an object (one-to-one) or array (one-to-many)
+      const choicesObj = Array.isArray(q.choices) ? q.choices[0] : q.choices
+      if (choicesObj?.correct_answer) {
+        correctById[q.question_id] = choicesObj.correct_answer
       }
     })
 
@@ -1775,11 +1777,15 @@ async function viewDetails(exam) {
     examStore.lastResult = {
       id: exam.result_id,
       score: exam.score,
+      examType: exam.session?.exam_type || null,
       answers: exam.answers,
       perQuestion,
       correctById
     }
     examStore.isSubmitted = true
+    if (exam.session?.exam_type) {
+      examStore.setExamType(exam.session.exam_type)
+    }
 
     router.push('/sthome/details')
   } catch (error) {

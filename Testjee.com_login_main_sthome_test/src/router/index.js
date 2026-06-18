@@ -157,20 +157,17 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // ========== EXAM SUBMISSION LOGIC ==========
-    try {
-      if (examStore.isSubmitted && to.name === 'Exam') {
-        console.log('Exam already submitted, redirecting to dashboard')
-        return next({ name: 'Dashboard' })
+      try {
+        if (examStore.isSubmitted && to.name === 'Exam') {
+          console.log('Exam already submitted, redirecting to dashboard')
+          return next({ name: 'Dashboard' })
+        }
+        // NOTE: ResultsDetails is intentionally NOT blocked here.
+        // The component self-loads from the DB on mount, so it works on direct
+        // URL navigation and page refresh without needing isSubmitted = true.
+      } catch (e) {
+        // ignore examStore not ready
       }
-
-      // Only prevent access to results details if exam not submitted
-      // Allow access to sthome (student home) even without submitted exam
-      if (!examStore.isSubmitted && to.name === 'ResultsDetails') {
-        return next({ name: 'Dashboard' })
-      }
-    } catch (e) {
-      // ignore examStore not ready
-    }
   }
 
   next()
