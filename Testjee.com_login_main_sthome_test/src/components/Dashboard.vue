@@ -1164,34 +1164,50 @@ async function checkRecentAutoSubmissions() {
   if (!studentProfile.value) return
 
   try {
-    // 1. Fetch latest submitted session for this student
+    // BUG 5 FIX: Only show banner for auto_submitted sessions, not voluntarily submitted ones
+    // BUG 11 FIX: Fetch all sessions in the 10-min window, not just the latest 1
     const { data: sessions, error } = await supabase
       .from('exam_sessions')
       .select('session_id, exam_type, start_time, end_time, total_duration_seconds')
       .eq('student_id', studentProfile.value.student_id)
       .eq('is_submitted', true)
+      .eq('auto_submitted', true)
       .order('end_time', { ascending: false })
-      .limit(1)
+      .limit(5) // Check last 5 to find one within the appeal window
 
     if (error) throw error
 
     if (sessions && sessions.length > 0) {
-      const session = sessions[0]
-      if (!session.end_time) return
-
-      const endTime = new Date(session.end_time).getTime()
+      // Find the most recent one within the 10-minute appeal window
       const now = Date.now()
-      const timeDiff = now - endTime
+      const eligibleSession = sessions.find(s => {
+        if (!s.end_time) return false
+        return (now - new Date(s.end_time).getTime()) < 600000
+      })
 
-      // 10 minutes appeal period (600,000ms)
-      if (timeDiff < 600000) {
-        recentSubmittedSession.value = session
+      if (eligibleSession) {
+        // BUG 1 FIX: Before showing the banner, check if the request is already completed
+        // (meaning student already resumed and finished the exam — don't show banner again)
+        const { data: existingReq } = await supabase
+          .from('exam_support_requests')
+          .select('status')
+          .eq('session_id', eligibleSession.session_id)
+          .maybeSingle()
+
+        if (existingReq?.status === 'completed') {
+          // Student already resumed and submitted — suppress banner
+          recentSubmittedSession.value = null
+          recentSupportRequest.value = null
+          return
+        }
+
+        recentSubmittedSession.value = eligibleSession
         
         // Start countdown timer for the 10-minute window
-        startAppealCountdown(endTime)
+        startAppealCountdown(new Date(eligibleSession.end_time).getTime())
 
         // 2. Fetch any matching support request
-        await fetchSupportRequestForSession(session.session_id)
+        await fetchSupportRequestForSession(eligibleSession.session_id)
       } else {
         recentSubmittedSession.value = null
         recentSupportRequest.value = null
@@ -1284,24 +1300,101 @@ async function submitDashboardAppeal() {
     
     const examStore = useExamStore()
     
-    // Inject session info into store so submitSupportRequest behaves correctly
+    // BUG 13 FIX: Use the store action instead of direct property mutation
+    examStore.setExamType(recentSubmittedSession.value.exam_type)
+    // Set sessionId via action (use the exported ref directly as it's Pinia)
     examStore.sessionId = recentSubmittedSession.value.session_id
-    examStore.examType = recentSubmittedSession.value.exam_type
     
-    // Load question data first so submitSupportRequest can build a valid answers snapshot
-    await examStore.fetchExamData()
+    // BUG 9 FIX: Load answers from the results table (the actual submitted answers)
+    // instead of calling fetchExamData() which would create a new random question set
+    let answersForSnapshot = []
+    let questionsForSnapshot = []
 
-    const res = await examStore.submitSupportRequest(
-      dashboardAppealReason.value,
-      dashboardAppealCustomMessage.value,
-      remainingSeconds
-    )
+    try {
+      const { data: resultRow } = await supabase
+        .from('results')
+        .select('answers, exam_sessions(exam_type)')
+        .eq('session_id', recentSubmittedSession.value.session_id)
+        .maybeSingle()
+
+      if (resultRow?.answers) {
+        answersForSnapshot = resultRow.answers
+      }
+
+      // Also fetch question details from DB for snapshot (using question_ids from answers)
+      const questionIds = answersForSnapshot
+        .filter(a => a?.question_id)
+        .map(a => a.question_id)
+
+      if (questionIds.length > 0) {
+        const { data: qRows } = await supabase
+          .from('questions')
+          .select('question_id, subject_id, question_type, question_content, image_url, external_reference, topics(topic_name), choices(choice1, choice2, choice3, choice4, correct_answer), subjects(subject_name)')
+          .in('question_id', questionIds)
+
+        if (qRows) {
+          questionsForSnapshot = qRows.map(row => ({
+            id: row.question_id,
+            text: (row.question_content?.text || row.question_content?.stem) || row.external_reference || '',
+            image_url: row.image_url || null,
+            subject: row.subjects?.subject_name || '',
+            topic: row.topics?.topic_name || '',
+            question_type: row.question_type,
+            options: row.question_type === 'multiple_choice' ? [
+              { id: 'a', text: row.choices?.choice1?.text || row.choices?.choice1 || '' },
+              { id: 'b', text: row.choices?.choice2?.text || row.choices?.choice2 || '' },
+              { id: 'c', text: row.choices?.choice3?.text || row.choices?.choice3 || '' },
+              { id: 'd', text: row.choices?.choice4?.text || row.choices?.choice4 || '' }
+            ] : null
+          }))
+        }
+      }
+    } catch (fetchErr) {
+      console.warn('Could not fetch results for appeal snapshot:', fetchErr)
+      // Non-critical: proceed with empty snapshot rather than blocking the appeal
+    }
+
+    // Directly insert the support request with the pre-built snapshots
+    // (bypasses examStore.submitSupportRequest which needs store questions loaded)
+    const { data: existingReq } = await supabase
+      .from('exam_support_requests')
+      .select('request_id, status')
+      .eq('session_id', recentSubmittedSession.value.session_id)
+      .maybeSingle()
+
+    if (existingReq) {
+      // Already submitted — just refresh status
+      await fetchSupportRequestForSession(recentSubmittedSession.value.session_id)
+      showDashboardAppealModal.value = false
+      return
+    }
+
+    // Mark session as auto_submitted before inserting request
+    await supabase
+      .from('exam_sessions')
+      .update({ auto_submitted: true })
+      .eq('session_id', recentSubmittedSession.value.session_id)
+
+    const authStore = useAuthStore()
+    const { data: insertedReq, error: insertErr } = await supabase
+      .from('exam_support_requests')
+      .insert({
+        session_id: recentSubmittedSession.value.session_id,
+        student_id: authStore.studentProfile?.student_id,
+        reason: dashboardAppealReason.value,
+        custom_message: dashboardAppealCustomMessage.value,
+        remaining_time_seconds: remainingSeconds,
+        answers: answersForSnapshot,
+        questions: questionsForSnapshot,
+        status: 'pending'
+      })
+      .select()
+
+    if (insertErr) throw insertErr
     
-    if (res.success) {
+    if (insertedReq) {
       showDashboardAppealModal.value = false
       await fetchSupportRequestForSession(recentSubmittedSession.value.session_id)
-    } else {
-      dashboardAppealError.value = res.error || 'Failed to submit request'
     }
   } catch (err) {
     dashboardAppealError.value = err.message || 'Error occurred'
@@ -1323,9 +1416,11 @@ async function resumeApprovedExam() {
   
   const res = await examStore.restoreResumedSession(recentSupportRequest.value)
   if (res.success) {
+    // isResuming is already set to true inside restoreResumedSession
+    // ExamLayout.onMounted will detect this and skip initializeSession
     router.push('/exam')
   } else {
-    alert('Failed to resume session. Please try again.')
+    alert(res.error || 'Failed to resume session. Please try again.')
   }
 }
 

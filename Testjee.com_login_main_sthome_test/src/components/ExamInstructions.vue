@@ -168,6 +168,14 @@ async function startExam() {
   decrementError.value = ''
 
   try {
+    // BUG 3 FIX: Skip decrement when resuming an approved session.
+    // The student already paid for this test — don't charge them again.
+    if (examStore.isResuming) {
+      console.log('🔄 Resuming approved session — skipping test count decrement')
+      emit('start')
+      return
+    }
+
     const testsRemaining = authStore.studentProfile?.number_of_tests || 0
     if (testsRemaining <= 0) {
       decrementError.value = 'You have no tests remaining. Please purchase more.'

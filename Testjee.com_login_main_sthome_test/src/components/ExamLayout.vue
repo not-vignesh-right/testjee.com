@@ -280,6 +280,8 @@ const graceSecondsLeft = ref(10)
 const graceReason = ref('') // 'blur' | 'fullscreen' | 'visibility'
 let graceTimer = null
 let wakeLock = null
+// BUG 8 FIX: Flag to suppress grace period while re-entering fullscreen programmatically on resume
+const isEnteringFullscreenOnResume = ref(false)
 
 // --- Screen Wake Lock API ---
 const requestWakeLock = async () => {
@@ -356,6 +358,20 @@ const clearGracePeriod = () => {
 onMounted(async () => {
   // 🔐 Ensure user is authenticated before loading exam
   if (!auth.isAuthenticated) return
+
+  // BUG 2 FIX: If we just restored a session (isResuming = true),
+  // skip initializeSession + fetchExamData entirely — state is already loaded
+  if (examStore.isResuming) {
+    console.log('🔄 Resuming restored session — skipping initializeSession & fetchExamData')
+    showInstructions.value = false
+    // Timer is started by resumeTest() which called restoreResumedSession() before routing here
+    // If we land here from Dashboard's resumeApprovedExam, start timer now
+    examStore.startTimer()
+    enforceFullScreen()
+    await requestWakeLock()
+    setupSecurityListeners()
+    return
+  }
 
   // 🛑 Prevent exam from reloading if already initialized AND not submitted
   if (examStore.questions.length > 0 && !examStore.isSubmitted) {
@@ -466,10 +482,18 @@ const resumeTest = async () => {
   
   const res = await examStore.restoreResumedSession(activeRequest.value)
   if (res.success) {
+    // BUG 8 FIX: Temporarily suppress fullscreen-change grace period
+    // while we are programmatically re-entering fullscreen after resume
+    isEnteringFullscreenOnResume.value = true
+    
     // Re-enter full screen
     await enforceFullScreen()
     
-    // Restart timer
+    // Short delay to let the fullscreenchange event fire and settle
+    // before re-enabling the grace period listener
+    setTimeout(() => { isEnteringFullscreenOnResume.value = false }, 1500)
+    
+    // Restart timer (remainingTime already set by restoreResumedSession)
     examStore.startTimer()
     
     // Clear overlay state
@@ -479,7 +503,7 @@ const resumeTest = async () => {
     appealStatus.value = 'idle'
     activeRequest.value = null
   } else {
-    alert('Failed to resume session. Please try refreshing.')
+    alert(res.error || 'Failed to resume session. Please try refreshing.')
   }
 }
 
@@ -517,6 +541,9 @@ function forceExitToDashboard() {
 // --- Security & Enforcement ---
 
 const handleFullscreenChange = async () => {
+  // BUG 8 FIX: Don't trigger grace period while we are programmatically entering fullscreen on resume
+  if (isEnteringFullscreenOnResume.value) return
+
   if (!document.fullscreenElement && !examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
     examStore.isFullScreen = false
     startGracePeriod('fullscreen')

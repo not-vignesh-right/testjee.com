@@ -27,6 +27,7 @@ export const useExamStore = defineStore('exam', () => {
   const isManuallySubmitting = ref(false) // Flag to prevent window blur cheating detection on manual submit
   const isSubmitting = ref(false) // Global lock to prevent duplicate async database writes
   const topicFilter = ref(null) // null = full mock; { [subjectName]: topicId[] } = topic-wise
+  const isResuming = ref(false) // Flag: true when resuming an approved session (skip instructions + decrement)
 
   // --- Config-derived reactive getters ---
   const examConfig = computed(() => getExamConfig(examType.value))
@@ -899,6 +900,7 @@ export const useExamStore = defineStore('exam', () => {
         correctById
       }
       isSubmitted.value = true
+      isResuming.value = false // Clear resuming flag after full submit
 
       // Clear localStorage after successful submission
       localStorage.removeItem('examAnswers')
@@ -909,6 +911,21 @@ export const useExamStore = defineStore('exam', () => {
 
       const pendingKey = `pending_submit_${authStore.studentProfile?.student_id || authStore.studentId || 'unauth'}`
       localStorage.removeItem(pendingKey)
+
+      // Mark support request as 'completed' if this was a resumed session
+      // so the dashboard banner is hidden after the student finishes the resumed exam
+      if (sessionId.value) {
+        try {
+          await supabase
+            .from('exam_support_requests')
+            .update({ status: 'completed', updated_at: new Date().toISOString() })
+            .eq('session_id', sessionId.value)
+            .eq('status', 'approved') // Only update if it was approved (not regular submits)
+        } catch (cleanupErr) {
+          // Non-critical: if this fails the exam result is still saved
+          console.warn('Could not mark support request as completed:', cleanupErr)
+        }
+      }
 
       console.log('Exam submitted, localStorage cleared')
 
@@ -1129,6 +1146,18 @@ export const useExamStore = defineStore('exam', () => {
     }
 
     try {
+      // BUG 6 FIX: Check if a request already exists for this session to prevent duplicates
+      const { data: existingRequest } = await supabase
+        .from('exam_support_requests')
+        .select('request_id, status')
+        .eq('session_id', sessionId.value)
+        .maybeSingle()
+
+      if (existingRequest) {
+        console.warn('⚠️ Support request already exists for this session:', existingRequest)
+        return { success: true, data: [existingRequest], alreadyExists: true }
+      }
+
       // Build answers snapshot array
       const totalQCount = questions.value.length
       const answersArray = Array(totalQCount).fill(null).map((_, i) => {
@@ -1143,6 +1172,23 @@ export const useExamStore = defineStore('exam', () => {
         }
       })
 
+      // BUG 4 FIX: Save the exact question list so resume restores the same questions in same order
+      const questionsSnapshot = questions.value.map(q => ({
+        id: q.id,
+        text: q.text,
+        image_url: q.image_url,
+        subject: q.subject,
+        topic: q.topic,
+        question_type: q.question_type,
+        options: q.options
+      }))
+
+      // BUG 5 FIX: Mark the session as auto_submitted so dashboard only shows banner for these
+      await supabase
+        .from('exam_sessions')
+        .update({ auto_submitted: true })
+        .eq('session_id', sessionId.value)
+
       const { data, error } = await supabase
         .from('exam_support_requests')
         .insert({
@@ -1152,6 +1198,7 @@ export const useExamStore = defineStore('exam', () => {
           custom_message: customMessage,
           remaining_time_seconds: remainingSeconds,
           answers: answersArray,
+          questions: questionsSnapshot,
           status: 'pending'
         })
         .select()
@@ -1165,61 +1212,103 @@ export const useExamStore = defineStore('exam', () => {
     }
   }
 
+  const setIsResuming = (value) => {
+    isResuming.value = value
+  }
+
   const restoreResumedSession = async (request) => {
     try {
       console.log('🔄 Restoring resumed exam session progress from request:', request)
       
-      // 1. Reset state first
+      // 1. Reset state
       sessionId.value = request.session_id
       isSubmitted.value = false
-      remainingTime.value = request.remaining_time_seconds
       userAnswers.value = {}
       draftAnswers.value = {}
       questionStatuses.value = {}
       timeSpent.value = {}
 
-      // 2. Load questions if not loaded yet
-      if (questions.value.length === 0) {
-        // We set examType first so fetchExamData knows which config to load
-        // Fetch session details from DB to know the exam_type
-        const { data: sessionData, error: sessError } = await supabase
-          .from('exam_sessions')
-          .select('exam_type')
-          .eq('session_id', request.session_id)
-          .single()
-        
-        if (sessError) throw sessError
-        examType.value = sessionData.exam_type
+      // 2. Fetch session to get exam_type and calculate ACTUAL remaining time from server time
+      //    BUG 7 FIX: Never trust request.remaining_time_seconds — always recalculate from start_time
+      const { data: sessionData, error: sessError } = await supabase
+        .from('exam_sessions')
+        .select('exam_type, start_time, total_duration_seconds')
+        .eq('session_id', request.session_id)
+        .single()
+      
+      if (sessError) throw sessError
+
+      examType.value = sessionData.exam_type
+
+      const startTime = new Date(sessionData.start_time)
+      const now = new Date()
+      const elapsedSeconds = Math.floor((now - startTime) / 1000)
+      const calculatedRemaining = Math.max(0, sessionData.total_duration_seconds - elapsedSeconds)
+      remainingTime.value = calculatedRemaining
+
+      if (calculatedRemaining <= 0) {
+        console.warn('⏰ Session time has already expired. Cannot resume.')
+        return { success: false, error: 'Session time has expired.' }
+      }
+
+      // BUG 2 FIX: Set is_submitted = false in DB so initializeSession doesn't create a new session
+      const { error: updateErr } = await supabase
+        .from('exam_sessions')
+        .update({ is_submitted: false, end_time: null })
+        .eq('session_id', request.session_id)
+
+      if (updateErr) {
+        console.error('❌ Failed to reopen session in DB:', updateErr)
+        throw updateErr
+      }
+
+      // BUG 4 FIX: Restore EXACT original questions from the snapshot in the support request
+      if (request.questions && Array.isArray(request.questions) && request.questions.length > 0) {
+        questions.value = request.questions
+        console.log('✅ Restored original question set from snapshot:', questions.value.length)
+        localStorage.setItem('examQuestions', JSON.stringify(questions.value))
+      } else {
+        // Fallback: fetch fresh (only if no snapshot, e.g. old requests)
+        console.warn('⚠️ No question snapshot in request, fetching fresh (order may differ)')
         await fetchExamData()
       }
 
-      // 3. Restore answers, status, and time spent from answers array snapshot
+      // 3. Initialize question statuses for all questions
+      questions.value.forEach(q => {
+        if (!questionStatuses.value[q.id]) {
+          questionStatuses.value[q.id] = { visited: false, answered: false, marked: false }
+        }
+        if (timeSpent.value[q.id] === undefined) timeSpent.value[q.id] = 0
+      })
+
+      // 4. Restore answers, status, and time spent from answers array snapshot
       if (request.answers && Array.isArray(request.answers)) {
         request.answers.forEach(a => {
           if (a && a.question_id) {
-            // Restore answer
-            if (a.answer !== null) {
+            if (a.answer !== null && a.answer !== undefined) {
               userAnswers.value[a.question_id] = a.answer
             }
-            // Restore time spent
             timeSpent.value[a.question_id] = a.time_taken || 0
-            // Restore question status
             questionStatuses.value[a.question_id] = {
               visited: (a.time_taken > 0 || a.answer !== null),
-              answered: (a.answer !== null),
+              answered: (a.answer !== null && a.answer !== undefined),
               marked: false
             }
           }
         })
       }
 
-      // 4. Save to localStorage
+      // 5. Set isResuming flag — prevents ExamInstructions decrement + initializeSession re-run
+      isResuming.value = true
+
+      // 6. Save to localStorage
       saveToLocalStorage()
       
-      console.log('✅ Exam session resumed state loaded successfully!')
+      console.log(`✅ Exam session resumed! ${calculatedRemaining}s remaining.`)
       return { success: true }
     } catch (error) {
       console.error('❌ Failed to restore resumed session:', error)
+      isResuming.value = false
       return { success: false, error: error.message }
     }
   }
@@ -1249,6 +1338,7 @@ export const useExamStore = defineStore('exam', () => {
     isSubmitted,
     allResults,
     statistics,
+    isResuming,
 
     // Getters
     currentQuestion,
@@ -1278,7 +1368,7 @@ export const useExamStore = defineStore('exam', () => {
     setExamType,
     isManuallySubmitting,
     submitSupportRequest,
-    restoreResumedSession
-    // Note: topicFilter and setTopicFilter already exported above
+    restoreResumedSession,
+    setIsResuming
   }
 })

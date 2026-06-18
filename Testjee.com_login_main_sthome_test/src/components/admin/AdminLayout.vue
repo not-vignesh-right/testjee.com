@@ -55,6 +55,18 @@
               >
                 + New Exam
               </RouterLink>
+              <!-- Resume Requests with pending badge -->
+              <RouterLink
+                to="/admin/resume-requests"
+                class="relative px-3 py-2 text-sm font-medium rounded-lg transition-colors"
+                :class="isActive('/admin/resume-requests') ? 'bg-amber-50 text-amber-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'"
+              >
+                Resume Requests
+                <span
+                  v-if="pendingResumeCount > 0"
+                  class="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+                >{{ pendingResumeCount }}</span>
+              </RouterLink>
             </nav>
 
             <!-- Username pill -->
@@ -103,6 +115,17 @@
         >
           + New Exam
         </RouterLink>
+        <RouterLink
+          to="/admin/resume-requests"
+          class="relative px-3 py-1.5 text-xs font-semibold rounded-md whitespace-nowrap transition-colors"
+          :class="isActive('/admin/resume-requests') ? 'bg-amber-100 text-amber-700' : 'text-gray-500 hover:bg-gray-200'"
+        >
+          Resume Requests
+          <span
+            v-if="pendingResumeCount > 0"
+            class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center"
+          >{{ pendingResumeCount }}</span>
+        </RouterLink>
       </div>
     </header>
 
@@ -115,9 +138,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAdminStore } from '../../stores/adminStore'
+import { supabase } from '../../lib/supabase'
 import logo from '../../assets/logo_test_jee_original.png'
 
 const router = useRouter()
@@ -132,6 +156,7 @@ const routeTitles = {
   SessionCredentials: 'Session Credentials',
   LiveExamMonitor: 'Live Monitor',
   ExamResults: 'Results & Leaderboard',
+  AdminResumeRequests: 'Resume Requests',
 }
 
 const pageTitle = computed(() => routeTitles[route.name] ?? null)
@@ -147,6 +172,30 @@ const handleLogout = () => {
   adminStore.logout()
   router.push('/')
 }
+
+// Pending resume requests badge count
+const pendingResumeCount = ref(0)
+let badgePollInterval = null
+
+async function fetchPendingCount() {
+  try {
+    const { count } = await supabase
+      .from('exam_support_requests')
+      .select('request_id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+    pendingResumeCount.value = count || 0
+  } catch {}
+}
+
+onMounted(async () => {
+  await fetchPendingCount()
+  // Poll every 30s to update the badge
+  badgePollInterval = setInterval(fetchPendingCount, 30000)
+})
+
+onUnmounted(() => {
+  if (badgePollInterval) clearInterval(badgePollInterval)
+})
 </script>
 
 <style scoped>

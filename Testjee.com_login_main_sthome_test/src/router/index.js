@@ -17,6 +17,7 @@ import SessionCredentials from '../components/admin/SessionCredentials.vue'
 import AdminLiveSessions from '../components/admin/AdminLiveSessions.vue'
 import LiveExamMonitor from '../components/admin/LiveExamMonitor.vue'
 import ExamResults from '../components/admin/ExamResults.vue'
+import AdminResumeRequests from '../components/admin/AdminResumeRequests.vue'
 
 // Student
 import ExamLogin from '../components/live-exam/ExamLogin.vue'
@@ -66,7 +67,8 @@ const routes = [
       { path: 'sessions/new', name: 'ScheduleExam', component: ScheduleExam },
       { path: 'sessions/:id/credentials', name: 'SessionCredentials', component: SessionCredentials },
       { path: 'sessions/:id/monitor', name: 'LiveExamMonitor', component: LiveExamMonitor },
-      { path: 'sessions/:id/results', name: 'ExamResults', component: ExamResults }
+      { path: 'sessions/:id/results', name: 'ExamResults', component: ExamResults },
+      { path: 'resume-requests', name: 'AdminResumeRequests', component: AdminResumeRequests }
     ]
   },
 
