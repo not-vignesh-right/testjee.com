@@ -214,6 +214,71 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Support logs / appeals -->
+      <div class="bg-white rounded-2xl border border-gray-200/80 overflow-hidden shadow-sm">
+        <div class="p-6 border-b border-gray-100">
+          <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536-3.536m0 5.656L11.293 4.17a1 1 0 010-1.414l1.414-1.414a1 1 0 011.414 0l1.414 1.414a1 1 0 010 1.414l-1.414 1.414zm-5.656 5.656l-3.536-3.536m0 5.656L3.293 8.17a1 1 0 010-1.414l1.414-1.414a1 1 0 011.414 0l1.414 1.414a1 1 0 010 1.414l-1.414 1.414z"></path></svg>
+            Resumption Request Logs
+          </h3>
+        </div>
+        <div v-if="supportRequests.length === 0" class="flex flex-col items-center justify-center py-12 text-gray-400">
+          <svg class="w-8 h-8 mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+          <p class="text-sm">No support logs for this student</p>
+        </div>
+        <table v-else class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50/80 border-b border-gray-200">
+              <th class="text-left py-3 px-4 font-semibold text-gray-600">Appeal Reason</th>
+              <th class="text-left py-3 px-4 font-semibold text-gray-600">Note</th>
+              <th class="text-center py-3 px-4 font-semibold text-gray-600">Remaining Time</th>
+              <th class="text-center py-3 px-4 font-semibold text-gray-600">Submitted At</th>
+              <th class="text-center py-3 px-4 font-semibold text-gray-600">Status</th>
+              <th class="text-center py-3 px-4 font-semibold text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="req in supportRequests" :key="req.request_id" class="border-b border-gray-100">
+              <td class="py-3 px-4 font-medium text-gray-900">{{ req.reason }}</td>
+              <td class="py-3 px-4 text-gray-500 italic">{{ req.custom_message || '—' }}</td>
+              <td class="py-3 px-4 text-center font-mono font-semibold">{{ formatSeconds(req.remaining_time_seconds) }}</td>
+              <td class="py-3 px-4 text-center text-gray-500 text-xs">{{ formatDateTime(req.created_at) }}</td>
+              <td class="py-3 px-4 text-center">
+                <span 
+                  :class="[
+                    req.status === 'pending' ? 'bg-amber-100 text-amber-700' : '',
+                    req.status === 'approved' ? 'bg-green-100 text-green-700' : '',
+                    req.status === 'rejected' ? 'bg-red-100 text-red-700' : '',
+                  ]"
+                  class="text-xs font-bold px-2.5 py-0.5 rounded-full border inline-block"
+                >
+                  {{ req.status }}
+                </span>
+              </td>
+              <td class="py-3 px-4 text-center">
+                <div v-if="req.status === 'pending'" class="flex items-center justify-center gap-1">
+                  <button 
+                    @click="approveResumeRequest(req)" 
+                    :disabled="saving"
+                    class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition-all"
+                  >
+                    Approve
+                  </button>
+                  <button 
+                    @click="rejectResumeRequest(req)" 
+                    :disabled="saving"
+                    class="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-bold transition-all"
+                  >
+                    Reject
+                  </button>
+                </div>
+                <span v-else class="text-xs text-gray-400 font-medium">Resolved</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </template>
@@ -233,6 +298,7 @@ const saving = ref(false)
 const saveMsg = ref('')
 const saveMsgType = ref('')
 const examSessions = ref([])
+const supportRequests = ref([])
 
 const form = reactive({
   student_name: '',
@@ -275,6 +341,7 @@ async function fetchStudent() {
 
     // Fetch exam sessions + results
     await fetchExamHistory(data.student_id)
+    await fetchSupportRequests(data.student_id)
   } catch (err) {
     console.error('Failed to fetch student:', err)
     showToast('Failed to load student', 'error')
@@ -380,6 +447,97 @@ function formatDateTime(dateStr) {
     day: 'numeric', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
+}
+
+async function fetchSupportRequests(studentId) {
+  try {
+    const { data, error } = await supabase
+      .from('exam_support_requests')
+      .select('request_id, session_id, reason, custom_message, status, created_at, remaining_time_seconds, resolved_at')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    supportRequests.value = data || []
+  } catch (err) {
+    console.error('Failed to fetch support requests:', err)
+  }
+}
+
+async function approveResumeRequest(req) {
+  if (!confirm(`Are you sure you want to approve resumption? This will clear their scorecard and reopen the exam.`)) return
+  
+  saving.value = true
+  try {
+    // 1. Update support request status
+    const { error: reqError } = await supabase
+      .from('exam_support_requests')
+      .update({ status: 'approved', resolved_at: new Date().toISOString() })
+      .eq('request_id', req.request_id)
+      
+    if (reqError) throw reqError
+
+    // 2. Delete result row
+    const { error: resultErr } = await supabase
+      .from('results')
+      .delete()
+      .eq('session_id', req.session_id)
+      
+    if (resultErr) {
+      console.warn('Results deletion warning:', resultErr)
+    }
+
+    // 3. Reopen exam session in DB
+    const { error: sessErr } = await supabase
+      .from('exam_sessions')
+      .update({
+        is_submitted: false,
+        start_time: new Date().toISOString(),
+        total_duration_seconds: req.remaining_time_seconds,
+        end_time: null
+      })
+      .eq('session_id', req.session_id)
+
+    if (sessErr) throw sessErr
+
+    showToast(`Test resumed successfully!`)
+    await fetchSupportRequests(student.value.student_id)
+    await fetchExamHistory(student.value.student_id)
+  } catch (err) {
+    console.error('Approve resumption error:', err)
+    showToast('Failed to approve resumption request', 'error')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function rejectResumeRequest(req) {
+  if (!confirm(`Reject resume request?`)) return
+  
+  saving.value = true
+  try {
+    const { error } = await supabase
+      .from('exam_support_requests')
+      .update({ status: 'rejected', resolved_at: new Date().toISOString() })
+      .eq('request_id', req.request_id)
+
+    if (error) throw error
+
+    showToast(`Resume request rejected`)
+    await fetchSupportRequests(student.value.student_id)
+  } catch (err) {
+    console.error('Reject resumption error:', err)
+    showToast('Failed to reject request', 'error')
+  } finally {
+    saving.value = false
+  }
+}
+
+function formatSeconds(secs) {
+  if (secs === undefined || secs === null) return '—'
+  const minutes = Math.floor(secs / 60)
+  const seconds = secs % 60
+  return `${minutes}m ${seconds.toString().padStart(2, '0')}s`
 }
 
 onMounted(fetchStudent)

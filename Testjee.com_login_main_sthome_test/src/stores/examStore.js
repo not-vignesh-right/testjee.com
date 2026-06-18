@@ -1120,6 +1120,110 @@ export const useExamStore = defineStore('exam', () => {
     remainingTime.value = getExamConfig(type).durationSeconds
   }
 
+  // Support Requests Actions
+  const submitSupportRequest = async (reason, customMessage, remainingSeconds) => {
+    const authStore = useAuthStore()
+    if (!authStore.studentId || !sessionId.value) {
+      console.error('Missing student ID or session ID for support request')
+      return { success: false, error: 'Session not initialized' }
+    }
+
+    try {
+      // Build answers snapshot array
+      const totalQCount = questions.value.length
+      const answersArray = Array(totalQCount).fill(null).map((_, i) => {
+        const question = questions.value[i]
+        if (!question) return null
+        const answer = userAnswers.value[question.id] || null
+        const time_taken = Math.floor(timeSpent.value[question.id] || 0)
+        return {
+          question_id: question.id,
+          answer: answer,
+          time_taken: time_taken
+        }
+      })
+
+      const { data, error } = await supabase
+        .from('exam_support_requests')
+        .insert({
+          session_id: sessionId.value,
+          student_id: authStore.studentId,
+          reason,
+          custom_message: customMessage,
+          remaining_time_seconds: remainingSeconds,
+          answers: answersArray,
+          status: 'pending'
+        })
+        .select()
+
+      if (error) throw error
+      console.log('✅ Support request submitted successfully:', data)
+      return { success: true, data }
+    } catch (error) {
+      console.error('❌ Failed to submit support request:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  const restoreResumedSession = async (request) => {
+    try {
+      console.log('🔄 Restoring resumed exam session progress from request:', request)
+      
+      // 1. Reset state first
+      sessionId.value = request.session_id
+      isSubmitted.value = false
+      remainingTime.value = request.remaining_time_seconds
+      userAnswers.value = {}
+      draftAnswers.value = {}
+      questionStatuses.value = {}
+      timeSpent.value = {}
+
+      // 2. Load questions if not loaded yet
+      if (questions.value.length === 0) {
+        // We set examType first so fetchExamData knows which config to load
+        // Fetch session details from DB to know the exam_type
+        const { data: sessionData, error: sessError } = await supabase
+          .from('exam_sessions')
+          .select('exam_type')
+          .eq('session_id', request.session_id)
+          .single()
+        
+        if (sessError) throw sessError
+        examType.value = sessionData.exam_type
+        await fetchExamData()
+      }
+
+      // 3. Restore answers, status, and time spent from answers array snapshot
+      if (request.answers && Array.isArray(request.answers)) {
+        request.answers.forEach(a => {
+          if (a && a.question_id) {
+            // Restore answer
+            if (a.answer !== null) {
+              userAnswers.value[a.question_id] = a.answer
+            }
+            // Restore time spent
+            timeSpent.value[a.question_id] = a.time_taken || 0
+            // Restore question status
+            questionStatuses.value[a.question_id] = {
+              visited: (a.time_taken > 0 || a.answer !== null),
+              answered: (a.answer !== null),
+              marked: false
+            }
+          }
+        })
+      }
+
+      // 4. Save to localStorage
+      saveToLocalStorage()
+      
+      console.log('✅ Exam session resumed state loaded successfully!')
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Failed to restore resumed session:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
   return {
     // Topic filter
     topicFilter,
@@ -1172,7 +1276,9 @@ export const useExamStore = defineStore('exam', () => {
     setNumericDraft,
     fetchStudentResults,
     setExamType,
-    isManuallySubmitting
+    isManuallySubmitting,
+    submitSupportRequest,
+    restoreResumedSession
     // Note: topicFilter and setTopicFilter already exported above
   }
 })

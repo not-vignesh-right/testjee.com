@@ -1,6 +1,84 @@
 <template>
   <div class="dashboard-page px-6 py-6 md:px-10 md:py-8" @click="closeKcetDropdown">
 
+    <!-- Recent Auto-Submit Support Appeal Banner -->
+    <div v-if="recentSubmittedSession" class="mb-6 animate-fadeIn">
+      <div 
+        class="relative p-5 rounded-2xl border-2 flex flex-col md:flex-row md:items-center justify-between gap-4 overflow-hidden backdrop-blur-md transition-all shadow-md text-left"
+        :class="[
+          !recentSupportRequest ? 'border-amber-200 bg-amber-50/70 text-amber-900 shadow-amber-50/30' : '',
+          recentSupportRequest?.status === 'pending' ? 'border-amber-200 bg-amber-50/70 text-amber-900 shadow-amber-50/30' : '',
+          recentSupportRequest?.status === 'approved' ? 'border-green-200 bg-green-50/70 text-green-900 shadow-green-50/30' : '',
+          recentSupportRequest?.status === 'rejected' ? 'border-red-200 bg-red-50/70 text-red-900 shadow-red-900/10' : '',
+        ]"
+      >
+        <div class="flex items-start gap-4">
+          <div 
+            class="p-3 rounded-xl flex-shrink-0"
+            :class="[
+              !recentSupportRequest ? 'bg-amber-100 text-amber-700' : '',
+              recentSupportRequest?.status === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' : '',
+              recentSupportRequest?.status === 'approved' ? 'bg-green-100 text-green-700' : '',
+              recentSupportRequest?.status === 'rejected' ? 'bg-red-100 text-red-700' : '',
+            ]"
+          >
+            <svg v-if="!recentSupportRequest" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+            <svg v-else-if="recentSupportRequest.status === 'pending'" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <svg v-else-if="recentSupportRequest.status === 'approved'" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <svg v-else-if="recentSupportRequest.status === 'rejected'" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </div>
+          <div>
+            <h4 class="font-bold text-sm md:text-base">
+              <span v-if="!recentSupportRequest">⚠️ Exam Auto-Submitted Unexpectedly</span>
+              <span v-else-if="recentSupportRequest.status === 'pending'">⏳ Resumption Appeal Pending</span>
+              <span v-else-if="recentSupportRequest.status === 'approved'">🎉 Resumption Request Approved!</span>
+              <span v-else-if="recentSupportRequest.status === 'rejected'">❌ Resumption Request Denied</span>
+            </h4>
+            <p class="text-xs mt-1 leading-relaxed opacity-90">
+              <span v-if="!recentSupportRequest">
+                Your <strong>{{ getExamTypeLabel(recentSubmittedSession.exam_type) }}</strong> session was auto-submitted. If this was a glitch, request support to resume. Time left to appeal: <strong class="font-mono text-xs">{{ appealTimeRemainingText }}</strong>
+              </span>
+              <span v-else-if="recentSupportRequest.status === 'pending'">
+                Gyan Edge administrators are reviewing your request for the <strong>{{ getExamTypeLabel(recentSubmittedSession.exam_type) }}</strong> mock test. Please wait.
+              </span>
+              <span v-else-if="recentSupportRequest.status === 'approved'">
+                Admins have approved your request. You can now resume your <strong>{{ getExamTypeLabel(recentSubmittedSession.exam_type) }}</strong> mock test.
+              </span>
+              <span v-else-if="recentSupportRequest.status === 'rejected'">
+                Your request to resume the <strong>{{ getExamTypeLabel(recentSubmittedSession.exam_type) }}</strong> mock test was not approved.
+              </span>
+            </p>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-3 mt-2 md:mt-0 flex-shrink-0">
+          <button 
+            v-if="!recentSupportRequest"
+            @click="showDashboardAppealModal = true"
+            class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all"
+          >
+            🙋‍♂️ Request Resume
+          </button>
+          
+          <button 
+            v-if="recentSupportRequest?.status === 'pending'"
+            @click="fetchSupportRequestForSession(recentSubmittedSession.session_id)"
+            class="px-4 py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-xl text-xs font-bold border border-amber-200 transition-all flex items-center gap-1.5"
+          >
+            🔄 Refresh Status
+          </button>
+          
+          <button 
+            v-if="recentSupportRequest?.status === 'approved'"
+            @click="resumeApprovedExam"
+            class="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all"
+          >
+            🚀 Resume Test Now
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Greeting Row -->
     <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-2 animate-fadeIn">
       <div>
@@ -684,6 +762,62 @@
       </div>
     </div>
   </div>
+
+  <!-- Dashboard Support Appeal Modal -->
+  <div v-if="showDashboardAppealModal" class="fixed inset-0 z-50 overflow-y-auto animate-fade-in">
+    <div class="flex items-center justify-center min-h-screen px-4 py-8">
+      <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showDashboardAppealModal = false"></div>
+      <div class="relative bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 animate-fade-in-up border border-gray-100 text-left">
+        <h3 class="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2">
+          🙋‍♂️ Support & Resume Request
+        </h3>
+        <p class="text-xs text-gray-500 mb-6">If your exam was auto-submitted due to screen sleep or a technical glitch, Gyan Edge admins can reopen your session.</p>
+        
+        <div class="space-y-4 mb-6">
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Select Reason</label>
+            <select v-model="dashboardAppealReason" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all cursor-pointer font-medium text-gray-800 text-sm">
+              <option value="My computer went to sleep/locked screen">💻 My computer went to sleep / locked screen</option>
+              <option value="I had a power failure / network drop">🔌 I had a power failure / network drop</option>
+              <option value="I exited fullscreen / switched tabs accidentally">⚠️ I exited fullscreen / switched tabs accidentally</option>
+              <option value="Other technical glitch">⚙️ Other technical glitch</option>
+            </select>
+          </div>
+          
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Additional details (optional)</label>
+            <textarea 
+              v-model="dashboardAppealCustomMessage"
+              rows="3" 
+              placeholder="Briefly describe what happened..."
+              class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all text-sm text-gray-800 placeholder-gray-400"
+            ></textarea>
+          </div>
+        </div>
+
+        <div v-if="dashboardAppealError" class="mb-4 p-3 rounded-xl bg-red-50 text-red-600 border border-red-100 text-xs font-medium animate-fadeIn">
+          {{ dashboardAppealError }}
+        </div>
+
+        <div class="flex gap-3">
+          <button 
+            @click="showDashboardAppealModal = false" 
+            class="flex-1 py-3 text-sm font-bold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button 
+            @click="submitDashboardAppeal" 
+            :disabled="dashboardAppealSubmitting"
+            class="flex-1 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-md shadow-blue-200/50 flex items-center justify-center gap-1.5"
+          >
+            <svg v-if="dashboardAppealSubmitting" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+            {{ dashboardAppealSubmitting ? 'Submitting...' : 'Submit Appeal' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -718,6 +852,18 @@ const isStartingExam = ref(false)
 const kcetSubject = ref('KCET_PHYSICS') // KCET subject dropdown default
 const kcetDropdownOpen = ref(false)
 const kcetTriggerRef = ref(null)  // template ref on the trigger button
+
+// --- Support Request / Appeal Banner State ---
+const recentSubmittedSession = ref(null)
+const recentSupportRequest = ref(null)
+const showDashboardAppealModal = ref(false)
+const dashboardAppealReason = ref('My computer went to sleep/locked screen')
+const dashboardAppealCustomMessage = ref('')
+const dashboardAppealError = ref('')
+const dashboardAppealSubmitting = ref(false)
+const appealTimeRemainingText = ref('')
+let dashboardPollInterval = null
+let countdownTimer = null
 const kcetDropdownStyle = ref({}) // fixed positioning style for teleported panel
 
 // ─── Topic Wise state ─────────────────────────────────────────────────────────
@@ -1001,13 +1147,187 @@ onMounted(async () => {
   window.addEventListener('resize', closeKcetDropdown)
 
   await fetchExamHistory()
+  await checkRecentAutoSubmissions()
 })
 
 onUnmounted(() => {
   if (quoteTimer) clearInterval(quoteTimer)
   window.removeEventListener('scroll', closeKcetDropdown, true)
   window.removeEventListener('resize', closeKcetDropdown)
+  
+  // Clean up support polls and countdown timers
+  if (dashboardPollInterval) clearInterval(dashboardPollInterval)
+  if (countdownTimer) clearInterval(countdownTimer)
 })
+
+async function checkRecentAutoSubmissions() {
+  if (!studentProfile.value) return
+
+  try {
+    // 1. Fetch latest submitted session for this student
+    const { data: sessions, error } = await supabase
+      .from('exam_sessions')
+      .select('session_id, exam_type, start_time, end_time, total_duration_seconds')
+      .eq('student_id', studentProfile.value.student_id)
+      .eq('is_submitted', true)
+      .order('end_time', { ascending: false })
+      .limit(1)
+
+    if (error) throw error
+
+    if (sessions && sessions.length > 0) {
+      const session = sessions[0]
+      if (!session.end_time) return
+
+      const endTime = new Date(session.end_time).getTime()
+      const now = Date.now()
+      const timeDiff = now - endTime
+
+      // 10 minutes appeal period (600,000ms)
+      if (timeDiff < 600000) {
+        recentSubmittedSession.value = session
+        
+        // Start countdown timer for the 10-minute window
+        startAppealCountdown(endTime)
+
+        // 2. Fetch any matching support request
+        await fetchSupportRequestForSession(session.session_id)
+      } else {
+        recentSubmittedSession.value = null
+        recentSupportRequest.value = null
+      }
+    } else {
+      recentSubmittedSession.value = null
+      recentSupportRequest.value = null
+    }
+  } catch (err) {
+    console.error('Error checking recent auto-submissions:', err)
+  }
+}
+
+async function fetchSupportRequestForSession(sessionId) {
+  try {
+    const { data, error } = await supabase
+      .from('exam_support_requests')
+      .select('*')
+      .eq('session_id', sessionId)
+      .maybeSingle()
+
+    if (error) throw error
+    
+    recentSupportRequest.value = data || null
+    
+    // If pending, start status polling
+    if (data && data.status === 'pending') {
+      startDashboardPolling()
+    } else {
+      stopDashboardPolling()
+    }
+  } catch (err) {
+    console.error('Error fetching support request:', err)
+  }
+}
+
+function startAppealCountdown(endTime) {
+  if (countdownTimer) clearInterval(countdownTimer)
+  
+  const updateCountdown = () => {
+    const timeRemaining = 600000 - (Date.now() - endTime)
+    if (timeRemaining <= 0) {
+      recentSubmittedSession.value = null
+      recentSupportRequest.value = null
+      clearInterval(countdownTimer)
+      countdownTimer = null
+      stopDashboardPolling()
+    } else {
+      const minutes = Math.floor(timeRemaining / 60000)
+      const seconds = Math.floor((timeRemaining % 60000) / 1000)
+      appealTimeRemainingText.value = `${minutes}m ${seconds}s`
+    }
+  }
+  
+  updateCountdown()
+  countdownTimer = setInterval(updateCountdown, 1000)
+}
+
+function startDashboardPolling() {
+  if (dashboardPollInterval) clearInterval(dashboardPollInterval)
+  
+  dashboardPollInterval = setInterval(async () => {
+    if (!recentSubmittedSession.value) {
+      stopDashboardPolling()
+      return
+    }
+    await fetchSupportRequestForSession(recentSubmittedSession.value.session_id)
+  }, 5000)
+}
+
+function stopDashboardPolling() {
+  if (dashboardPollInterval) {
+    clearInterval(dashboardPollInterval)
+    dashboardPollInterval = null
+  }
+}
+
+async function submitDashboardAppeal() {
+  if (!recentSubmittedSession.value) return
+  
+  dashboardAppealSubmitting.value = true
+  dashboardAppealError.value = ''
+  
+  try {
+    // Calculate remaining seconds at submission
+    const start = new Date(recentSubmittedSession.value.start_time).getTime()
+    const end = new Date(recentSubmittedSession.value.end_time).getTime()
+    const elapsed = Math.floor((end - start) / 1000)
+    const remainingSeconds = Math.max(0, recentSubmittedSession.value.total_duration_seconds - elapsed)
+    
+    const examStore = useExamStore()
+    
+    // Inject session info into store so submitSupportRequest behaves correctly
+    examStore.sessionId = recentSubmittedSession.value.session_id
+    examStore.examType = recentSubmittedSession.value.exam_type
+    
+    // Load question data first so submitSupportRequest can build a valid answers snapshot
+    await examStore.fetchExamData()
+
+    const res = await examStore.submitSupportRequest(
+      dashboardAppealReason.value,
+      dashboardAppealCustomMessage.value,
+      remainingSeconds
+    )
+    
+    if (res.success) {
+      showDashboardAppealModal.value = false
+      await fetchSupportRequestForSession(recentSubmittedSession.value.session_id)
+    } else {
+      dashboardAppealError.value = res.error || 'Failed to submit request'
+    }
+  } catch (err) {
+    dashboardAppealError.value = err.message || 'Error occurred'
+  } finally {
+    dashboardAppealSubmitting.value = false
+  }
+}
+
+async function resumeApprovedExam() {
+  if (!recentSupportRequest.value) return
+  
+  const examStore = useExamStore()
+  
+  stopDashboardPolling()
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+  
+  const res = await examStore.restoreResumedSession(recentSupportRequest.value)
+  if (res.success) {
+    router.push('/exam')
+  } else {
+    alert('Failed to resume session. Please try again.')
+  }
+}
 
 async function fetchExamHistory() {
   loading.value = true
