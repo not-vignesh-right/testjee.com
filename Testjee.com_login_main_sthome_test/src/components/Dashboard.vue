@@ -1165,16 +1165,16 @@ async function checkRecentAutoSubmissions() {
 
   try {
     // Fetch recently submitted sessions (within 10-min appeal window)
-    // NOTE: We intentionally do NOT filter by auto_submitted here because
-    // that column requires a DB migration. The 'completed' status check below
-    // is the correct gate for suppressing the banner after a resume.
+    // Now that DB migration is done, filter by auto_submitted = true so
+    // manual submits never show the banner
     const { data: sessions, error } = await supabase
       .from('exam_sessions')
-      .select('session_id, exam_type, start_time, end_time, total_duration_seconds')
+      .select('session_id, exam_type, start_time, end_time, total_duration_seconds, auto_submitted')
       .eq('student_id', studentProfile.value.student_id)
       .eq('is_submitted', true)
+      .eq('auto_submitted', true)
       .order('end_time', { ascending: false })
-      .limit(5) // Check last 5 to find one within the appeal window
+      .limit(5)
 
     if (error) throw error
 
@@ -1187,23 +1187,50 @@ async function checkRecentAutoSubmissions() {
       })
 
       if (eligibleSession) {
-        // Suppress banner if there is already a 'completed' support request
-        // — this means the student already resumed and finished the exam
+        // Fetch the support request for this session
         const { data: existingReq } = await supabase
           .from('exam_support_requests')
-          .select('status')
+          .select('*')
           .eq('session_id', eligibleSession.session_id)
           .maybeSingle()
 
+        // Suppress banner if:
+        // 1) Request is 'completed' — student already resumed and finished
+        // 2) Request is 'approved' — check if session is no longer submitted
+        //    (meaning student already started the resumed exam, hide banner)
         if (existingReq?.status === 'completed') {
           recentSubmittedSession.value = null
           recentSupportRequest.value = null
           return
         }
 
+        if (existingReq?.status === 'approved') {
+          // Check if the session was reopened (is_submitted = false) meaning
+          // student is mid-resumed-exam — hide the banner to prevent double-resume
+          const { data: sessionState } = await supabase
+            .from('exam_sessions')
+            .select('is_submitted')
+            .eq('session_id', eligibleSession.session_id)
+            .single()
+
+          if (sessionState && !sessionState.is_submitted) {
+            // Student is actively in the resumed exam — hide banner
+            recentSubmittedSession.value = null
+            recentSupportRequest.value = null
+            return
+          }
+        }
+
         recentSubmittedSession.value = eligibleSession
         startAppealCountdown(new Date(eligibleSession.end_time).getTime())
-        await fetchSupportRequestForSession(eligibleSession.session_id)
+        recentSupportRequest.value = existingReq || null
+
+        // Start polling if pending
+        if (existingReq?.status === 'pending') {
+          startDashboardPolling()
+        } else if (existingReq?.status === 'approved') {
+          stopDashboardPolling()
+        }
       } else {
         recentSubmittedSession.value = null
         recentSupportRequest.value = null

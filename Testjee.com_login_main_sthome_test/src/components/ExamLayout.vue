@@ -41,12 +41,21 @@
             <p class="text-sm text-gray-500 mb-8 border-t pt-4">As per the instructions, exiting full-screen mode or switching tabs is strictly prohibited.</p>
             
             <div class="flex flex-col gap-3">
-              <button 
-                @click="showAppealForm = true" 
-                class="w-full py-3.5 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-95"
-              >
-                🙋‍♂️ Need Help / Request Resume
-              </button>
+              <!-- If already resumed once, no more appeals -->
+              <template v-if="isResumedSession">
+                <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-left mb-2">
+                  <p class="text-sm font-bold text-amber-800 mb-1">⚠️ Resume Limit Reached</p>
+                  <p class="text-xs text-amber-700 leading-relaxed">You have already used your one allowed resume for this session. The exam has been submitted with your current progress. No further resumptions are permitted.</p>
+                </div>
+              </template>
+              <template v-else>
+                <button 
+                  @click="showAppealForm = true" 
+                  class="w-full py-3.5 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-95"
+                >
+                  🙋‍♂️ Need Help / Request Resume
+                </button>
+              </template>
               <button 
                 @click="forceExitToDashboard" 
                 class="w-full py-3 px-6 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl font-semibold border border-gray-200 transition-all active:scale-95"
@@ -275,6 +284,10 @@ const appealError = ref('')
 const activeRequest = ref(null)
 let statusPollInterval = null
 
+// Track if this is a RESUMED session (already used one resume chance)
+// If true: student forfeits the right to appeal again on another exit
+const isResumedSession = ref(false)
+
 const showGraceWarning = ref(false)
 const graceSecondsLeft = ref(10)
 const graceReason = ref('') // 'blur' | 'fullscreen' | 'visibility'
@@ -364,8 +377,7 @@ onMounted(async () => {
   if (examStore.isResuming) {
     console.log('🔄 Resuming restored session — skipping initializeSession & fetchExamData')
     showInstructions.value = false
-    // Timer is started by resumeTest() which called restoreResumedSession() before routing here
-    // If we land here from Dashboard's resumeApprovedExam, start timer now
+    isResumedSession.value = true // Mark: this is a resumed session — no more appeals allowed
     examStore.startTimer()
     enforceFullScreen()
     await requestWakeLock()
@@ -427,12 +439,36 @@ const submitAppeal = async () => {
   )
   
   if (res.success) {
-    appealStatus.value = 'pending'
-    appealSubmitted.value = true
-    activeRequest.value = res.data[0]
-    
-    // Start polling status
-    startPollingRequestStatus()
+    if (res.alreadyExists) {
+      // A request already exists for this session (duplicate click or race condition)
+      // Fetch it and start polling its status
+      try {
+        const { data: existing } = await supabase
+          .from('exam_support_requests')
+          .select('*')
+          .eq('session_id', examStore.sessionId)
+          .maybeSingle()
+        if (existing) {
+          activeRequest.value = existing
+          appealStatus.value = existing.status // 'pending', 'approved', or 'rejected'
+          if (existing.status === 'pending') {
+            startPollingRequestStatus()
+          }
+        } else {
+          appealStatus.value = 'idle'
+          appealError.value = 'Could not find your request. Please try again.'
+        }
+      } catch {
+        appealStatus.value = 'idle'
+        appealError.value = 'Could not find your request. Please try again.'
+      }
+    } else {
+      appealStatus.value = 'pending'
+      appealSubmitted.value = true
+      activeRequest.value = res.data[0]
+      // Start polling status
+      startPollingRequestStatus()
+    }
   } else {
     appealStatus.value = 'idle'
     appealError.value = res.error || 'Failed to submit appeal. Please try again.'
@@ -482,6 +518,9 @@ const resumeTest = async () => {
   
   const res = await examStore.restoreResumedSession(activeRequest.value)
   if (res.success) {
+    // Mark: this is now a resumed session — no more appeals if they exit again
+    isResumedSession.value = true
+
     // BUG 8 FIX: Temporarily suppress fullscreen-change grace period
     // while we are programmatically re-entering fullscreen after resume
     isEnteringFullscreenOnResume.value = true

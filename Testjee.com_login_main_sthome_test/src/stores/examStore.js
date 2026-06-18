@@ -912,15 +912,16 @@ export const useExamStore = defineStore('exam', () => {
       const pendingKey = `pending_submit_${authStore.studentProfile?.student_id || authStore.studentId || 'unauth'}`
       localStorage.removeItem(pendingKey)
 
-      // Mark support request as 'completed' if this was a resumed session
-      // so the dashboard banner is hidden after the student finishes the resumed exam
+      // Mark support request as 'completed' after any exam submission
+      // Closes BOTH pending and approved requests so the dashboard banner
+      // is always hidden once the exam has been submitted for this session
       if (sessionId.value) {
         try {
           const { error: srErr } = await supabase
             .from('exam_support_requests')
             .update({ status: 'completed' })
             .eq('session_id', sessionId.value)
-            .eq('status', 'approved')
+            .in('status', ['pending', 'approved'])
           if (srErr) console.warn('Could not mark support request as completed:', srErr)
         } catch (cleanupErr) {
           console.warn('Could not mark support request as completed:', cleanupErr)
