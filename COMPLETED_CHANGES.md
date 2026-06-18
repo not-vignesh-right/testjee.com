@@ -2,7 +2,7 @@
 
 This document provides a summary of the stability updates and support features implemented to prevent accidental auto-submissions and allow students to resume mock exams.
 
----
+--- 
 
 ## 1. Exam Stability & Sleep Prevention
 
