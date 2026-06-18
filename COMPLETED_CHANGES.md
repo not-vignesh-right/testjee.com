@@ -7,7 +7,9 @@ This document provides a summary of the stability updates and support features i
 ## 1. Exam Stability & Sleep Prevention
 
 * **Screen Wake Lock API**: Integrated screen wake locks in [ExamLayout.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/ExamLayout.vue) and [LiveExamInterface.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/live-exam/LiveExamInterface.vue) to block OS screen savers, screen dimming, and locks when students are inactive.
-* **10-Second Grace Warning Overlay**: Introduced a warning overlay with a 10-second countdown in `ExamLayout.vue` for `blur` (click outside), `visibilitychange` (tab switch/minimize), and `fullscreenchange` (exiting fullscreen) events. If students return within 10 seconds, the countdown is aborted and focus is restored.
+* **10-Second Grace Warning vs. Instant Auto-Submit**: Configured the proctoring enforcement rules:
+  - **Tab switching / minimizing the window**: Triggers **instant auto-submission** without a grace period, as this is an intentional cheating action.
+  - **Exiting fullscreen / window blur (losing focus)**: Retains the **10-second warning countdown grace period** overlay to allow recovery, since these can be triggered accidentally by system dialogs or notifications.
 
 ---
 
