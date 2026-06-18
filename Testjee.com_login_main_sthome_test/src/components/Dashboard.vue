@@ -1164,21 +1164,22 @@ async function checkRecentAutoSubmissions() {
   if (!studentProfile.value) return
 
   try {
-    // BUG 5 FIX: Only show banner for auto_submitted sessions, not voluntarily submitted ones
-    // BUG 11 FIX: Fetch all sessions in the 10-min window, not just the latest 1
+    // Fetch recently submitted sessions (within 10-min appeal window)
+    // NOTE: We intentionally do NOT filter by auto_submitted here because
+    // that column requires a DB migration. The 'completed' status check below
+    // is the correct gate for suppressing the banner after a resume.
     const { data: sessions, error } = await supabase
       .from('exam_sessions')
       .select('session_id, exam_type, start_time, end_time, total_duration_seconds')
       .eq('student_id', studentProfile.value.student_id)
       .eq('is_submitted', true)
-      .eq('auto_submitted', true)
       .order('end_time', { ascending: false })
       .limit(5) // Check last 5 to find one within the appeal window
 
     if (error) throw error
 
     if (sessions && sessions.length > 0) {
-      // Find the most recent one within the 10-minute appeal window
+      // Find the most recent session within the 10-minute appeal window
       const now = Date.now()
       const eligibleSession = sessions.find(s => {
         if (!s.end_time) return false
@@ -1186,8 +1187,8 @@ async function checkRecentAutoSubmissions() {
       })
 
       if (eligibleSession) {
-        // BUG 1 FIX: Before showing the banner, check if the request is already completed
-        // (meaning student already resumed and finished the exam — don't show banner again)
+        // Suppress banner if there is already a 'completed' support request
+        // — this means the student already resumed and finished the exam
         const { data: existingReq } = await supabase
           .from('exam_support_requests')
           .select('status')
@@ -1195,18 +1196,13 @@ async function checkRecentAutoSubmissions() {
           .maybeSingle()
 
         if (existingReq?.status === 'completed') {
-          // Student already resumed and submitted — suppress banner
           recentSubmittedSession.value = null
           recentSupportRequest.value = null
           return
         }
 
         recentSubmittedSession.value = eligibleSession
-        
-        // Start countdown timer for the 10-minute window
         startAppealCountdown(new Date(eligibleSession.end_time).getTime())
-
-        // 2. Fetch any matching support request
         await fetchSupportRequestForSession(eligibleSession.session_id)
       } else {
         recentSubmittedSession.value = null

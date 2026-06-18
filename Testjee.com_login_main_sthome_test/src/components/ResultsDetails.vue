@@ -178,7 +178,9 @@ import { useExamStore } from '../stores/examStore'
 
 const router = useRouter()
 const examStore = useExamStore()
-const lastResult = examStore.lastResult
+
+// FIX: Use computed so this stays reactive when the store updates after mount
+const lastResult = computed(() => examStore.lastResult)
 
 // Derive exam config from the stored exam type in the result session
 const examConfig = computed(() => {
@@ -190,7 +192,7 @@ const examConfig = computed(() => {
     'KCET_MATHEMATICS': { shortLabel: 'KCET Mathematics', maxScore: 60 },
   }
   // Try to get exam type from the result session or from the live examStore
-  const examType = lastResult?.examType || examStore.examType
+  const examType = lastResult.value?.examType || examStore.examType
   return EXAM_CONFIG_MAP[examType] ?? { shortLabel: 'JEE Main', maxScore: 300 }
 })
 
@@ -200,15 +202,15 @@ function goToDetail(questionId) {
 
 // Generate exam label from result id
 const examLabel = computed(() => {
-  if (!lastResult?.id) return ''
-  return `#${lastResult.id}`
+  if (!lastResult.value?.id) return ''
+  return `#${lastResult.value.id}`
 })
 
-const totalQuestions = computed(() => (lastResult?.perQuestion || []).length)
+const totalQuestions = computed(() => (lastResult.value?.perQuestion || []).length)
 
 const groupedBySubject = computed(() => {
   const groups = {}
-  ;(lastResult?.perQuestion || []).forEach(q => {
+  ;(lastResult.value?.perQuestion || []).forEach(q => {
     const subject = q.subject || 'Unknown'
     if (!groups[subject]) groups[subject] = []
     groups[subject].push(q)
@@ -265,19 +267,19 @@ function getSubjectSkipped(questions) {
 }
 
 function getCorrectCount() {
-  return (lastResult?.perQuestion || []).filter(p => p.isCorrect).length
+  return (lastResult.value?.perQuestion || []).filter(p => p.isCorrect).length
 }
 
 function getWrongCount() {
-  return (lastResult?.perQuestion || []).filter(p => p.chosen && !p.isCorrect).length
+  return (lastResult.value?.perQuestion || []).filter(p => p.chosen && !p.isCorrect).length
 }
 
 function getUnattemptedCount() {
-  return (lastResult?.perQuestion || []).filter(p => !p.chosen).length
+  return (lastResult.value?.perQuestion || []).filter(p => !p.chosen).length
 }
 
 function getTotalTime() {
-  const total = (lastResult?.perQuestion || []).reduce((sum, p) => sum + (p.time_taken || 0), 0)
+  const total = (lastResult.value?.perQuestion || []).reduce((sum, p) => sum + (p.time_taken || 0), 0)
   return formatTime(total)
 }
 </script>
