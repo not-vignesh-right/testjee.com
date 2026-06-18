@@ -321,6 +321,37 @@ const clearResponse = () => {
   handleAnswerChange()
 }
 
+let wakeLock = null
+
+const requestWakeLock = async () => {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen')
+      console.log('Screen Wake Lock acquired successfully')
+    }
+  } catch (err) {
+    console.warn('Failed to acquire Screen Wake Lock:', err)
+  }
+}
+
+const releaseWakeLock = async () => {
+  try {
+    if (wakeLock) {
+      await wakeLock.release()
+      wakeLock = null
+      console.log('Screen Wake Lock released successfully')
+    }
+  } catch (err) {
+    console.warn('Failed to release Screen Wake Lock:', err)
+  }
+}
+
+const handleVisibilityChange = async () => {
+  if (!document.hidden) {
+    await requestWakeLock()
+  }
+}
+
 onMounted(async () => {
   if (!store.studentSessionId) {
     router.push(`/live-exam/${route.params.sessionCode}`)
@@ -350,13 +381,16 @@ onMounted(async () => {
   }
   
   loadingQuestions.value = false
+
+  // Acquire Screen Wake Lock
+  await requestWakeLock()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 // Safety Check Unmount - store handles syncing active time on route leave generally, but let's be explicit
-onUnmounted(() => {
-  if (document.visibilityState === 'hidden') {
-     // Push whatever last pending was. 
-  }
+onUnmounted(async () => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  await releaseWakeLock()
 })
 
 const handlePostSubmit = () => {

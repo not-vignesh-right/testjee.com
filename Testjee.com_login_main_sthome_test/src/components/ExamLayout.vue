@@ -45,6 +45,41 @@
         </div>
       </div>
 
+      <!-- Grace Period Warning Overlay -->
+      <div v-if="showGraceWarning" class="fixed inset-0 z-[110] bg-gray-900/90 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center border border-amber-200" style="animation: fadeIn 0.3s ease-out">
+          <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8 text-amber-600 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-gray-900 mb-3">Security Warning: Focus Lost!</h2>
+          <p class="text-gray-600 text-sm mb-6 leading-relaxed">
+            <template v-if="graceReason === 'fullscreen'">
+              You have exited full-screen mode. Please click the button below to return to full-screen.
+            </template>
+            <template v-else-if="graceReason === 'visibility'">
+              You switched tabs or minimized the window. Please return to the exam immediately.
+            </template>
+            <template v-else>
+              You clicked outside the exam window or opened another app. Please click back inside.
+            </template>
+          </p>
+          <div class="bg-amber-50 rounded-xl py-3 px-4 mb-6 border border-amber-100 flex items-center justify-between">
+            <span class="text-xs text-amber-800 font-semibold uppercase tracking-wider">Auto-Submitting In</span>
+            <span class="text-2xl font-mono font-bold text-amber-700 animate-pulse">{{ graceSecondsLeft }}s</span>
+          </div>
+          <button 
+            v-if="graceReason === 'fullscreen'"
+            @click="enforceFullScreen" 
+            class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
+          >
+            Return to Full Screen
+          </button>
+          <p v-else class="text-xs text-gray-400">Click anywhere inside this window to resume the exam.</p>
+        </div>
+      </div>
+
       <!-- Header Bar -->
       <HeaderBar />
       
@@ -82,6 +117,88 @@ const router = useRouter()
 const showInstructions = ref(true)
 const autoSubmitReason = ref('')
 
+const showGraceWarning = ref(false)
+const graceSecondsLeft = ref(10)
+const graceReason = ref('') // 'blur' | 'fullscreen' | 'visibility'
+let graceTimer = null
+let wakeLock = null
+
+// --- Screen Wake Lock API ---
+const requestWakeLock = async () => {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen')
+      console.log('Screen Wake Lock acquired successfully')
+    }
+  } catch (err) {
+    console.warn('Failed to acquire Screen Wake Lock:', err)
+  }
+}
+
+const releaseWakeLock = async () => {
+  try {
+    if (wakeLock) {
+      await wakeLock.release()
+      wakeLock = null
+      console.log('Screen Wake Lock released successfully')
+    }
+  } catch (err) {
+    console.warn('Failed to release Screen Wake Lock:', err)
+  }
+}
+
+// --- Grace Period Manager ---
+const startGracePeriod = (reason) => {
+  if (graceTimer) {
+    if (reason === 'visibility' && graceReason.value !== 'visibility') {
+      graceReason.value = 'visibility'
+    }
+    return
+  }
+
+  graceReason.value = reason
+  showGraceWarning.value = true
+  graceSecondsLeft.value = 10
+
+  graceTimer = setInterval(async () => {
+    if (graceSecondsLeft.value > 1) {
+      graceSecondsLeft.value--
+    } else {
+      clearInterval(graceTimer)
+      graceTimer = null
+      showGraceWarning.value = false
+
+      // Log auto-submit reason
+      if (graceReason.value === 'visibility') {
+        autoSubmitReason.value = 'switched tabs or minimized the window for too long'
+      } else if (graceReason.value === 'blur') {
+        autoSubmitReason.value = 'clicked outside the exam window for too long'
+      } else if (graceReason.value === 'fullscreen') {
+        autoSubmitReason.value = 'stayed out of full-screen mode for too long'
+      }
+
+      await releaseWakeLock()
+
+      if (examStore.emergencySubmit) {
+        examStore.emergencySubmit()
+      }
+      await examStore.submitExam()
+    }
+  }, 1000)
+}
+
+const clearGracePeriod = () => {
+  if (graceReason.value === 'fullscreen' && !document.fullscreenElement) {
+    return
+  }
+  if (graceTimer) {
+    clearInterval(graceTimer)
+    graceTimer = null
+  }
+  showGraceWarning.value = false
+  graceReason.value = ''
+}
+
 // Exam initialization
 onMounted(async () => {
   // 🔐 Ensure user is authenticated before loading exam
@@ -108,14 +225,19 @@ onMounted(async () => {
     // 🕒 Start global exam timer if resuming directly
     examStore.startTimer()
     enforceFullScreen()
+    await requestWakeLock()
   }
 
   // Setup security listeners
   setupSecurityListeners()
 })
 
-onUnmounted(() => {
+onUnmounted(async () => {
   removeSecurityListeners()
+  if (graceTimer) {
+    clearInterval(graceTimer)
+  }
+  await releaseWakeLock()
 })
 
 // --- Exam Flow Mechanics ---
@@ -128,6 +250,9 @@ async function beginExamFullScreen() {
   
   // Start the timer
   examStore.startTimer()
+
+  // Acquire wake lock to prevent sleep
+  await requestWakeLock()
 }
 
 async function enforceFullScreen() {
@@ -150,15 +275,11 @@ function forceExitToDashboard() {
 
 const handleFullscreenChange = async () => {
   if (!document.fullscreenElement && !examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
-    // Student exited full screen mid-exam - STRICT AUTO SUBMIT
     examStore.isFullScreen = false
-    autoSubmitReason.value = 'exited full-screen mode'
-    if (examStore.emergencySubmit) {
-      examStore.emergencySubmit()
-    }
-    await examStore.submitExam()
+    startGracePeriod('fullscreen')
   } else if (document.fullscreenElement) {
     examStore.isFullScreen = true
+    clearGracePeriod()
   }
 }
 
@@ -177,27 +298,29 @@ const handleBeforeUnload = (e) => {
 }
 
 const handleVisibilityChange = async () => {
-  if (document.hidden && !examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
-    // If tab becomes hidden (switched away) - STRICT AUTO SUBMIT
-    console.warn("Tab hidden - STRICT AUTO SUBMIT")
-    autoSubmitReason.value = 'switched tabs or minimized the window'
-    if (examStore.emergencySubmit) {
-      examStore.emergencySubmit()
+  if (document.hidden) {
+    if (!examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
+      console.warn("Tab hidden - starting visibility grace period")
+      startGracePeriod('visibility')
     }
-    await examStore.submitExam()
+  } else {
+    clearGracePeriod()
+    if (!examStore.isSubmitted && !showInstructions.value) {
+      await requestWakeLock()
+    }
   }
 }
 
 const handleWindowBlur = async () => {
   if (!examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
-    // If window loses focus (clicked outside window/tab) - STRICT AUTO SUBMIT
-    console.warn("Window blurred - STRICT AUTO SUBMIT")
-    autoSubmitReason.value = 'clicked outside the exam window or opened another application'
-    if (examStore.emergencySubmit) {
-      examStore.emergencySubmit()
-    }
-    await examStore.submitExam()
+    console.warn("Window blurred - starting blur grace period")
+    startGracePeriod('blur')
   }
+}
+
+const handleWindowFocus = () => {
+  console.log("Window focused - clearing grace period")
+  clearGracePeriod()
 }
 
 const handleContextMenu = (e) => {
@@ -252,6 +375,7 @@ function setupSecurityListeners() {
   window.addEventListener('beforeunload', handleBeforeUnload)
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('blur', handleWindowBlur)
+  window.addEventListener('focus', handleWindowFocus)
   document.addEventListener('contextmenu', handleContextMenu)
   document.addEventListener('keydown', handleKeyDown)
   
@@ -267,6 +391,7 @@ function removeSecurityListeners() {
   window.removeEventListener('beforeunload', handleBeforeUnload)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   window.removeEventListener('blur', handleWindowBlur)
+  window.removeEventListener('focus', handleWindowFocus)
   document.removeEventListener('contextmenu', handleContextMenu)
   document.removeEventListener('keydown', handleKeyDown)
   
