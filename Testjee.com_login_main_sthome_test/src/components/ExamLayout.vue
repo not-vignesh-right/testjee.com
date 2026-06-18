@@ -308,9 +308,6 @@ const releaseWakeLock = async () => {
 // --- Grace Period Manager ---
 const startGracePeriod = (reason) => {
   if (graceTimer) {
-    if (reason === 'visibility' && graceReason.value !== 'visibility') {
-      graceReason.value = 'visibility'
-    }
     return
   }
 
@@ -327,9 +324,7 @@ const startGracePeriod = (reason) => {
       showGraceWarning.value = false
 
       // Log auto-submit reason
-      if (graceReason.value === 'visibility') {
-        autoSubmitReason.value = 'switched tabs or minimized the window for too long'
-      } else if (graceReason.value === 'blur') {
+      if (graceReason.value === 'blur') {
         autoSubmitReason.value = 'clicked outside the exam window for too long'
       } else if (graceReason.value === 'fullscreen') {
         autoSubmitReason.value = 'stayed out of full-screen mode for too long'
@@ -548,8 +543,24 @@ const handleBeforeUnload = (e) => {
 const handleVisibilityChange = async () => {
   if (document.hidden) {
     if (!examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
-      console.warn("Tab hidden - starting visibility grace period")
-      startGracePeriod('visibility')
+      console.warn("Tab hidden - instant auto-submit")
+      
+      // Clear any existing grace period (e.g. from blur)
+      if (graceTimer) {
+        clearInterval(graceTimer)
+        graceTimer = null
+      }
+      showGraceWarning.value = false
+      graceReason.value = ''
+
+      autoSubmitReason.value = 'switched tabs or minimized the window'
+      
+      await releaseWakeLock()
+      
+      if (examStore.emergencySubmit) {
+        examStore.emergencySubmit()
+      }
+      await examStore.submitExam()
     }
   } else {
     clearGracePeriod()
