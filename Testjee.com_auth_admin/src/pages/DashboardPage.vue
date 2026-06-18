@@ -467,24 +467,7 @@ async function fetchSupportRequests() {
   try {
     const { data, error } = await supabase
       .from('exam_support_requests')
-      .select(`
-        request_id,
-        session_id,
-        student_id,
-        reason,
-        custom_message,
-        status,
-        created_at,
-        remaining_time_seconds,
-        students (
-          student_name,
-          email_id
-        ),
-        exam_sessions (
-          exam_type,
-          end_time
-        )
-      `)
+      .select('request_id,session_id,student_id,reason,custom_message,status,created_at,remaining_time_seconds,students(student_name,email_id),exam_sessions(exam_type,end_time)')
       .order('created_at', { ascending: false })
 
     if (error) throw error

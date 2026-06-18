@@ -24,4 +24,5 @@ We created a custom workflow allowing students to appeal accidental auto-submits
   - Displays all pending and resolved resumption appeals.
   - **Approve**: Sets status to `approved`, deletes the temporary scorecard from the `results` table, and reopens the session (`is_submitted = false`, resets `start_time` and set `total_duration_seconds = remaining_time`).
   - **Reject**: Sets request status to `rejected`.
+  - **Proxy Parse Fix**: Replaced the multiline PostgREST query parameter with a single-line string without spaces/newlines to work correctly with the custom admin REST proxy API.
 * **Student History Log (`StudentDetailPage.vue`)**: Shows resumption request histories for full student diagnostic records.
