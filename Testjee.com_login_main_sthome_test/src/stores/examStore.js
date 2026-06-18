@@ -916,13 +916,13 @@ export const useExamStore = defineStore('exam', () => {
       // so the dashboard banner is hidden after the student finishes the resumed exam
       if (sessionId.value) {
         try {
-          await supabase
+          const { error: srErr } = await supabase
             .from('exam_support_requests')
-            .update({ status: 'completed', updated_at: new Date().toISOString() })
+            .update({ status: 'completed' })
             .eq('session_id', sessionId.value)
-            .eq('status', 'approved') // Only update if it was approved (not regular submits)
+            .eq('status', 'approved')
+          if (srErr) console.warn('Could not mark support request as completed:', srErr)
         } catch (cleanupErr) {
-          // Non-critical: if this fails the exam result is still saved
           console.warn('Could not mark support request as completed:', cleanupErr)
         }
       }
