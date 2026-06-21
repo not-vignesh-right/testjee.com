@@ -162,9 +162,6 @@ router.beforeEach(async (to, from, next) => {
           console.log('Exam already submitted, redirecting to dashboard')
           return next({ name: 'Dashboard' })
         }
-        // NOTE: ResultsDetails is intentionally NOT blocked here.
-        // The component self-loads from the DB on mount, so it works on direct
-        // URL navigation and page refresh without needing isSubmitted = true.
       } catch (e) {
         // ignore examStore not ready
       }

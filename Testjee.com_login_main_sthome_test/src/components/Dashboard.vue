@@ -1,5 +1,6 @@
 <template>
-  <div class="dashboard-page px-6 py-6 md:px-10 md:py-8" @click="closeKcetDropdown">
+  <div @click="closeKcetDropdown">
+  <div class="dashboard-page px-6 py-6 md:px-10 md:py-8">
 
     <!-- Recent Auto-Submit Support Appeal Banner -->
     <div v-if="recentSubmittedSession" class="mb-6 animate-fadeIn">
@@ -817,6 +818,7 @@
         </div>
       </div>
     </div>
+  </div>
   </div>
 </template>
 
