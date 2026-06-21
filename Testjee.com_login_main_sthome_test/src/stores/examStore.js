@@ -1229,11 +1229,10 @@ export const useExamStore = defineStore('exam', () => {
       questionStatuses.value = {}
       timeSpent.value = {}
 
-      // 2. Fetch session to get exam_type and calculate ACTUAL remaining time from server time
-      //    BUG 7 FIX: Never trust request.remaining_time_seconds — always recalculate from start_time
+      // 2. Fetch session to get exam_type
       const { data: sessionData, error: sessError } = await supabase
         .from('exam_sessions')
-        .select('exam_type, start_time, total_duration_seconds')
+        .select('exam_type')
         .eq('session_id', request.session_id)
         .single()
       
@@ -1241,21 +1240,23 @@ export const useExamStore = defineStore('exam', () => {
 
       examType.value = sessionData.exam_type
 
-      const startTime = new Date(sessionData.start_time)
-      const now = new Date()
-      const elapsedSeconds = Math.floor((now - startTime) / 1000)
-      const calculatedRemaining = Math.max(0, sessionData.total_duration_seconds - elapsedSeconds)
-      remainingTime.value = calculatedRemaining
+      const currentNow = new Date().toISOString()
+      remainingTime.value = request.remaining_time_seconds
 
-      if (calculatedRemaining <= 0) {
+      if (remainingTime.value <= 0) {
         console.warn('⏰ Session time has already expired. Cannot resume.')
         return { success: false, error: 'Session time has expired.' }
       }
 
-      // BUG 2 FIX: Set is_submitted = false in DB so initializeSession doesn't create a new session
+      // Reopen session in DB and reset start_time to NOW so student gets full remaining time
       const { error: updateErr } = await supabase
         .from('exam_sessions')
-        .update({ is_submitted: false, end_time: null })
+        .update({ 
+          is_submitted: false, 
+          end_time: null,
+          start_time: currentNow,
+          total_duration_seconds: request.remaining_time_seconds
+        })
         .eq('session_id', request.session_id)
 
       if (updateErr) {

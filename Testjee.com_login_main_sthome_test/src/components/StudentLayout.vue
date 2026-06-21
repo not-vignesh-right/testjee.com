@@ -142,19 +142,7 @@
 
       <!-- Page Content -->
       <main class="flex-1 overflow-x-hidden overflow-y-auto relative scroll-smooth">
-        <router-view v-slot="{ Component }">
-          <transition 
-            enter-active-class="transition ease-out duration-400 transform"
-            enter-from-class="opacity-0 translate-y-4"
-            enter-to-class="opacity-100 translate-y-0"
-            leave-active-class="transition ease-in duration-200 transform"
-            leave-from-class="opacity-100 translate-y-0"
-            leave-to-class="opacity-0 -translate-y-2"
-            mode="out-in"
-          >
-            <component :is="Component" />
-          </transition>
-        </router-view>
+        <router-view />
       </main>
     </div>
   </div>
