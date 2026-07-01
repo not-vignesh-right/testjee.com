@@ -1,7 +1,183 @@
 <template>
   <div class="min-h-screen bg-gta-light">
-    <!-- Show message if exam is submitted/expired -->
-    <div v-if="examStore.isSubmitted" class="min-h-screen flex items-center justify-center">
+    <!-- Submission Reason Modal / Appeal System (Prioritized to avoid unmounting when submitted) -->
+    <div v-if="autoSubmitReason" class="fixed inset-0 z-[100] bg-gray-900/95 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center border border-gray-100 animate-fadeIn">
+        
+        <!-- Standard Auto-Submit Message -->
+        <template v-if="!showAppealForm">
+          <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+          </div>
+          <h2 class="text-2xl font-bold text-gray-900 mb-3">Exam Auto-Submitted</h2>
+          <p class="text-gray-600 mb-4">Your exam has been automatically submitted because you <strong class="text-red-600">{{ autoSubmitReason }}</strong>.</p>
+          <p class="text-sm text-gray-500 mb-8 border-t pt-4">As per the instructions, exiting full-screen mode or switching tabs is strictly prohibited.</p>
+          
+          <div class="flex flex-col gap-3">
+            <!-- If already resumed once, no more appeals -->
+            <template v-if="isResumedSession">
+              <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-left mb-2">
+                <p class="text-sm font-bold text-amber-800 mb-1">⚠️ Resume Limit Reached</p>
+                <p class="text-xs text-amber-700 leading-relaxed">You have already used your one allowed resume for this session. The exam has been submitted with your current progress. No further resumptions are permitted.</p>
+              </div>
+            </template>
+            <template v-else>
+              <button 
+                @click="showAppealForm = true" 
+                class="w-full py-3.5 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-95"
+              >
+                🙋‍♂️ Need Help / Request Resume
+              </button>
+            </template>
+            <button 
+              @click="forceExitToDashboard" 
+              class="w-full py-3 px-6 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl font-semibold border border-gray-200 transition-all active:scale-95"
+            >
+              Return to Dashboard
+            </button>
+          </div>
+        </template>
+
+        <!-- Appeal / Support Form -->
+        <template v-else-if="showAppealForm && appealStatus === 'idle'">
+          <div class="text-left">
+            <h3 class="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2">
+              🙋‍♂️ Support & Resume Request
+            </h3>
+            <p class="text-xs text-gray-500 mb-6">If this auto-submit was accidental, request Gyan Edge admins to reopen your session.</p>
+            
+            <div class="space-y-4 mb-6">
+              <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Select Reason</label>
+                <select v-model="appealReason" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all cursor-pointer font-medium text-gray-800 text-sm">
+                  <option value="My computer went to sleep/locked screen">💻 My computer went to sleep / locked screen</option>
+                  <option value="I had a power failure / network drop">🔌 I had a power failure / network drop</option>
+                  <option value="I exited fullscreen / switched tabs accidentally">⚠️ I exited fullscreen / switched tabs accidentally</option>
+                  <option value="Other technical glitch">⚙️ Other technical glitch</option>
+                </select>
+              </div>
+              
+              <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Additional details (optional)</label>
+                <textarea 
+                  v-model="appealCustomMessage"
+                  rows="3" 
+                  placeholder="Briefly describe what happened..."
+                  class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all text-sm text-gray-800 placeholder-gray-400"
+                ></textarea>
+              </div>
+            </div>
+
+            <div v-if="appealError" class="mb-4 p-3 rounded-xl bg-red-50 text-red-600 border border-red-100 text-xs font-medium">
+              {{ appealError }}
+            </div>
+
+            <div class="flex gap-3">
+              <button 
+                @click="showAppealForm = false" 
+                class="flex-1 py-3 text-sm font-bold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Back
+              </button>
+              <button 
+                @click="submitAppeal" 
+                class="flex-1 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-md shadow-blue-200/50"
+              >
+                Submit Appeal
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- Submitting appeal state -->
+        <template v-else-if="appealStatus === 'submitting'">
+          <div class="py-12 flex flex-col items-center justify-center">
+            <svg class="animate-spin h-10 w-10 text-blue-600 mb-4" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-sm font-bold text-gray-700">Submitting your request...</p>
+          </div>
+        </template>
+
+        <!-- Pending admin approval -->
+        <template v-else-if="appealStatus === 'pending'">
+          <div class="py-4 text-center">
+            <div class="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-amber-100 animate-pulse">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h3 class="text-lg font-bold text-gray-900 mb-2">Waiting for Admin Approval</h3>
+            <p class="text-sm text-gray-500 mb-6 max-w-xs mx-auto leading-relaxed">
+              Your appeal for the session resume has been sent. Gyan Edge admins will review your request shortly. 
+            </p>
+            
+            <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100 text-left mb-6 space-y-2">
+              <div class="flex justify-between text-xs text-gray-500"><span class="font-medium">Reason:</span> <span class="font-bold text-gray-800">{{ appealReason }}</span></div>
+              <div class="flex justify-between text-xs text-gray-500"><span class="font-medium">Time Submitted:</span> <span class="font-bold text-gray-800">Just now</span></div>
+              <div class="flex justify-between text-xs text-gray-500"><span class="font-medium">Status:</span> <span class="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 uppercase tracking-wider text-[9px]">Pending</span></div>
+            </div>
+
+            <div class="flex flex-col gap-2">
+              <button 
+                @click="forceExitToDashboard" 
+                class="w-full py-3 px-6 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl font-semibold border border-gray-200 transition-all active:scale-95"
+              >
+                Close & Go to Dashboard
+              </button>
+              <p class="text-[10px] text-gray-400 mt-2">You can close this. You'll also be able to check approval status and resume directly from the Dashboard.</p>
+            </div>
+          </div>
+        </template>
+
+        <!-- Approved resumed session -->
+        <template v-else-if="appealStatus === 'approved'">
+          <div class="py-4 text-center animate-fadeIn">
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md shadow-green-100">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">Resume Request Approved!</h3>
+            <p class="text-sm text-gray-500 mb-8">Click the button below to return to your exam with your saved progress and remaining time.</p>
+            
+            <button 
+              @click="resumeTest" 
+              class="w-full py-4 px-6 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
+            >
+              🚀 Resume Test Now
+            </button>
+          </div>
+        </template>
+
+        <!-- Rejected request -->
+        <template v-else-if="appealStatus === 'rejected'">
+          <div class="py-4 text-center animate-fadeIn">
+            <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md shadow-red-100">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">Resume Request Denied</h3>
+            <p class="text-sm text-gray-500 mb-8">Unfortunately, the administrators did not approve your resume request.</p>
+            
+            <button 
+              @click="forceExitToDashboard" 
+              class="w-full py-3.5 px-6 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-bold shadow-lg transition-all"
+            >
+              Return to Dashboard
+            </button>
+          </div>
+        </template>
+
+      </div>
+    </div>
+
+    <!-- Show message if exam is submitted/expired naturally -->
+    <div v-else-if="examStore.isSubmitted" class="min-h-screen flex items-center justify-center">
       <div class="bg-white p-8 rounded-lg shadow-lg text-center max-w-md">
         <div class="text-6xl mb-4">⏰</div>
         <h2 class="text-2xl font-bold text-gray-800 mb-4">Exam Time Expired</h2>
@@ -25,182 +201,6 @@
 
     <!-- Normal exam view -->
     <div v-else class="exam-container">
-      <!-- Submission Reason Modal -->
-      <div v-if="autoSubmitReason" class="fixed inset-0 z-[100] bg-gray-900/95 flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center border border-gray-100 animate-fadeIn">
-          
-          <!-- Standard Auto-Submit Message -->
-          <template v-if="!showAppealForm">
-            <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-              </svg>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-3">Exam Auto-Submitted</h2>
-            <p class="text-gray-600 mb-4">Your exam has been automatically submitted because you <strong class="text-red-600">{{ autoSubmitReason }}</strong>.</p>
-            <p class="text-sm text-gray-500 mb-8 border-t pt-4">As per the instructions, exiting full-screen mode or switching tabs is strictly prohibited.</p>
-            
-            <div class="flex flex-col gap-3">
-              <!-- If already resumed once, no more appeals -->
-              <template v-if="isResumedSession">
-                <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-left mb-2">
-                  <p class="text-sm font-bold text-amber-800 mb-1">⚠️ Resume Limit Reached</p>
-                  <p class="text-xs text-amber-700 leading-relaxed">You have already used your one allowed resume for this session. The exam has been submitted with your current progress. No further resumptions are permitted.</p>
-                </div>
-              </template>
-              <template v-else>
-                <button 
-                  @click="showAppealForm = true" 
-                  class="w-full py-3.5 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-95"
-                >
-                  🙋‍♂️ Need Help / Request Resume
-                </button>
-              </template>
-              <button 
-                @click="forceExitToDashboard" 
-                class="w-full py-3 px-6 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl font-semibold border border-gray-200 transition-all active:scale-95"
-              >
-                Return to Dashboard
-              </button>
-            </div>
-          </template>
-
-          <!-- Appeal / Support Form -->
-          <template v-else-if="showAppealForm && appealStatus === 'idle'">
-            <div class="text-left">
-              <h3 class="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2">
-                🙋‍♂️ Support & Resume Request
-              </h3>
-              <p class="text-xs text-gray-500 mb-6">If this auto-submit was accidental, request Gyan Edge admins to reopen your session.</p>
-              
-              <div class="space-y-4 mb-6">
-                <div>
-                  <label class="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Select Reason</label>
-                  <select v-model="appealReason" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all cursor-pointer font-medium text-gray-800 text-sm">
-                    <option value="My computer went to sleep/locked screen">💻 My computer went to sleep / locked screen</option>
-                    <option value="I had a power failure / network drop">🔌 I had a power failure / network drop</option>
-                    <option value="I exited fullscreen / switched tabs accidentally">⚠️ I exited fullscreen / switched tabs accidentally</option>
-                    <option value="Other technical glitch">⚙️ Other technical glitch</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label class="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Additional details (optional)</label>
-                  <textarea 
-                    v-model="appealCustomMessage"
-                    rows="3" 
-                    placeholder="Briefly describe what happened..."
-                    class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all text-sm text-gray-800 placeholder-gray-400"
-                  ></textarea>
-                </div>
-              </div>
-
-              <div v-if="appealError" class="mb-4 p-3 rounded-xl bg-red-50 text-red-600 border border-red-100 text-xs font-medium">
-                {{ appealError }}
-              </div>
-
-              <div class="flex gap-3">
-                <button 
-                  @click="showAppealForm = false" 
-                  class="flex-1 py-3 text-sm font-bold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-                >
-                  Back
-                </button>
-                <button 
-                  @click="submitAppeal" 
-                  class="flex-1 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-md shadow-blue-200/50"
-                >
-                  Submit Appeal
-                </button>
-              </div>
-            </div>
-          </template>
-
-          <!-- Submitting appeal state -->
-          <template v-else-if="appealStatus === 'submitting'">
-            <div class="py-12 flex flex-col items-center justify-center">
-              <svg class="animate-spin h-10 w-10 text-blue-600 mb-4" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <p class="text-sm font-bold text-gray-700">Submitting your request...</p>
-            </div>
-          </template>
-
-          <!-- Pending admin approval -->
-          <template v-else-if="appealStatus === 'pending'">
-            <div class="py-4 text-center">
-              <div class="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-amber-100 animate-pulse">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
-              <h3 class="text-lg font-bold text-gray-900 mb-2">Waiting for Admin Approval</h3>
-              <p class="text-sm text-gray-500 mb-6 max-w-xs mx-auto leading-relaxed">
-                Your appeal for the session resume has been sent. Gyan Edge admins will review your request shortly. 
-              </p>
-              
-              <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100 text-left mb-6 space-y-2">
-                <div class="flex justify-between text-xs text-gray-500"><span class="font-medium">Reason:</span> <span class="font-bold text-gray-800">{{ appealReason }}</span></div>
-                <div class="flex justify-between text-xs text-gray-500"><span class="font-medium">Time Submitted:</span> <span class="font-bold text-gray-800">Just now</span></div>
-                <div class="flex justify-between text-xs text-gray-500"><span class="font-medium">Status:</span> <span class="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 uppercase tracking-wider text-[9px]">Pending</span></div>
-              </div>
-
-              <div class="flex flex-col gap-2">
-                <button 
-                  @click="forceExitToDashboard" 
-                  class="w-full py-3 px-6 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl font-semibold border border-gray-200 transition-all active:scale-95"
-                >
-                  Close & Go to Dashboard
-                </button>
-                <p class="text-[10px] text-gray-400 mt-2">You can close this. You'll also be able to check approval status and resume directly from the Dashboard.</p>
-              </div>
-            </div>
-          </template>
-
-          <!-- Approved resumed session -->
-          <template v-else-if="appealStatus === 'approved'">
-            <div class="py-4 text-center animate-fadeIn">
-              <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md shadow-green-100">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold text-gray-900 mb-2">Resume Request Approved!</h3>
-              <p class="text-sm text-gray-500 mb-8">Click the button below to return to your exam with your saved progress and remaining time.</p>
-              
-              <button 
-                @click="resumeTest" 
-                class="w-full py-4 px-6 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
-              >
-                🚀 Resume Test Now
-              </button>
-            </div>
-          </template>
-
-          <!-- Rejected request -->
-          <template v-else-if="appealStatus === 'rejected'">
-            <div class="py-4 text-center animate-fadeIn">
-              <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md shadow-red-100">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold text-gray-900 mb-2">Resume Request Denied</h3>
-              <p class="text-sm text-gray-500 mb-8">Unfortunately, the administrators did not approve your resume request.</p>
-              
-              <button 
-                @click="forceExitToDashboard" 
-                class="w-full py-3.5 px-6 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-bold shadow-lg transition-all"
-              >
-                Return to Dashboard
-              </button>
-            </div>
-          </template>
-
-        </div>
-      </div>
-
       <!-- Grace Period Warning Overlay -->
       <div v-if="showGraceWarning" class="fixed inset-0 z-[110] bg-gray-900/90 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center border border-amber-200" style="animation: fadeIn 0.3s ease-out">
