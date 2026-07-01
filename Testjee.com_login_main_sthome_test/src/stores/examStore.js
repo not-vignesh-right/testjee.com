@@ -1306,7 +1306,7 @@ export const useExamStore = defineStore('exam', () => {
       // 6. Save to localStorage
       saveToLocalStorage()
       
-      console.log(`✅ Exam session resumed! ${calculatedRemaining}s remaining.`)
+      console.log(`✅ Exam session resumed! ${remainingTime.value}s remaining.`)
       return { success: true }
     } catch (error) {
       console.error('❌ Failed to restore resumed session:', error)
