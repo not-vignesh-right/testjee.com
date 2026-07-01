@@ -205,26 +205,7 @@ async function loadRequests() {
   try {
     const { data, error } = await supabase
       .from('exam_support_requests')
-      .select(`
-        request_id,
-        session_id,
-        student_id,
-        reason,
-        custom_message,
-        remaining_time_seconds,
-        answers,
-        status,
-        created_at,
-        exam_sessions (
-          exam_type,
-          start_time,
-          total_duration_seconds
-        ),
-        students (
-          student_name,
-          email_id
-        )
-      `)
+      .select('request_id,session_id,student_id,reason,custom_message,remaining_time_seconds,answers,status,created_at,exam_sessions(exam_type,start_time,total_duration_seconds),students(student_name,email_id)')
       .order('created_at', { ascending: false })
 
     if (error) throw error
