@@ -399,6 +399,20 @@ onMounted(async () => {
     return
   }
 
+  // Check if a support request already exists for this session to enforce resume request limit
+  try {
+    const { data: existingApp } = await supabase
+      .from('exam_support_requests')
+      .select('request_id')
+      .eq('session_id', sessionId)
+      .maybeSingle()
+    if (existingApp) {
+      isResumedSession.value = true
+    }
+  } catch (err) {
+    console.warn('Error checking existing support request:', err)
+  }
+
   // 🚀 Load exam data once
   await examStore.fetchExamData()
 

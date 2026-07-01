@@ -1156,7 +1156,11 @@ export const useExamStore = defineStore('exam', () => {
 
       if (existingRequest) {
         console.warn('⚠️ Support request already exists for this session:', existingRequest)
-        return { success: true, data: [existingRequest], alreadyExists: true }
+        if (existingRequest.status === 'pending' || existingRequest.status === 'approved') {
+          return { success: true, data: [existingRequest], alreadyExists: true }
+        }
+        // If already completed or rejected, do not allow resubmission
+        return { success: false, error: 'You have already used your resume limit for this session.' }
       }
 
       // Build answers snapshot array
@@ -1305,6 +1309,22 @@ export const useExamStore = defineStore('exam', () => {
 
       // 6. Save to localStorage
       saveToLocalStorage()
+
+      // 7. Update support request status in DB to 'completed' as it has now been consumed/restored
+      try {
+        const { error: updateReqErr } = await supabase
+          .from('exam_support_requests')
+          .update({ status: 'completed' })
+          .eq('request_id', request.request_id)
+        
+        if (updateReqErr) {
+          console.warn('⚠️ Failed to update support request status to completed:', updateReqErr)
+        } else {
+          console.log('✅ Support request marked as completed in DB')
+        }
+      } catch (dbErr) {
+        console.warn('⚠️ Failed to update support request status:', dbErr)
+      }
       
       console.log(`✅ Exam session resumed! ${remainingTime.value}s remaining.`)
       return { success: true }
