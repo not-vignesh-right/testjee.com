@@ -179,31 +179,27 @@ let badgePollInterval = null
 let realtimeSub = null
 
 async function fetchPendingCount() {
+  if (!adminStore.adminProfile?.admin_id) return
   try {
-    const { count } = await supabase
-      .from('exam_support_requests')
-      .select('request_id', { count: 'exact', head: true })
-      .eq('status', 'pending')
-    pendingResumeCount.value = count || 0
+    // Security fix: was an unscoped head-count over ALL admins' requests. Now derived from
+    // the same admin-scoped RPC as AdminResumeRequests.vue (see add-admin-scoped-appeals-rpc.sql).
+    const { data } = await supabase.rpc('get_admin_pending_appeals', {
+      p_admin_id: adminStore.adminProfile.admin_id
+    })
+    pendingResumeCount.value = (data || []).filter(r => r.status === 'pending').length
   } catch {}
 }
 
 onMounted(async () => {
   await fetchPendingCount()
 
-  // NEW-07: Realtime subscription instead of 30s polling — updates within ~1s of a
-  // student submitting or an admin actioning an appeal.
+  // NEW-07: Realtime subscription instead of 30s polling. Postgres_changes can't filter on
+  // the deep join needed to scope this to one admin, so every event just triggers a refetch
+  // of the properly-scoped count above — never trust row-level INSERT/UPDATE payloads here.
   realtimeSub = supabase
     .channel('admin-resume-watch')
     .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'exam_support_requests'
-    }, () => {
-      pendingResumeCount.value++
-    })
-    .on('postgres_changes', {
-      event: 'UPDATE',
+      event: '*',
       schema: 'public',
       table: 'exam_support_requests'
     }, () => {

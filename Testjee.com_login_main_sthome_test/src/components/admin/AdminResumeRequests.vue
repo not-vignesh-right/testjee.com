@@ -178,7 +178,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../../lib/supabase'
+import { useAdminStore } from '../../stores/adminStore'
 
+const adminStore = useAdminStore()
 const loading = ref(true)
 const requests = ref([])
 const activeTab = ref('pending')
@@ -201,27 +203,21 @@ const filteredRequests = computed(() => {
 })
 
 async function loadRequests() {
+  if (!adminStore.adminProfile?.admin_id) return
   loading.value = true
   try {
-    // NEW-03 fix: also embed student_exam_sessions -> temp_students so live-exam appeals
-    // (which have no student_id/exam_sessions row) show up with the right student identity
-    // instead of silently being invisible.
-    const { data, error } = await supabase
-      .from('exam_support_requests')
-      .select('request_id,session_id,student_session_id,student_id,reason,custom_message,remaining_time_seconds,answers,status,created_at,exam_sessions(exam_type,start_time,total_duration_seconds),students(student_name,email_id),student_exam_sessions(temp_students(student_name,roll_number))')
-      .order('created_at', { ascending: false })
+    // Security fix: scoped via get_admin_pending_appeals RPC instead of an unfiltered
+    // direct table select — live-exam appeals are now restricted to the admin who owns
+    // that live session (regular-exam appeals have no admin-ownership concept in the
+    // schema, so they remain visible to all admins, unchanged). See
+    // add-admin-scoped-appeals-rpc.sql.
+    const { data, error } = await supabase.rpc('get_admin_pending_appeals', {
+      p_admin_id: adminStore.adminProfile.admin_id
+    })
 
     if (error) throw error
 
-    requests.value = (data || []).map(r => {
-      const liveStudent = r.student_exam_sessions?.temp_students
-      return {
-        ...r,
-        exam_type: r.exam_sessions?.exam_type ?? (r.student_session_id ? 'Live Exam' : null),
-        student_name: r.students?.student_name ?? liveStudent?.student_name,
-        student_email: r.students?.email_id ?? (liveStudent ? `Roll: ${liveStudent.roll_number || '—'}` : null),
-      }
-    })
+    requests.value = (data || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   } catch (err) {
     console.error('Error loading resume requests:', err)
   } finally {

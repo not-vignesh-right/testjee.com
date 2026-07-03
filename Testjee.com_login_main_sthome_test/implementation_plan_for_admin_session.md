@@ -64,7 +64,20 @@ at three call sites instead of selecting the active store once.
 
 ---
 
-# 🛠️ SECURITY HOTFIX: Multi-Admin Scoping (Pending Decision)
+# ✅ SECURITY HOTFIX: Multi-Admin Scoping (Complete)
+
+> **Implementation Note:** The drafted RPC below had three bugs that would have made it
+> fail to create (or fail at call time) against the actual schema — `p_admin_id`/`student_id`
+> typed `UUID` where `schema.sql` confirms `admins.admin_id`/`students.student_id` are
+> `integer`; `ts.temp_id` referencing a column that doesn't exist (`temp_students`' PK is
+> `temp_student_id`); and `es.admin_id` referencing a column `exam_sessions` doesn't have at
+> all. That last point also settles the "business rule" question raised in the note below:
+> regular self-serve exams have no admin-ownership concept anywhere in the schema, so only
+> the live-exam path can be (and now is) scoped — regular-exam appeals stay visible to all
+> admins, unchanged from before. Corrected RPC is in `add-admin-scoped-appeals-rpc.sql`.
+> `AdminResumeRequests.vue` and `AdminLayout.vue` now call it instead of the unscoped query;
+> the Realtime badge subscription (which can't filter on the deep join) is now a pure
+> "something changed, refetch the scoped count" trigger rather than an unscoped increment.
 
 **The Issue:** `AdminResumeRequests.vue` and `AdminLayout.vue` query `exam_support_requests` globally without an `admin_id` filter. If this is deployed in a Multi-Tenant/SaaS environment (multiple independent institutes), Admin A will see Admin B's students' PII (Names, Roll Numbers) in the pending appeals list.
 
