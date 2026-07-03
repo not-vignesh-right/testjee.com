@@ -199,6 +199,26 @@
       @start="beginExamFullScreen" 
     />
 
+    <!-- Page-Reload Resume Overlay: requires user gesture to re-enter fullscreen -->
+    <div v-else-if="showResumeOverlay" class="fixed inset-0 z-[100] bg-gray-900/95 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center border border-gray-100" style="animation: fadeIn 0.4s ease-out">
+        <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+          </svg>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-3">Exam In Progress</h2>
+        <p class="text-gray-600 mb-2">Your exam session is still active with <strong class="text-blue-600">{{ examStore.formatTime(examStore.remainingTime) }}</strong> remaining.</p>
+        <p class="text-sm text-gray-500 mb-8">Click the button below to return to your exam in full-screen mode.</p>
+        <button
+          @click="resumeFromOverlay"
+          class="w-full py-3.5 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-95"
+        >
+          ▶ Continue Exam in Full Screen
+        </button>
+      </div>
+    </div>
+
     <!-- Normal exam view -->
     <div v-else class="exam-container">
       <!-- Grace Period Warning Overlay -->
@@ -295,6 +315,8 @@ let graceTimer = null
 let wakeLock = null
 // BUG 8 FIX: Flag to suppress grace period while re-entering fullscreen programmatically on resume
 const isEnteringFullscreenOnResume = ref(false)
+// Flag to suppress proctoring while the page-reload resume overlay is shown
+const showResumeOverlay = ref(false)
 
 // --- Screen Wake Lock API ---
 const requestWakeLock = async () => {
@@ -396,9 +418,12 @@ onMounted(async () => {
   const sessionId = await examStore.initializeSession()
   
   if (sessionId) {
-    // If an active session exists (e.g. from page reload/resume), skip instructions
+    // Active session found (page reload / resumption): DON'T programmatically enforce fullscreen
+    // because the browser blocks it without a user gesture, which triggers blur/visibility events
+    // and causes instant auto-submit. Instead, show the resume overlay requiring a user click.
     showInstructions.value = false
-    
+    showResumeOverlay.value = true
+
     // Check if a support request already exists for this session to enforce resume request limit
     try {
       const { data: existingApp } = await supabase
@@ -413,13 +438,10 @@ onMounted(async () => {
       console.warn('Error checking existing support request:', err)
     }
 
-    // 🕒 Start global exam timer immediately for resumption
+    // Start the timer while overlay is shown — time must keep ticking honestly
     examStore.startTimer()
-    enforceFullScreen()
-    await requestWakeLock()
   } else {
-    // This is a fresh exam start! Instructions are shown.
-    // Fetch questions in the background so they are ready when they click start
+    // Fresh exam start: fetch questions in the background so they are ready when student clicks start
     await examStore.fetchExamData()
   }
 })
@@ -557,6 +579,16 @@ const resumeTest = async () => {
   }
 }
 
+// --- Page-Reload Resume Handler ---
+async function resumeFromOverlay() {
+  showResumeOverlay.value = false
+  // Now we have a user gesture — safe to request fullscreen
+  isEnteringFullscreenOnResume.value = true
+  await enforceFullScreen()
+  setTimeout(() => { isEnteringFullscreenOnResume.value = false }, 1500)
+  await requestWakeLock()
+}
+
 // --- Exam Flow Mechanics ---
 
 async function beginExamFullScreen() {
@@ -607,6 +639,8 @@ function forceExitToDashboard() {
 const handleFullscreenChange = async () => {
   // BUG 8 FIX: Don't trigger grace period while we are programmatically entering fullscreen on resume
   if (isEnteringFullscreenOnResume.value) return
+  // Don't trigger during the page-reload resume overlay
+  if (showResumeOverlay.value) return
 
   if (!document.fullscreenElement && !examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
     examStore.isFullScreen = false
@@ -633,7 +667,7 @@ const handleBeforeUnload = (e) => {
 
 const handleVisibilityChange = async () => {
   if (document.hidden) {
-    if (!examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
+    if (!examStore.isSubmitted && !showInstructions.value && !showResumeOverlay.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
       console.warn("Tab hidden - instant auto-submit")
       
       // Clear any existing grace period (e.g. from blur)
@@ -662,7 +696,7 @@ const handleVisibilityChange = async () => {
 }
 
 const handleWindowBlur = async () => {
-  if (!examStore.isSubmitted && !showInstructions.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
+  if (!examStore.isSubmitted && !showInstructions.value && !showResumeOverlay.value && !autoSubmitReason.value && !examStore.isManuallySubmitting) {
     console.warn("Window blurred - starting blur grace period")
     startGracePeriod('blur')
   }

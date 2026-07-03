@@ -238,6 +238,8 @@ export const useExamStore = defineStore('exam', () => {
       if (questions.value.length > 0) {
         questionStatuses.value[questions.value[0].id].visited = true
         goToQuestion(0)
+        // Save questions back to localStorage so page-reload can restore them
+        localStorage.setItem('examQuestions', JSON.stringify(questions.value))
       }
 
       return newSession.session_id
