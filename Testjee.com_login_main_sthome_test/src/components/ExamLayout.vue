@@ -351,10 +351,13 @@ const startGracePeriod = (reason) => {
   showGraceWarning.value = true
   graceSecondsLeft.value = 10
 
+  const targetGraceEndTime = Date.now() + 10 * 1000
+
   graceTimer = setInterval(async () => {
-    if (graceSecondsLeft.value > 1) {
-      graceSecondsLeft.value--
-    } else {
+    const secondsLeft = Math.max(0, Math.ceil((targetGraceEndTime - Date.now()) / 1000))
+    graceSecondsLeft.value = secondsLeft
+
+    if (secondsLeft <= 0) {
       clearInterval(graceTimer)
       graceTimer = null
       showGraceWarning.value = false

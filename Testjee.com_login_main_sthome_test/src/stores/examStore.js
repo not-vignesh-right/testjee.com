@@ -1147,10 +1147,13 @@ export const useExamStore = defineStore('exam', () => {
       globalTimerInterval.value = null
     }
 
+    const targetEndTime = Date.now() + remainingTime.value * 1000
+
     globalTimerInterval.value = setInterval(() => {
-      if (remainingTime.value > 0) {
-        remainingTime.value--
-      } else {
+      const secondsLeft = Math.max(0, Math.floor((targetEndTime - Date.now()) / 1000))
+      remainingTime.value = secondsLeft
+
+      if (secondsLeft <= 0) {
         clearInterval(globalTimerInterval.value)
         globalTimerInterval.value = null
         submitExam(true)

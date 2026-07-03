@@ -324,10 +324,13 @@ export const useExamSessionStore = defineStore('examSession', () => {
     const startTimer = () => {
         if (mainTimerInterval.value) clearInterval(mainTimerInterval.value)
 
+        const targetEndTime = Date.now() + timeRemainingSeconds.value * 1000
+
         mainTimerInterval.value = setInterval(() => {
-            if (timeRemainingSeconds.value > 0) {
-                timeRemainingSeconds.value--
-            } else {
+            const secondsLeft = Math.max(0, Math.floor((targetEndTime - Date.now()) / 1000))
+            timeRemainingSeconds.value = secondsLeft
+
+            if (secondsLeft <= 0) {
                 if (!isTimeUpAlertGiver.value) {
                     isTimeUpAlertGiver.value = true
                     handleTimeUp()
