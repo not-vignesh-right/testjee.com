@@ -106,11 +106,24 @@ router.beforeEach(async (to, from, next) => {
   const examStore = useExamStore()
   const adminStore = useAdminStore()
 
-  // BUG-14 fix: live exam students authenticate via temp credentials (examSessionStore),
-  // not Supabase Auth, so the normal requiresAuth guard below would bounce them to login.
   if (to.path === '/exam' && to.query.mode === 'live') {
     const liveStore = useExamSessionStore()
     if (!liveStore.studentSessionId) {
+      const username = sessionStorage.getItem('student_username')
+      const sessionCode = to.query.sessionCode
+      if (username && sessionCode) {
+        console.log(`🔄 Restoring live exam session on reload for username: ${username}, session: ${sessionCode}`)
+        const loginRes = await liveStore.loginToExam(sessionCode, username)
+        if (loginRes.success) {
+          const loadRes = await liveStore.loadQuestions()
+          if (loadRes.success) {
+            const { bridgeLiveSessionToExamStore } = await import('../stores/liveExamBridge')
+            bridgeLiveSessionToExamStore(sessionCode)
+            examStore.isLiveReload = true
+            return next()
+          }
+        }
+      }
       return next('/live-exam')
     }
     return next()

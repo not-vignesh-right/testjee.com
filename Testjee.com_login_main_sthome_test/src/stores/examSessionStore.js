@@ -89,6 +89,22 @@ export const useExamSessionStore = defineStore('examSession', () => {
                 sessionStatus: info.session_status,
                 canStart: info.can_start
             }
+
+            // If the exam is in_progress, fetch start_time to calculate personalEndTime correctly for reload/resume
+            if (info.status === 'in_progress' && info.student_session_id) {
+                const { data: sesData } = await supabase
+                    .from('student_exam_sessions')
+                    .select('start_time')
+                    .eq('student_session_id', info.student_session_id)
+                    .maybeSingle()
+
+                if (sesData && sesData.start_time) {
+                    sessionDetails.value.personalEndTime = new Date(
+                        new Date(sesData.start_time).getTime() + info.duration_minutes * 60 * 1000
+                    ).toISOString()
+                }
+            }
+
             return { success: true, data: info }
         } catch (err) {
             console.error('Login to Exam Failed:', err)

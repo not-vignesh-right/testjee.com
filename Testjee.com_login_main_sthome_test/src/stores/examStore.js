@@ -36,6 +36,7 @@ export const useExamStore = defineStore('exam', () => {
   // persistence and submission are delegated to examSessionStore instead of exam_sessions/results.
   const isLiveMode = ref(false)
   const liveSessionCode = ref(null)
+  const isLiveReload = ref(false)
 
   // --- Config-derived reactive getters ---
   const examConfig = computed(() => getExamConfig(examType.value))
@@ -1502,6 +1503,7 @@ export const useExamStore = defineStore('exam', () => {
     isLoadingQuestions,
     isLiveMode,
     liveSessionCode,
+    isLiveReload,
 
     // Getters
     currentQuestion,
