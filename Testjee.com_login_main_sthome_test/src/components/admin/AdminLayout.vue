@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col font-sans">
+  <div class="min-h-screen bg-canvas flex flex-col font-sans">
 
     <!-- Shared Admin Header -->
-    <header class="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+    <header class="bg-surface border-b border-slate-200 sticky top-0 z-30">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center h-16">
 
@@ -22,10 +22,10 @@
 
             <!-- Breadcrumb separator + page title -->
             <template v-if="pageTitle">
-              <svg class="w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4 text-slate-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
               </svg>
-              <span class="text-sm font-semibold text-gray-600 truncate">{{ pageTitle }}</span>
+              <span class="text-sm font-semibold text-ink-700 truncate">{{ pageTitle }}</span>
             </template>
           </div>
 
@@ -36,42 +36,42 @@
             <nav class="hidden md:flex items-center gap-1 mr-2">
               <RouterLink
                 to="/admin/home"
-                class="px-3 py-2 text-sm font-medium rounded-lg transition-colors"
-                :class="isActive('/admin/home') ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'"
+                class="px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ease-out-quart"
+                :class="isActive('/admin/home') ? 'bg-gta-secondary text-white' : 'text-ink-500 hover:text-ink-900 hover:bg-slate-100'"
               >
                 Dashboard
               </RouterLink>
               <RouterLink
                 to="/admin/sessions"
-                class="px-3 py-2 text-sm font-medium rounded-lg transition-colors"
-                :class="isActive('/admin/sessions') ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'"
+                class="px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ease-out-quart"
+                :class="isActive('/admin/sessions') ? 'bg-gta-secondary text-white' : 'text-ink-500 hover:text-ink-900 hover:bg-slate-100'"
               >
                 Sessions
               </RouterLink>
               <RouterLink
                 to="/admin/sessions/new"
-                class="px-3 py-2 text-sm font-medium rounded-lg transition-colors"
-                :class="isActive('/admin/sessions/new') ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'"
+                class="px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ease-out-quart"
+                :class="isActive('/admin/sessions/new') ? 'bg-gta-secondary text-white' : 'text-ink-500 hover:text-ink-900 hover:bg-slate-100'"
               >
                 + New Exam
               </RouterLink>
               <!-- Resume Requests with pending badge -->
               <RouterLink
                 to="/admin/resume-requests"
-                class="relative px-3 py-2 text-sm font-medium rounded-lg transition-colors"
-                :class="isActive('/admin/resume-requests') ? 'bg-amber-50 text-amber-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'"
+                class="relative px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ease-out-quart"
+                :class="isActive('/admin/resume-requests') ? 'bg-gta-secondary text-white' : 'text-ink-500 hover:text-ink-900 hover:bg-slate-100'"
               >
                 Resume Requests
                 <span
                   v-if="pendingResumeCount > 0"
-                  class="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+                  class="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-700 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
                 >{{ pendingResumeCount }}</span>
               </RouterLink>
             </nav>
 
             <!-- Username pill -->
-            <span class="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full border border-gray-200">
-              <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span class="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 bg-slate-100 px-3 py-1.5 rounded-full">
+              <svg class="w-3.5 h-3.5 text-ink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z"/>
               </svg>
               {{ adminStore.adminProfile?.username }}
@@ -80,7 +80,7 @@
             <!-- Logout -->
             <button
               @click="handleLogout"
-              class="inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 text-sm font-medium rounded-lg text-gray-600 bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200 shadow-sm transition-colors"
+              class="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg text-ink-500 hover:bg-red-50 hover:text-gta-danger transition-colors duration-200 ease-out-quart"
               title="Logout"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,37 +93,37 @@
       </div>
 
       <!-- Mobile nav strip -->
-      <div class="md:hidden border-t border-gray-100 bg-gray-50 px-4 flex gap-1 overflow-x-auto no-scrollbar py-1.5">
+      <div class="md:hidden border-t border-slate-100 bg-canvas px-4 flex gap-1 overflow-x-auto no-scrollbar py-1.5">
         <RouterLink
           to="/admin/home"
-          class="px-3 py-1.5 text-xs font-semibold rounded-md whitespace-nowrap transition-colors"
-          :class="isActive('/admin/home') ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-200'"
+          class="px-3 py-1.5 text-xs font-semibold rounded-md whitespace-nowrap transition-colors duration-200"
+          :class="isActive('/admin/home') ? 'bg-gta-secondary text-white' : 'text-ink-500 hover:bg-slate-200'"
         >
           Dashboard
         </RouterLink>
         <RouterLink
           to="/admin/sessions"
-          class="px-3 py-1.5 text-xs font-semibold rounded-md whitespace-nowrap transition-colors"
-          :class="isActive('/admin/sessions') ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-200'"
+          class="px-3 py-1.5 text-xs font-semibold rounded-md whitespace-nowrap transition-colors duration-200"
+          :class="isActive('/admin/sessions') ? 'bg-gta-secondary text-white' : 'text-ink-500 hover:bg-slate-200'"
         >
           Sessions
         </RouterLink>
         <RouterLink
           to="/admin/sessions/new"
-          class="px-3 py-1.5 text-xs font-semibold rounded-md whitespace-nowrap transition-colors"
-          :class="isActive('/admin/sessions/new') ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-200'"
+          class="px-3 py-1.5 text-xs font-semibold rounded-md whitespace-nowrap transition-colors duration-200"
+          :class="isActive('/admin/sessions/new') ? 'bg-gta-secondary text-white' : 'text-ink-500 hover:bg-slate-200'"
         >
           + New Exam
         </RouterLink>
         <RouterLink
           to="/admin/resume-requests"
-          class="relative px-3 py-1.5 text-xs font-semibold rounded-md whitespace-nowrap transition-colors"
-          :class="isActive('/admin/resume-requests') ? 'bg-amber-100 text-amber-700' : 'text-gray-500 hover:bg-gray-200'"
+          class="relative px-3 py-1.5 text-xs font-semibold rounded-md whitespace-nowrap transition-colors duration-200"
+          :class="isActive('/admin/resume-requests') ? 'bg-gta-secondary text-white' : 'text-ink-500 hover:bg-slate-200'"
         >
           Resume Requests
           <span
             v-if="pendingResumeCount > 0"
-            class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center"
+            class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-700 text-white text-[8px] font-bold rounded-full flex items-center justify-center"
           >{{ pendingResumeCount }}</span>
         </RouterLink>
       </div>

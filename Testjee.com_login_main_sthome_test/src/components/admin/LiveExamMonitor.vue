@@ -13,162 +13,146 @@
       
       <!-- Back Button to standard sessions list -->
       <div class="mb-4">
-        <button 
+        <button
           @click="router.push('/admin/sessions')"
-          class="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors bg-white px-3.5 py-2 rounded-xl border border-gray-200 shadow-sm"
+          class="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-500 hover:text-ink-900 transition-colors duration-200"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-          Back to Sessions List
+          Back to sessions
         </button>
       </div>
 
-      <!-- Top Monitor Strip -->
-      <div class="bg-gray-900 rounded-2xl shadow-xl overflow-hidden mb-6 flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-800 text-white">
-        
-        <!-- Live Alert Area -->
-        <div class="p-6 md:w-1/3 flex items-start gap-4">
-          <div class="bg-red-500/20 p-3 rounded-xl border border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
-            <svg class="w-8 h-8 text-red-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          </div>
-          <div>
+      <!-- War Room panel: session identity, stats, and the progress gauge unified into one
+           dark surface instead of two stacked dark boxes — the "mission control" moment
+           deserves one coherent read, not a stack of boxed metrics. -->
+      <div class="bg-ink-900 rounded-2xl overflow-hidden mb-6 text-white">
+        <div class="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10">
+          <div class="min-w-0">
             <div class="flex items-center gap-2 mb-1">
-              <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse block"></span>
-              <span class="text-red-400 font-bold tracking-widest text-xs uppercase">Live Session</span>
+              <span class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+              <span class="text-red-400 font-semibold tracking-wide text-xs uppercase">Live session</span>
             </div>
-            <h1 class="text-2xl font-bold leading-tight line-clamp-2 truncate">{{ sessionMeta.session_name }}</h1>
-            <p class="text-gray-400 text-sm font-mono mt-1 w-max bg-gray-800 px-2 py-0.5 rounded border border-gray-700">CODE: {{ sessionMeta.session_code }}</p>
+            <h1 class="text-xl sm:text-2xl font-bold leading-tight truncate">{{ sessionMeta.session_name }}</h1>
+            <p class="text-slate-400 text-sm font-mono mt-1">{{ sessionMeta.session_code }}</p>
           </div>
-        </div>
-
-        <!-- Global Stats Box -->
-        <div class="p-6 md:w-2/3 flex flex-col justify-center">
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
-            
-            <div class="flex flex-col">
-               <span class="text-xs font-medium text-gray-500 uppercase tracking-widest mb-1">Time Elapsed</span>
-               <div class="text-xl lg:text-3xl font-bold font-mono text-gray-100">{{ timerDisplay }}</div>
+          <div class="flex items-center gap-6 shrink-0">
+            <div class="text-right">
+              <p class="text-xs text-slate-400 uppercase tracking-wide">Elapsed</p>
+              <p class="text-lg font-bold font-mono tabular-nums">{{ timerDisplay }}</p>
             </div>
-
-            <div class="flex flex-col">
-               <span class="text-xs font-medium text-gray-500 uppercase tracking-widest mb-1">Students Enrolled</span>
-               <div class="text-xl lg:text-3xl font-bold text-gray-100">{{ sessionMeta.total_students_enrolled }}</div>
-            </div>
-
-            <div class="flex flex-col">
-               <span class="text-xs font-medium text-blue-400 uppercase tracking-widest mb-1">In Progress</span>
-               <div class="text-xl lg:text-3xl font-bold text-blue-100 bg-blue-900/40 py-1 rounded-lg border border-blue-800/50">{{ sessionMeta.students_in_progress }}</div>
-            </div>
-
-            <div class="flex flex-col">
-               <span class="text-xs font-medium text-green-400 uppercase tracking-widest mb-1">Submitted</span>
-               <div class="text-xl lg:text-3xl font-bold text-green-100 bg-green-900/40 py-1 rounded-lg border border-green-800/50">{{ sessionMeta.students_submitted }}</div>
-            </div>
-
-          </div>
-        </div>
-      </div>
-
-      <!-- Real Progress Bar -->
-      <div class="bg-gray-900 rounded-xl px-6 py-4 mb-6 border border-gray-800">
-        <div class="flex justify-between text-xs font-semibold text-gray-400 mb-2">
-          <span>Exam Progress</span>
-          <span>{{ sessionMeta.students_submitted }} of {{ sessionMeta.total_students_enrolled }} submitted</span>
-        </div>
-        <div class="w-full h-3 bg-gray-800 rounded-full overflow-hidden flex gap-0.5">
-          <div class="bg-green-500 h-full transition-all duration-700 ease-out rounded-l-full"
-            :style="`width: ${progressPct(sessionMeta.students_submitted)}%`">
-          </div>
-          <div class="bg-blue-500 h-full transition-all duration-700 ease-out"
-            :style="`width: ${progressPct(sessionMeta.students_in_progress)}%`">
-          </div>
-        </div>
-        <div class="flex gap-4 text-xs text-gray-500 mt-2">
-          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 block"></span>Submitted</span>
-          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500 block"></span>In Progress</span>
-          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-600 block"></span>Waiting</span>
-        </div>
-      </div>
-
-      <!-- Live Activities Log & Control -->
-      <div class="flex flex-col lg:flex-row gap-6 mb-6">
-        
-        <!-- Controls Column -->
-        <div class="w-full lg:w-1/3 space-y-6">
-          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 class="text-lg font-bold text-gray-900 mb-4">Command Center</h3>
-            
-            <p class="text-sm text-gray-600 mb-6">The exam will automatically end and auto-submit all pending students at <strong>{{ formatTimeOnly(sessionMeta.scheduled_end_time) }}</strong>.</p>
-            
-            <button 
+            <button
               @click="endExamEarly"
               :disabled="loadingAction"
-              class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-xl font-bold transition-all shadow-md shadow-red-200"
+              class="inline-flex items-center gap-2 bg-red-700 hover:bg-red-800 text-white py-2.5 px-4 rounded-xl font-semibold text-sm transition-colors duration-200 ease-out-quart disabled:opacity-60"
             >
-              <svg v-if="!loadingAction" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-              <svg v-else class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              FORCE END EXAM EARLY
+              <svg v-if="!loadingAction" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <svg v-else class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              End exam early
             </button>
-            <p class="text-xs text-red-500 font-medium text-center mt-2">Will instantly auto-submit all active tests. CANNOT BE UNDONE.</p>
           </div>
+        </div>
 
-          <!-- Dummy alert feed to simulate real-time activity for the visual effect until websocket logs push here in future iterations -->
-          <div class="bg-gray-50 rounded-xl border border-gray-200 p-6">
-             <h3 class="text-sm font-bold text-gray-700 uppercase tracking-widest mb-4 flex items-center gap-2">
-               <span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-               Activity Feed Snapshot
+        <!-- Stat row: color carried by the number itself, not a colored box around it -->
+        <div class="grid grid-cols-3 divide-x divide-white/10">
+          <div class="px-6 py-4 text-center">
+            <p class="text-2xl font-bold tabular-nums">{{ sessionMeta.students_not_started ?? (sessionMeta.total_students_enrolled - sessionMeta.students_in_progress - sessionMeta.students_submitted) }}</p>
+            <p class="text-xs text-slate-400 uppercase tracking-wide mt-0.5">Waiting</p>
+          </div>
+          <div class="px-6 py-4 text-center">
+            <p class="text-2xl font-bold tabular-nums text-blue-400">{{ sessionMeta.students_in_progress }}</p>
+            <p class="text-xs text-slate-400 uppercase tracking-wide mt-0.5">In progress</p>
+          </div>
+          <div class="px-6 py-4 text-center">
+            <p class="text-2xl font-bold tabular-nums text-emerald-400">{{ sessionMeta.students_submitted }}</p>
+            <p class="text-xs text-slate-400 uppercase tracking-wide mt-0.5">Submitted</p>
+          </div>
+        </div>
+
+        <!-- Progress gauge -->
+        <div class="px-6 pb-6 pt-1">
+          <div class="w-full h-2 bg-white/10 rounded-full overflow-hidden flex gap-px">
+            <div class="bg-emerald-500 h-full transition-all duration-700 ease-out-expo rounded-l-full"
+              :style="`width: ${progressPct(sessionMeta.students_submitted)}%`">
+            </div>
+            <div class="bg-blue-500 h-full transition-all duration-700 ease-out-expo"
+              :style="`width: ${progressPct(sessionMeta.students_in_progress)}%`">
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 mt-2">{{ sessionMeta.students_submitted }} of {{ sessionMeta.total_students_enrolled }} submitted · ends automatically at {{ formatTimeOnly(sessionMeta.scheduled_end_time) }}</p>
+        </div>
+      </div>
+
+      <!-- Live Activities Log & Table -->
+      <div class="flex flex-col lg:flex-row gap-6 mb-6">
+
+        <!-- Activity feed -->
+        <div class="w-full lg:w-1/3">
+          <div class="bg-surface rounded-xl border border-slate-200 p-5">
+             <h3 class="text-xs font-semibold text-ink-500 uppercase tracking-wide mb-4 flex items-center gap-2">
+               <span class="w-1.5 h-1.5 bg-gta-danger rounded-full animate-pulse"></span>
+               Activity
              </h3>
 
-             <div class="space-y-4 text-sm font-medium">
-                <div v-for="s in (sessionMeta?.students_submitted > 0 ? Array(sessionMeta.students_submitted).fill('Submitted') : [])" class="flex gap-3 text-green-700 bg-green-50 p-2 rounded">
-                  <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                  <span>A student successfully submitted their exam.</span>
+             <TransitionGroup
+               tag="div"
+               class="space-y-2 text-sm"
+               enter-active-class="transition duration-300 ease-out-expo"
+               enter-from-class="opacity-0 -translate-y-1"
+               enter-to-class="opacity-100 translate-y-0"
+             >
+                <div v-for="i in sessionMeta.students_submitted" :key="`submitted-${i}`" class="flex gap-2.5 items-center text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
+                  <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  <span class="font-medium">A student submitted their exam</span>
                 </div>
-                <!-- Default loader lines -->
-                <div v-if="sessionMeta.students_in_progress > 0" class="flex gap-3 text-blue-700 opacity-60">
-                   <svg class="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                   <span>Waiting for completion... {{ sessionMeta.students_in_progress }} remaining.</span>
+                <div v-if="sessionMeta.students_in_progress > 0" key="in-progress" class="flex gap-2.5 items-center text-ink-500 px-3 py-2">
+                   <svg class="w-4 h-4 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                   <span>{{ sessionMeta.students_in_progress }} still writing</span>
                 </div>
-             </div>
+             </TransitionGroup>
           </div>
+          <p class="text-xs text-ink-500 mt-2 px-1">"Force end" instantly auto-submits every active test and locks the session — cannot be undone.</p>
         </div>
 
         <!-- Student Master Table list View -->
-        <div class="w-full lg:w-2/3 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-[600px]">
-           <div class="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 rounded-t-xl">
-             <h3 class="font-bold text-gray-900">Live Status Tracker</h3>
-             <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded border border-green-200 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>Live</span>
+        <div class="w-full lg:w-2/3 bg-surface rounded-xl border border-slate-200 flex flex-col h-[600px]">
+           <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+             <h3 class="font-semibold text-ink-900 text-sm">Live status tracker</h3>
+             <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Live</span>
            </div>
 
            <div class="flex-1 overflow-auto relative p-0">
              <table class="w-full text-left border-collapse text-sm">
-               <thead class="bg-white sticky top-0 shadow-sm z-10">
+               <thead class="bg-surface sticky top-0 z-10">
                  <tr>
-                   <th class="p-4 font-semibold text-gray-500 uppercase tracking-wider border-b">Student</th>
-                   <th class="p-4 font-semibold text-gray-500 uppercase tracking-wider border-b">Status</th>
-                   <th class="p-4 font-semibold text-gray-500 uppercase tracking-wider border-b text-right">Time Taken</th>
+                   <th class="p-4 font-semibold text-ink-500 uppercase tracking-wide text-xs border-b border-slate-200">Student</th>
+                   <th class="p-4 font-semibold text-ink-500 uppercase tracking-wide text-xs border-b border-slate-200">Status</th>
+                   <th class="p-4 font-semibold text-ink-500 uppercase tracking-wide text-xs border-b border-slate-200 text-right">Time taken</th>
                  </tr>
                </thead>
-               <tbody class="divide-y divide-gray-100">
-                  <tr v-for="student in liveResults" :key="student.username" class="hover:bg-gray-50 transition-colors">
+               <tbody class="divide-y divide-slate-100">
+                  <tr v-for="student in liveResults" :key="student.username" class="hover:bg-slate-50 transition-colors duration-150">
                      <td class="p-4">
-                       <div class="font-semibold text-gray-900">{{ student.student_name || 'Anonymous' }}</div>
-                       <div class="text-xs text-gray-500 font-mono mt-0.5">{{ student.username }} • {{ student.roll_number || 'No Roll' }}</div>
+                       <div class="font-semibold text-ink-900">{{ student.student_name || 'Anonymous' }}</div>
+                       <div class="text-xs text-ink-500 font-mono mt-0.5">{{ student.username }} · {{ student.roll_number || 'No roll' }}</div>
                      </td>
                      <td class="p-4">
-                       <span 
-                        class="px-2 py-1 rounded text-xs font-bold uppercase"
+                       <span
+                        class="px-2 py-1 rounded-md text-xs font-semibold"
                         :class="{
-                          'bg-gray-100 text-gray-600': student.status === 'not_started',
-                          'bg-blue-100 text-blue-800 border-blue-200': student.status === 'in_progress',
-                          'bg-green-100 text-green-800 border-green-200': student.status === 'submitted' || student.status === 'auto_submitted'
+                          'bg-slate-100 text-ink-500': student.status === 'not_started',
+                          'bg-blue-50 text-blue-700': student.status === 'in_progress',
+                          'bg-emerald-50 text-emerald-700': student.status === 'submitted' || student.status === 'auto_submitted'
                         }"
                        >
                         {{ student.status.replace('_', ' ') }}
                        </span>
                      </td>
-                     <td class="p-4 text-right font-mono text-gray-600">
+                     <td class="p-4 text-right font-mono text-ink-500 tabular-nums">
                        <template v-if="student.status === 'in_progress'">
-                         ...
+                         &mdash;
                        </template>
                        <template v-else-if="student.time_taken_seconds">
                           {{ formatDuration(student.time_taken_seconds) }}

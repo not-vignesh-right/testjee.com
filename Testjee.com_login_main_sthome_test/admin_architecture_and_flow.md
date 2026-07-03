@@ -5,6 +5,48 @@
 
 ---
 
+# ✅ PHASE 6: The "Impeccable" UI/UX Overhaul (Complete)
+
+The admin panel currently functions perfectly, but visually relies on the "Tailwind Default" aesthetic (white cards on gray backgrounds, standard dropdowns, repetitive spacing). Phase 6 will elevate this from a basic internal tool to a **premium, production-grade SaaS product**.
+
+> **Implementation Note:** Built via the `impeccable` skill, which required setup first —
+> wrote `PRODUCT.md` (register: product; users: institutes from ~30-student coaching
+> centers to large colleges; personality: precise & calm, Linear/Stripe-register) after a
+> short interview. Identity-preserving: kept the existing brand blue (`gta-primary`,
+> "bright blue from logo") as the system's anchor rather than introducing a new palette —
+> the admin panel just never adopted it, unlike the student exam UI, which is the actual
+> root cause of the generic feel. Added `canvas`/`surface`/`ink` tokens to
+> `tailwind.config.js`, scoped to the admin panel only (student exam UI's `body` background
+> and tokens are untouched). One real fix beyond the plan's brief: **contrast**. Several
+> initial choices — `ink-400` for secondary text, both hero banners' caption text, several
+> semibold-not-bold labels on saturated buttons/badges — computed below 4.5:1 against their
+> backgrounds (the exact "muted gray on tinted near-white" trap, plus light text on
+> mid-saturation brand color). Fixed by darkening `ink-500` itself, eliminating `ink-400`
+> as a text color entirely (kept only where a heavier weight was already safe), and
+> swapping banner/badge backgrounds to `gta-secondary`/`red-700` where the lighter brand
+> shades couldn't give their text enough headroom. Also added a global
+> `prefers-reduced-motion` override in `style.css` (collapses all transitions/animations to
+> near-instant), since none existed anywhere in the app before this.
+
+## 1. Global Aesthetic & System (The Foundation)
+- **Escape the "Nested Card" Trap:** We will remove unnecessary borders and drop-shadows. Instead of every page being a white card on a gray background, we will use a unified, sophisticated canvas (e.g., a true off-white or deep tinted neutral) and rely on whitespace, typography, and subtle dividers for structure.
+- **Typography Upgrade:** Limit to a single, high-quality typeface (e.g., Inter or Outfit). Implement a strict hierarchy using size and weight contrast, abandoning all-caps body text and tiny "eyebrow" tracking. 
+- **Micro-interactions:** Add purposeful, exponential ease-out transitions to buttons, list items, and route changes. No bouncy or elastic animations; only smooth, professional motion.
+
+## 2. Redesigning `ScheduleExam.vue` (The Core Flow)
+- **Visual "Exam Type" Selection:** Replace the boring `<select>` dropdown with a grid of clickable, premium tiles (JEE, NEET, KCET). Clicking a tile smoothly updates the form state below it.
+- **Smart Timing Logic:** As you noted, duration is dictated by the exam (e.g., JEE is 3 hours). We will display the `180 mins` as a locked, branded badge (tied to the Exam Type tile). It will have a subtle "Edit Custom Duration" button next to it for edge cases, reducing cognitive load for the 99% standard path.
+- **Smarter Date Picking:** Default the `start_time` to `now + 5 minutes` as planned, but style the input to feel like a premium scheduling tool, not a raw HTML5 input.
+
+## 3. Redesigning `LiveExamMonitor.vue` (The War Room)
+- **The Progress Tracker:** Transform the basic horizontal progress bar into a striking, data-viz style tracker (e.g., segmented rings or a smooth, gradient-filled gauge) that instantly communicates the ratio of *Waiting vs. In Progress vs. Submitted*.
+- **Live Activity Feed:** Animate the entry of new student statuses using `motion` (or native CSS transitions) so the admin *feels* the real-time nature of the exam. 
+
+## 4. Redesigning `AdminHome.vue` (The Dashboard)
+- **Break the "Identical Grid" Cliché:** Instead of 4 identically sized stat cards for Quotas and Limits, we will use an asymmetrical layout. The "Live Now" banner will dominate as the hero element, while quotas will be visualized as sleek, minimal inline sparklines or typographic locks.
+
+---
+
 # ✅ Upcoming Enhancements (Complete)
 
 **1. Default Schedule Time (`ScheduleExam.vue`)** — `minDateTime` now computes `now + 5

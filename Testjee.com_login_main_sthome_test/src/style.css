@@ -61,4 +61,16 @@
   .nav-button-danger {
     @apply bg-white text-red-600 border-2 border-red-600 hover:bg-red-600 hover:text-white;
   }
-} 
+}
+
+/* Phase 6: reduced motion isn't optional. Collapses every transition/animation (including
+   loading spinners) to effectively instant for users who've asked the OS for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

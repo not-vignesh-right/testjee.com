@@ -1,10 +1,9 @@
 <template>
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-      
       <!-- Loading State -->
       <div v-if="loading" class="flex justify-center items-center h-64">
-        <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <svg class="animate-spin h-8 w-8 text-gta-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
@@ -13,105 +12,97 @@
       <!-- Dashboard Content -->
       <div v-else-if="adminStore.adminProfile">
         <!-- Dashboard Header -->
-        <div class="mb-8">
-          <h2 class="text-2xl font-bold text-gray-900 leading-tight">Dashboard Overview</h2>
-          <p class="mt-1 text-sm text-gray-500">Monitor your institute's test and student capacity.</p>
+        <div class="mb-10">
+          <h2 class="text-2xl font-semibold text-ink-900 tracking-tight">Dashboard</h2>
+          <p class="mt-1 text-sm text-ink-500">{{ adminStore.adminProfile.institute_name }}</p>
         </div>
 
-        <!-- Live Now Banner -->
-        <div v-if="liveSession" class="mb-8 bg-gradient-to-r from-red-600 to-red-700 rounded-2xl p-6 text-white shadow-lg shadow-red-900/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div class="flex items-center gap-4">
-            <div class="w-3 h-3 bg-white rounded-full animate-pulse shrink-0"></div>
+        <!-- Live Now: dominant hero element when a session is running, otherwise the
+             primary action takes its place. Only one of these two commands attention. -->
+        <transition
+          enter-active-class="transition duration-300 ease-out-expo"
+          enter-from-class="opacity-0 -translate-y-1"
+          enter-to-class="opacity-100 translate-y-0"
+        >
+          <div v-if="liveSession" class="mb-10 bg-red-700 rounded-2xl p-6 sm:p-7 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+            <div class="flex items-center gap-4 min-w-0">
+              <span class="relative shrink-0 flex h-2.5 w-2.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+              </span>
+              <div class="min-w-0">
+                <p class="text-red-100 text-xs font-semibold uppercase tracking-wide">Live now</p>
+                <h3 class="text-xl font-bold truncate">{{ liveSession.session_name }}</h3>
+                <p class="text-red-100 text-sm mt-0.5 tabular-nums">
+                  {{ liveSession.students_submitted }} / {{ liveSession.total_students_enrolled }} submitted · {{ liveElapsedDisplay }} elapsed
+                </p>
+              </div>
+            </div>
+            <button @click="router.push(`/admin/sessions/${liveSession.live_session_id}/monitor`)"
+              class="shrink-0 px-5 py-2.5 bg-white text-gta-danger font-semibold rounded-xl text-sm hover:bg-red-50 transition-colors duration-200 ease-out-quart">
+              Open monitor
+            </button>
+          </div>
+
+          <div v-else class="mb-10 rounded-2xl p-6 sm:p-7 bg-gta-secondary text-white flex flex-col sm:flex-row sm:items-center justify-between gap-5">
             <div>
-              <p class="text-red-200 text-xs font-bold uppercase tracking-widest">Live Now</p>
-              <h3 class="text-xl font-black">{{ liveSession.session_name }}</h3>
-              <p class="text-red-200 text-sm mt-0.5">
-                {{ liveSession.students_submitted }} / {{ liveSession.total_students_enrolled }} submitted
-                · Elapsed: {{ liveElapsedDisplay }}
-              </p>
+              <p class="text-blue-100 text-xs font-semibold uppercase tracking-wide">Get started</p>
+              <h3 class="text-xl font-bold mt-0.5">Schedule your next live exam</h3>
+              <p class="text-blue-100 text-sm mt-0.5">Pick an exam type, set a time, and credentials generate automatically.</p>
             </div>
+            <button
+              @click="router.push('/admin/sessions/new')"
+              class="shrink-0 px-5 py-2.5 bg-white text-gta-primary font-semibold rounded-xl text-sm hover:bg-blue-50 transition-colors duration-200 ease-out-quart"
+            >
+              Schedule exam
+            </button>
           </div>
-          <button @click="router.push(`/admin/sessions/${liveSession.live_session_id}/monitor`)"
-            class="shrink-0 px-5 py-2.5 bg-white text-red-700 font-bold rounded-xl text-sm hover:bg-red-50 transition-colors shadow-sm">
-            → Open Monitor
-          </button>
-        </div>
+        </transition>
 
-        <!-- Stats Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          
-          <!-- Tests Card -->
-          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col relative overflow-hidden group">
-            <div class="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <svg class="w-16 h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-              </svg>
-            </div>
-            
-            <dt class="text-sm font-medium text-gray-500 mb-1">Tests Created</dt>
-            <dd class="text-3xl font-bold text-gray-900 mb-4">{{ adminStore.adminProfile.tests_created }} <span class="text-lg font-medium text-gray-400">/ {{ adminStore.adminProfile.max_tests }}</span></dd>
-            
-            <div class="mt-auto w-full">
-              <div class="flex justify-between items-end mb-1">
-                <span class="text-xs font-medium text-gray-500">Usage</span>
-                <span class="text-xs font-bold text-blue-600">{{ testsPercentage }}%</span>
+        <!-- Capacity: one panel, not two identical boxed cards. Structure via a divider and
+             typography, not by wrapping each metric in its own bordered/shadowed box. -->
+        <div class="mb-10">
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-4">Capacity</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 border-y border-slate-200">
+            <div class="py-5 sm:pr-8">
+              <div class="flex items-baseline justify-between mb-2">
+                <span class="text-sm font-medium text-ink-700">Tests created</span>
+                <span class="text-sm tabular-nums text-ink-500">{{ adminStore.adminProfile.tests_created }} <span class="text-ink-500">/ {{ adminStore.adminProfile.max_tests }}</span></span>
               </div>
-              <div class="w-full bg-gray-100 rounded-full h-2.5">
-                <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-1000 ease-out" :style="{ width: testsPercentage + '%' }"></div>
+              <div class="w-full bg-slate-100 rounded-full h-1.5">
+                <div class="bg-gta-primary h-1.5 rounded-full transition-all duration-700 ease-out-expo" :style="{ width: testsPercentage + '%' }"></div>
               </div>
             </div>
-          </div>
-
-          <!-- Students Card -->
-          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col relative overflow-hidden group">
-             <div class="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <svg class="w-16 h-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-              </svg>
-            </div>
-            
-            <dt class="text-sm font-medium text-gray-500 mb-1">Students Created</dt>
-            <dd class="text-3xl font-bold text-gray-900 mb-4">{{ adminStore.adminProfile.students_created }} <span class="text-lg font-medium text-gray-400">/ {{ adminStore.adminProfile.max_students }}</span></dd>
-            
-            <div class="mt-auto w-full">
-              <div class="flex justify-between items-end mb-1">
-                <span class="text-xs font-medium text-gray-500">Usage</span>
-                <span class="text-xs font-bold text-green-600">{{ studentsPercentage }}%</span>
+            <div class="py-5 sm:pl-8">
+              <div class="flex items-baseline justify-between mb-2">
+                <span class="text-sm font-medium text-ink-700">Students created</span>
+                <span class="text-sm tabular-nums text-ink-500">{{ adminStore.adminProfile.students_created }} <span class="text-ink-500">/ {{ adminStore.adminProfile.max_students }}</span></span>
               </div>
-              <div class="w-full bg-gray-100 rounded-full h-2.5">
-                <div class="bg-gradient-to-r from-green-500 to-green-600 h-2.5 rounded-full transition-all duration-1000 ease-out" :style="{ width: studentsPercentage + '%' }"></div>
+              <div class="w-full bg-slate-100 rounded-full h-1.5">
+                <div class="bg-gta-success h-1.5 rounded-full transition-all duration-700 ease-out-expo" :style="{ width: studentsPercentage + '%' }"></div>
               </div>
             </div>
           </div>
-          
         </div>
 
         <!-- Quick Actions -->
         <div>
-          <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button 
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-4">Quick actions</h3>
+          <div class="flex flex-wrap gap-3">
+            <button
+              v-if="liveSession"
               @click="router.push('/admin/sessions/new')"
-              class="relative block w-full border-2 border-gray-300 border-dashed rounded-lg p-6 text-center hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors bg-white group"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-gta-primary hover:bg-gta-secondary transition-colors duration-200 ease-out-quart"
             >
-               <svg class="mx-auto h-8 w-8 text-blue-500 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-              </svg>
-              <span class="mt-2 block text-sm font-bold text-gray-900">
-                Schedule Live Exam
-              </span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+              Schedule live exam
             </button>
-            
-            <button 
+            <button
               @click="router.push('/admin/sessions')"
-              class="relative block w-full border border-gray-200 rounded-lg p-6 text-center shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all bg-white group"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-ink-700 bg-slate-100 hover:bg-slate-200 transition-colors duration-200 ease-out-quart"
             >
-              <svg class="mx-auto h-8 w-8 text-blue-500 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-              </svg>
-              <span class="mt-2 block text-sm font-bold text-gray-900">
-                View All Sessions
-              </span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+              View all sessions
             </button>
           </div>
         </div>
@@ -189,4 +180,3 @@ onUnmounted(() => {
 })
 
 </script>
-
