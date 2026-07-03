@@ -28,6 +28,7 @@ export const useExamStore = defineStore('exam', () => {
   const isSubmitting = ref(false) // Global lock to prevent duplicate async database writes
   const topicFilter = ref(null) // null = full mock; { [subjectName]: topicId[] } = topic-wise
   const isResuming = ref(false) // Flag: true when resuming an approved session (skip instructions + decrement)
+  const isLoadingQuestions = ref(false)
 
   // --- Config-derived reactive getters ---
   const examConfig = computed(() => getExamConfig(examType.value))
@@ -202,6 +203,7 @@ export const useExamStore = defineStore('exam', () => {
   }
 
   const fetchExamData = async () => {
+    isLoadingQuestions.value = true
     try {
       const authStore = useAuthStore()
       if (!authStore.studentId) throw new Error('No student ID available')
@@ -211,6 +213,7 @@ export const useExamStore = defineStore('exam', () => {
 
       if (questions.value.length > 0) {
         console.log('fetchExamData: Questions already loaded (e.g., from localStorage). Skipping fetch.')
+        isLoadingQuestions.value = false
         return
       }
 
@@ -623,6 +626,8 @@ export const useExamStore = defineStore('exam', () => {
       }
     } catch (error) {
       console.error('fetchExamData: Critical failure:', error)
+    } finally {
+      isLoadingQuestions.value = false
     }
   }
 
@@ -646,6 +651,7 @@ export const useExamStore = defineStore('exam', () => {
     sessionStartTime.value = null
     lastResult.value = null
     topicFilter.value = null // Reset topic filter for fresh exam
+    isLoadingQuestions.value = false // Reset loading state
     // Reset time from config so resuming after a different exam type is correct
     remainingTime.value = examConfig.value.durationSeconds
     currentQuestionIndex.value = 0
@@ -1225,6 +1231,21 @@ export const useExamStore = defineStore('exam', () => {
     try {
       console.log('🔄 Restoring resumed exam session progress from request:', request)
       
+      // Verify that the request is actually approved in the DB
+      const { data: dbRequest, error: reqDbErr } = await supabase
+        .from('exam_support_requests')
+        .select('status')
+        .eq('request_id', request.request_id)
+        .single()
+
+      if (reqDbErr || !dbRequest) {
+        throw new Error('Support request not found in database.')
+      }
+
+      if (dbRequest.status !== 'approved') {
+        throw new Error('This support request has already been used or is no longer approved.')
+      }
+
       // 1. Reset state
       sessionId.value = request.session_id
       isSubmitted.value = false
@@ -1361,6 +1382,7 @@ export const useExamStore = defineStore('exam', () => {
     allResults,
     statistics,
     isResuming,
+    isLoadingQuestions,
 
     // Getters
     currentQuestion,

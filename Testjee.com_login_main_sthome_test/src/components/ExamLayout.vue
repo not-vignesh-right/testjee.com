@@ -372,6 +372,9 @@ onMounted(async () => {
   // 🔐 Ensure user is authenticated before loading exam
   if (!auth.isAuthenticated) return
 
+  // Setup security listeners immediately to prevent early fullscreen exit or tab switch bypass
+  setupSecurityListeners()
+
   // BUG 2 FIX: If we just restored a session (isResuming = true),
   // skip initializeSession + fetchExamData entirely — state is already loaded
   if (examStore.isResuming) {
@@ -381,7 +384,6 @@ onMounted(async () => {
     examStore.startTimer()
     enforceFullScreen()
     await requestWakeLock()
-    setupSecurityListeners()
     return
   }
 
@@ -396,6 +398,7 @@ onMounted(async () => {
   // If session is null (expired/submitted), don't load exam
   if (!sessionId) {
     console.log('⚠️ Session expired or submitted, not loading exam')
+    removeSecurityListeners()
     return
   }
 
@@ -422,9 +425,6 @@ onMounted(async () => {
     enforceFullScreen()
     await requestWakeLock()
   }
-
-  // Setup security listeners
-  setupSecurityListeners()
 })
 
 onUnmounted(async () => {
