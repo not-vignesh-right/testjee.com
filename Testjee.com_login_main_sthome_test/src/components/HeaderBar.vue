@@ -84,7 +84,11 @@ async function handleSubmit() {
   }
   const result = await examStore.submitExam()
   if (result.success) {
-    router.push("/sthome")
+    if (examStore.isLiveMode) {
+      router.push(`/live-exam/${examStore.liveSessionCode}/results`)
+    } else {
+      router.push("/sthome")
+    }
   } else {
     alert("Failed to submit exam. Please try again.")
   }

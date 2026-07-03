@@ -106,6 +106,16 @@ router.beforeEach(async (to, from, next) => {
   const examStore = useExamStore()
   const adminStore = useAdminStore()
 
+  // BUG-14 fix: live exam students authenticate via temp credentials (examSessionStore),
+  // not Supabase Auth, so the normal requiresAuth guard below would bounce them to login.
+  if (to.path === '/exam' && to.query.mode === 'live') {
+    const liveStore = useExamSessionStore()
+    if (!liveStore.studentSessionId) {
+      return next('/live-exam')
+    }
+    return next()
+  }
+
   // Admin route protection
   if (to.meta.requiresAdminAuth) {
     await adminStore.loadSession()

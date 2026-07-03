@@ -23,6 +23,12 @@
                 <p class="text-xs text-amber-700 leading-relaxed">You have already used your one allowed resume for this session. The exam has been submitted with your current progress. No further resumptions are permitted.</p>
               </div>
             </template>
+            <template v-else-if="isLiveMode">
+              <div class="p-4 rounded-xl bg-blue-50 border border-blue-200 text-left mb-2">
+                <p class="text-sm font-bold text-blue-800 mb-1">Exam Submitted</p>
+                <p class="text-xs text-blue-700 leading-relaxed">Resume requests for live proctored sessions aren't available yet. If this was accidental, please contact your instructor directly.</p>
+              </div>
+            </template>
             <template v-else>
               <button 
                 @click="showAppealForm = true" 
@@ -184,8 +190,8 @@
         <p class="text-gray-600 mb-6">
           Your exam session has ended. Your answers have been automatically submitted.
         </p>
-        <button 
-          @click="$router.push('/sthome')"
+        <button
+          @click="goToResultsOrDashboard"
           class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
         >
           View Results
@@ -282,10 +288,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useExamStore } from '../stores/examStore'
 import { useAuthStore } from '../stores/authStore'
+import { useExamSessionStore } from '../stores/examSessionStore'
 import { supabase } from '../lib/supabase'
 
 import HeaderBar from './HeaderBar.vue'
@@ -296,6 +303,20 @@ import ExamInstructions from './ExamInstructions.vue'
 const examStore = useExamStore()
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
+const liveStore = useExamSessionStore()
+
+// BUG-14: live exam sessions (temp-credential students, no Supabase Auth) are bridged into
+// this store by liveExamBridge.js and run through the same fullscreen/anti-cheat UI.
+const isLiveMode = computed(() => examStore.isLiveMode === true)
+
+function goToResultsOrDashboard() {
+  if (isLiveMode.value) {
+    router.push(`/live-exam/${route.query.sessionCode || examStore.liveSessionCode}/results`)
+  } else {
+    router.push('/sthome')
+  }
+}
 
 const showInstructions = ref(true)
 const autoSubmitReason = ref('')
@@ -378,7 +399,7 @@ const startGracePeriod = (reason) => {
       if (examStore.emergencySubmit) {
         examStore.emergencySubmit()
       }
-      await examStore.submitExam()
+      await examStore.submitExam(true)
     }
   }, 1000)
 }
@@ -397,6 +418,22 @@ const clearGracePeriod = () => {
 
 // Exam initialization
 onMounted(async () => {
+  // LIVE MODE: questions were already loaded and bridged into examStore by ExamWaitingRoom
+  // (via liveExamBridge.js) before navigating here. Skip the regular-exam auth/session flow.
+  if (isLiveMode.value) {
+    if (!liveStore.studentSessionId) {
+      router.push('/live-exam')
+      return
+    }
+    setupSecurityListeners()
+    showInstructions.value = false // Lobby already served as the instructions screen
+    isResumedSession.value = false
+    examStore.startTimer()
+    await enforceFullScreen()
+    await requestWakeLock()
+    return
+  }
+
   // 🔐 Ensure user is authenticated before loading exam
   if (!auth.isAuthenticated) return
 
@@ -643,7 +680,7 @@ async function enforceFullScreen() {
 
 function forceExitToDashboard() {
   autoSubmitReason.value = ''
-  router.push('/sthome')
+  goToResultsOrDashboard()
 }
 
 // --- Security & Enforcement ---
@@ -697,7 +734,7 @@ const handleVisibilityChange = async () => {
       if (examStore.emergencySubmit) {
         examStore.emergencySubmit()
       }
-      await examStore.submitExam()
+      await examStore.submitExam(true)
     }
   } else {
     clearGracePeriod()

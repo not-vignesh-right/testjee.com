@@ -114,6 +114,16 @@ export const useExamSessionStore = defineStore('examSession', () => {
                 questionOrder.value = data[0].question_order
                 examStatus.value = 'in_progress'
 
+                // BUG-04 fix: the per-student end time is start_time + duration, NOT the
+                // session's scheduled_end_time (which is wrong once admin uses "Start Early").
+                // Computed client-side from `now` since start_student_exam fires right as the
+                // student clicks Start, and the RPC doesn't currently return a start timestamp.
+                if (sessionDetails.value.durationMinutes) {
+                    sessionDetails.value.personalEndTime = new Date(
+                        Date.now() + sessionDetails.value.durationMinutes * 60 * 1000
+                    ).toISOString()
+                }
+
                 // Calculate initial time remaining based on end time
                 calculateTimeRemaining()
 
@@ -284,8 +294,11 @@ export const useExamSessionStore = defineStore('examSession', () => {
     // ------------------------------------------------------------------------
 
     const calculateTimeRemaining = () => {
-        if (!sessionDetails.value.scheduledEndTime) return 0
-        const end = new Date(sessionDetails.value.scheduledEndTime).getTime()
+        // BUG-04 fix: prefer the student's own personal end time (start + duration) over the
+        // session's scheduled_end_time, since "Start Early" makes those two diverge.
+        const endTimeSource = sessionDetails.value.personalEndTime || sessionDetails.value.scheduledEndTime
+        if (!endTimeSource) return 0
+        const end = new Date(endTimeSource).getTime()
         const now = Date.now()
         const diff = Math.max(0, Math.floor((end - now) / 1000))
         timeRemainingSeconds.value = diff

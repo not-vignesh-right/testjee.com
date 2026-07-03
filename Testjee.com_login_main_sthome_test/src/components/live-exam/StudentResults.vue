@@ -119,26 +119,18 @@ onMounted(async () => {
   }
 
   try {
-    // Specifically pull ranking info
-    // The previous get_student_exam_questions gives answers, but we need the exam specific metrics
-    // We can query the student_exam_sessions table directly since it's the current user
-    const { data, error } = await supabase
-       .from('student_exam_sessions')
-       .select(`
-         *,
-         temp_students (student_name, roll_number)
-       `)
-       .eq('student_session_id', store.studentSessionId)
-       .single()
+    // BUG-11 fix: use a SECURITY DEFINER RPC instead of a direct table select — live-exam
+    // students aren't Supabase-authenticated, so a direct select depends on anon RLS policies
+    // that may not be (or may stop being) in place on student_exam_sessions.
+    const { data, error } = await supabase.rpc('get_student_live_result', {
+      input_student_session_id: store.studentSessionId
+    })
 
     if (error) throw error
+    if (!data || data.length === 0) throw new Error('No result found for this session')
 
-    resultMeta.value = {
-      ...data,
-      student_name: data.temp_students?.student_name,
-      roll_number: data.temp_students?.roll_number
-    }
-    
+    resultMeta.value = data[0]
+
   } catch (err) {
     console.error('Failed fetching results', err)
   } finally {

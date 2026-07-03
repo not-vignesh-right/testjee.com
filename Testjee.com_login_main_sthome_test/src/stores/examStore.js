@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './authStore'
+import { useExamSessionStore } from './examSessionStore'
 import { EXAM_CONFIGS, getExamConfig } from '../data/examConfigs'
 
 export const useExamStore = defineStore('exam', () => {
@@ -29,6 +30,12 @@ export const useExamStore = defineStore('exam', () => {
   const topicFilter = ref(null) // null = full mock; { [subjectName]: topicId[] } = topic-wise
   const isResuming = ref(false) // Flag: true when resuming an approved session (skip instructions + decrement)
   const isLoadingQuestions = ref(false)
+
+  // --- Live Exam Bridge State ---
+  // When true, this store is being driven by a live-session bridge (see liveExamBridge.js):
+  // persistence and submission are delegated to examSessionStore instead of exam_sessions/results.
+  const isLiveMode = ref(false)
+  const liveSessionCode = ref(null)
 
   // --- Config-derived reactive getters ---
   const examConfig = computed(() => getExamConfig(examType.value))
@@ -251,6 +258,9 @@ export const useExamStore = defineStore('exam', () => {
 
   // Save to localStorage (instant, no API calls)
   const saveToLocalStorage = () => {
+    // Live sessions persist to student_exam_sessions instead — writing here would let a
+    // live exam's in-progress state get mistakenly restored as a regular exam session later.
+    if (isLiveMode.value) return
     localStorage.setItem('examAnswers', JSON.stringify(userAnswers.value))
     localStorage.setItem('examDrafts', JSON.stringify(draftAnswers.value))
     localStorage.setItem('currentQuestionIndex', currentQuestionIndex.value.toString())
@@ -713,6 +723,8 @@ export const useExamStore = defineStore('exam', () => {
     currentQuestionIndex.value = 0
     numericDrafts.value = {}
     timeSpent.value = {}
+    isLiveMode.value = false
+    liveSessionCode.value = null
   }
 
   const setTopicFilter = (filter) => {
@@ -747,8 +759,15 @@ export const useExamStore = defineStore('exam', () => {
       questionStatuses.value[questionId].visited = true
       delete draftAnswers.value[questionId] // Clear draft once committed
 
-      // Save to localStorage (instant, no API call)
-      saveToLocalStorage()
+      if (isLiveMode.value) {
+        // Live sessions have no localStorage/support-request snapshot to fall back on —
+        // every answer must be persisted to student_exam_sessions immediately so a crash
+        // or the resume/appeal flow can recover the true state from the DB.
+        await useExamSessionStore().saveAnswer(questionId, answer, questionStatuses.value[questionId].marked)
+      } else {
+        // Save to localStorage (instant, no API call)
+        saveToLocalStorage()
+      }
 
       return { success: true }
     } catch (error) {
@@ -760,7 +779,11 @@ export const useExamStore = defineStore('exam', () => {
   const markForReview = (questionId) => {
     questionStatuses.value[questionId].marked = true
     questionStatuses.value[questionId].visited = true
-    saveToLocalStorage()
+    if (isLiveMode.value) {
+      useExamSessionStore().saveAnswer(questionId, userAnswers.value[questionId] ?? null, true)
+    } else {
+      saveToLocalStorage()
+    }
   }
 
   const clearResponse = (questionId) => {
@@ -768,8 +791,12 @@ export const useExamStore = defineStore('exam', () => {
     delete draftAnswers.value[questionId]
     questionStatuses.value[questionId].answered = false
 
-    // Save to localStorage
-    saveToLocalStorage()
+    if (isLiveMode.value) {
+      useExamSessionStore().saveAnswer(questionId, null, !!questionStatuses.value[questionId].marked)
+    } else {
+      // Save to localStorage
+      saveToLocalStorage()
+    }
   }
 
   const goToQuestion = (index) => {
@@ -790,6 +817,13 @@ export const useExamStore = defineStore('exam', () => {
 
       // Save current position to localStorage
       saveToLocalStorage()
+
+      if (isLiveMode.value) {
+        // Keep examSessionStore's own per-question time tracking (used at live submit time)
+        // in sync with navigation that now happens through ExamLayout/examStore instead of
+        // LiveExamInterface's own navigateToQuestion().
+        useExamSessionStore().navigateToQuestion(index + 1)
+      }
 
       // Start new timer
       currentStartTime.value = Date.now()
@@ -813,10 +847,33 @@ export const useExamStore = defineStore('exam', () => {
     }
   }
 
-  const submitExam = async () => {
+  const submitExam = async (isAutoSubmit = false) => {
     if (isSubmitting.value || isSubmitted.value) {
       console.warn('⚠️ Exam already submitting or submitted, ignoring duplicate submit')
       return { success: false, message: 'Exam currently submitting or already submitted' }
+    }
+
+    // Live sessions submit through student_exam_sessions (examSessionStore), not
+    // exam_sessions/results — completely different scoring/tables.
+    if (isLiveMode.value) {
+      isSubmitting.value = true
+      try {
+        if (currentTimer.value) {
+          clearInterval(currentTimer.value)
+          currentTimer.value = null
+        }
+        if (globalTimerInterval.value) {
+          clearInterval(globalTimerInterval.value)
+          globalTimerInterval.value = null
+        }
+        const res = await useExamSessionStore().submitExam(isAutoSubmit)
+        if (res.success) {
+          isSubmitted.value = true
+        }
+        return res
+      } finally {
+        isSubmitting.value = false
+      }
     }
 
     isSubmitting.value = true
@@ -1003,6 +1060,9 @@ export const useExamStore = defineStore('exam', () => {
   }
 
   const emergencySubmit = () => {
+    // Live sessions persist every answer immediately via saveAnswer — there's no
+    // localStorage snapshot step to do here, and no exam_sessions row to key off.
+    if (isLiveMode.value) return
     if (isSubmitted.value || !sessionId.value) return;
 
     try {
@@ -1092,7 +1152,7 @@ export const useExamStore = defineStore('exam', () => {
       } else {
         clearInterval(globalTimerInterval.value)
         globalTimerInterval.value = null
-        submitExam()
+        submitExam(true)
       }
     }, 1000)
   } // The global timer of 3 hours
@@ -1440,6 +1500,8 @@ export const useExamStore = defineStore('exam', () => {
     statistics,
     isResuming,
     isLoadingQuestions,
+    isLiveMode,
+    liveSessionCode,
 
     // Getters
     currentQuestion,

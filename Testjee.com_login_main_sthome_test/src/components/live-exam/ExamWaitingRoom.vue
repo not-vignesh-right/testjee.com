@@ -128,6 +128,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useExamSessionStore } from '../../stores/examSessionStore'
+import { bridgeLiveSessionToExamStore } from '../../stores/liveExamBridge'
 import { supabase } from '../../lib/supabase'
 
 const router = useRouter()
@@ -252,12 +253,23 @@ const startCountdownTimers = () => {
 const beginExam = async () => {
   loadingStart.value = true
   try {
-    // Attempt store API call to start
-    const res = await store.startExam()
-    if (!res.success) throw new Error(res.error)
-    
-    router.push(`/live-exam/${route.params.sessionCode}/active`)
-    
+    // Step 1: Start exam in DB — gets question_order, creates/activates student_exam_sessions row
+    const startRes = await store.startExam()
+    if (!startRes.success) throw new Error(startRes.error)
+
+    // Step 2: Load question content (text, choices, images) — BUG-01: this was never called,
+    // so the exam screen rendered blank while the timer silently ran in the background.
+    const loadRes = await store.loadQuestions()
+    if (!loadRes.success) throw new Error('Failed to load questions from server')
+
+    // Step 3: Bridge live session data into examStore so ExamLayout.vue (fullscreen,
+    // anti-cheat, grace period, question palette) can run the exam instead of the
+    // lightweight LiveExamInterface.vue.
+    bridgeLiveSessionToExamStore(route.params.sessionCode)
+
+    // Step 4: Navigate to the full exam UI
+    router.push(`/exam?mode=live&sessionCode=${route.params.sessionCode}`)
+
   } catch(err) {
     console.error('Failed to begin', err)
     alert(err.message || 'Failed to start exam. Server might still be preparing.')
