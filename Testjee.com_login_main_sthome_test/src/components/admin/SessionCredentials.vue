@@ -298,10 +298,10 @@ const forceStartExam = async () => {
   actionLoading.value = true
   actionError.value = ''
   try {
-    // admin_start_exam is a pre-existing RPC not yet hardened to token-based auth (see
-    // harden-admin-rpc-security.sql's "Still NOT fixed" note) — still takes input_admin_id.
+    // admin_start_exam has been upgraded to be token-verified (via fix-admin-start-exam-time.sql)
+    // and correctly syncs scheduled_start_time so the student sees the exam as started.
     const { error } = await supabase.rpc('admin_start_exam', {
-      input_admin_id: adminStore.adminProfile.admin_id,
+      p_token: adminStore.getToken(),
       input_live_session_id: sessionId
     })
     if (error) throw error

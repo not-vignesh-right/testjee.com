@@ -259,7 +259,7 @@ const startExam = async (sessionId) => {
   loading.value = true
   try {
     const { error } = await supabase.rpc('admin_start_exam', {
-      input_admin_id: adminStore.adminProfile.admin_id,
+      p_token: adminStore.getToken(),
       input_live_session_id: sessionId
     })
     if (error) throw error
