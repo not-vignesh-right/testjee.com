@@ -408,10 +408,10 @@ onMounted(async () => {
   if (examStore.isResuming) {
     console.log('🔄 Resuming restored session — skipping initializeSession & fetchExamData')
     showInstructions.value = false
-    isResumedSession.value = true // Mark: this is a resumed session — no more appeals allowed
+    isResumedSession.value = true
+    // Use overlay so the fullscreen request has a proper user gesture
+    showResumeOverlay.value = true
     examStore.startTimer()
-    enforceFullScreen()
-    await requestWakeLock()
     return
   }
 
@@ -665,15 +665,15 @@ const handleFullscreenChange = async () => {
 
 const handleBeforeUnload = (e) => {
   if (!examStore.isSubmitted && !showInstructions.value && !examStore.isManuallySubmitting) {
-    e.preventDefault()
-    e.returnValue = '' // Shows browser default warning
-    
-    // Emergency submit attempt
+    // ONLY save state locally — do NOT submit to DB here.
+    // Reason: Ctrl+R (page refresh) fires beforeunload and we want the session to survive.
+    // Tab-close is caught by visibilitychange (fires before beforeunload) → instant auto-submit.
+    // Address-bar navigation is caught by the blur grace period.
     if (examStore.emergencySubmit) {
       examStore.emergencySubmit()
-    } else {
-      examStore.submitExam() // Best effort
     }
+    e.preventDefault()
+    e.returnValue = '' // Shows browser's native "Leave site?" dialog
   }
 }
 

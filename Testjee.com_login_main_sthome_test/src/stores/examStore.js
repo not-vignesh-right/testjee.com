@@ -1235,7 +1235,8 @@ export const useExamStore = defineStore('exam', () => {
         return {
           question_id: question.id,
           answer: answer,
-          time_taken: time_taken
+          time_taken: time_taken,
+          is_marked: !!(questionStatuses.value[question.id]?.marked) // Preserve marked-for-review
         }
       })
 
@@ -1375,7 +1376,7 @@ export const useExamStore = defineStore('exam', () => {
             questionStatuses.value[a.question_id] = {
               visited: (a.time_taken > 0 || a.answer !== null),
               answered: (a.answer !== null && a.answer !== undefined),
-              marked: false
+              marked: !!(a.is_marked) // Restore marked-for-review state
             }
           }
         })
