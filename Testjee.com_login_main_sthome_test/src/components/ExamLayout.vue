@@ -560,17 +560,22 @@ const resumeTest = async () => {
 // --- Exam Flow Mechanics ---
 
 async function beginExamFullScreen() {
+  // CRITICAL: Disable instructions screen FIRST so proctoring handlers (fullscreen/tab)
+  // are active immediately. If the student exits fullscreen during the async DB call below,
+  // the grace period will trigger correctly instead of being silently ignored.
+  showInstructions.value = false
+
   // If no session exists yet, create it now! (Fresh start after accepting instructions)
   if (!examStore.sessionId) {
     const sessionId = await examStore.createNewSession()
     if (!sessionId) {
+      // Roll back — show instructions again so student can retry
+      showInstructions.value = true
       alert('Failed to initialize exam session. Please try again.')
       return
     }
   }
 
-  showInstructions.value = false
-  
   // Try to go fullscreen
   await enforceFullScreen()
   

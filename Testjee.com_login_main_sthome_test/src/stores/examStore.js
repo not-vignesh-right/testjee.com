@@ -156,6 +156,16 @@ export const useExamStore = defineStore('exam', () => {
     }
   }
 
+  // Initialize question statuses for currently loaded questions (idempotent)
+  const initializeQuestionStatuses = () => {
+    questions.value.forEach(q => {
+      if (!questionStatuses.value[q.id]) {
+        questionStatuses.value[q.id] = { visited: false, answered: false, marked: false }
+      }
+      if (timeSpent.value[q.id] === undefined) timeSpent.value[q.id] = 0
+    })
+  }
+
   // Create new session (fresh start when student clicks start)
   const createNewSession = async () => {
     const authStore = useAuthStore()
@@ -167,7 +177,25 @@ export const useExamStore = defineStore('exam', () => {
     try {
       console.log('Creating new exam session...')
 
-      // Reset all exam state for fresh start
+      // CRITICAL: Force-submit any dangling unsubmitted sessions for this exam type
+      // so a fresh exam never accidentally resumes an old one left open from a bug.
+      const { data: staleSession } = await supabase
+        .from('exam_sessions')
+        .select('session_id')
+        .eq('student_id', authStore.studentId)
+        .eq('exam_type', examType.value)
+        .eq('is_submitted', false)
+        .maybeSingle()
+
+      if (staleSession) {
+        console.warn('⚠️ Found stale open session, force-submitting before creating new one:', staleSession.session_id)
+        await supabase
+          .from('exam_sessions')
+          .update({ is_submitted: true, end_time: new Date().toISOString(), auto_submitted: false })
+          .eq('session_id', staleSession.session_id)
+      }
+
+      // Reset answer/progress state for fresh start
       userAnswers.value = {}
       draftAnswers.value = {}
       questionStatuses.value = {}
@@ -202,6 +230,15 @@ export const useExamStore = defineStore('exam', () => {
       sessionId.value = newSession.session_id
       sessionStartTime.value = newSession.start_time
       remainingTime.value = newSession.total_duration_seconds
+
+      // CRITICAL: Re-initialize question statuses from the already-fetched questions.
+      // fetchExamData runs BEFORE createNewSession, so questions are loaded but statuses
+      // were wiped above. We must restore them here so navigation doesn't crash.
+      initializeQuestionStatuses()
+      if (questions.value.length > 0) {
+        questionStatuses.value[questions.value[0].id].visited = true
+        goToQuestion(0)
+      }
 
       return newSession.session_id
     } catch (error) {
@@ -1410,6 +1447,7 @@ export const useExamStore = defineStore('exam', () => {
     // Actions
     initializeSession,
     createNewSession,
+    initializeQuestionStatuses,
     fetchExamData,
     resetExamState,
     selectDraftAnswer,
