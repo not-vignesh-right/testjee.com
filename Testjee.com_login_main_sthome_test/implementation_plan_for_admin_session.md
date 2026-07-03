@@ -64,6 +64,77 @@ at three call sites instead of selecting the active store once.
 
 ---
 
+# 🛠️ SECURITY HOTFIX: Multi-Admin Scoping (Pending Decision)
+
+**The Issue:** `AdminResumeRequests.vue` and `AdminLayout.vue` query `exam_support_requests` globally without an `admin_id` filter. If this is deployed in a Multi-Tenant/SaaS environment (multiple independent institutes), Admin A will see Admin B's students' PII (Names, Roll Numbers) in the pending appeals list.
+
+**The Fix:**
+Do not filter this on the frontend `select()` statement—the table joins are too deep and complex to write cleanly in Vue. Instead, create a dedicated PostgreSQL RPC to fetch the requests scoped securely to the logged-in admin.
+
+**1. Create the RPC in Supabase (SQL):**
+```sql
+CREATE OR REPLACE FUNCTION get_admin_pending_appeals(p_admin_id UUID)
+RETURNS TABLE (
+  request_id INT,
+  session_id INT,
+  student_session_id INT,
+  student_id UUID,
+  reason TEXT,
+  custom_message TEXT,
+  remaining_time_seconds INT,
+  answers JSONB,
+  status TEXT,
+  created_at TIMESTAMPTZ,
+  exam_type TEXT,
+  student_name TEXT,
+  student_email TEXT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    esr.request_id,
+    esr.session_id,
+    esr.student_session_id,
+    esr.student_id,
+    esr.reason,
+    esr.custom_message,
+    esr.remaining_time_seconds,
+    esr.answers,
+    esr.status,
+    esr.created_at,
+    COALESCE(es.exam_type, 'Live Exam') AS exam_type,
+    COALESCE(st.student_name, ts.student_name) AS student_name,
+    COALESCE(st.email_id, 'Roll: ' || ts.roll_number) AS student_email
+  FROM exam_support_requests esr
+  -- Join path for Live Exams:
+  LEFT JOIN student_exam_sessions ses ON esr.student_session_id = ses.student_session_id
+  LEFT JOIN live_exam_sessions les ON ses.live_session_id = les.live_session_id
+  LEFT JOIN temp_students ts ON ses.temp_student_id = ts.temp_id
+  -- Join path for Regular Exams:
+  LEFT JOIN exam_sessions es ON esr.session_id = es.session_id
+  LEFT JOIN students st ON esr.student_id = st.student_id
+  -- Filter by the admin who owns the live session, OR (if regular exams belong to global admins) adjust logic here:
+  WHERE les.admin_id = p_admin_id OR es.admin_id = p_admin_id; 
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+*(Note: You will need to verify if `exam_sessions` actually has an `admin_id` column for the regular exam path. If regular exams are self-assigned and don't belong to a specific admin, you must decide a business rule for who sees them).*
+
+**2. Update `AdminResumeRequests.vue`:**
+Swap the complex `supabase.from('exam_support_requests').select(...)` query in `loadRequests()` to instead call:
+```js
+const { data, error } = await supabase.rpc('get_admin_pending_appeals', {
+  p_admin_id: adminStore.adminProfile.admin_id
+})
+```
+
+**3. Update `AdminLayout.vue` (Realtime Badge):**
+You cannot use standard Supabase Realtime `postgres_changes` to filter by a deeply joined `admin_id`. Instead of `postgres_changes`, you should either:
+- Rely strictly on the fallback poll interval (calling the new RPC).
+- OR, broadcast a custom Realtime event from a database trigger when a request is inserted, containing the `admin_id` in the payload, and have the client listen to that specific broadcast.
+
+---
+
 ---
 
 # ✅ PHASE 1 — Critical Path (Complete)
