@@ -30,6 +30,7 @@ import { useExamStore } from '../stores/examStore'
 import { useAuthStore } from '../stores/authStore'
 import { useAdminStore } from '../stores/adminStore'
 import { useExamSessionStore } from '../stores/examSessionStore'
+import { supabase } from '../lib/supabase'
 
 const routes = [
   // Login is the root page of this app (served at /login/ via router base)
@@ -117,8 +118,23 @@ router.beforeEach(async (to, from, next) => {
         if (loginRes.success) {
           const loadRes = await liveStore.loadQuestions()
           if (loadRes.success) {
+            // Bug fix: this reload-recovery path predates the bridge's examType parameter
+            // (added for BUG-09/NEW-06) and was never updated to pass it — every reload of
+            // a NEET/KCET live exam was silently falling back to the JEE_MAIN_FULL subject
+            // layout. Fetch it the same best-effort way ExamWaitingRoom.vue's beginExam() does.
+            let examType
+            try {
+              const { data: examTypeData } = await supabase
+                .from('live_exam_sessions')
+                .select('exam_type')
+                .eq('session_code', sessionCode)
+                .maybeSingle()
+              examType = examTypeData?.exam_type
+            } catch (typeErr) {
+              console.warn('Could not fetch exam_type on reload (non-fatal):', typeErr)
+            }
             const { bridgeLiveSessionToExamStore } = await import('../stores/liveExamBridge')
-            bridgeLiveSessionToExamStore(sessionCode)
+            bridgeLiveSessionToExamStore(sessionCode, examType)
             examStore.isLiveReload = true
             return next()
           }

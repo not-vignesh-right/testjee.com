@@ -31,6 +31,7 @@
                 <select
                   v-model="formData.exam_type"
                   required
+                  @change="onExamTypeChange"
                   class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors appearance-none text-gray-700 font-medium"
                 >
                   <option v-for="opt in examTypeOptions" :key="opt.key" :value="opt.key">
@@ -154,7 +155,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../../lib/supabase'
 import { useAdminStore } from '../../stores/adminStore'
@@ -191,10 +192,13 @@ const formData = ref({
   instructions: 'Please do not refresh the page during the exam. Avoid switching tabs as your session may be monitored.'
 })
 
-// Reset duration to the exam type's default whenever it changes (admin can still tweak it)
-watch(() => formData.value.exam_type, (newType) => {
-  formData.value.duration_minutes = Math.round(getExamConfig(newType).durationSeconds / 60)
-})
+// Reset duration to the exam type's default when the admin explicitly picks a new one.
+// Deliberately a @change handler, not a `watch` — a watch would also fire when the
+// "Duplicate Session" prefill below sets exam_type programmatically, silently clobbering
+// the prefilled duration for any session whose duration differs from that type's default.
+const onExamTypeChange = () => {
+  formData.value.duration_minutes = Math.round(getExamConfig(formData.value.exam_type).durationSeconds / 60)
+}
 
 // 4.6: Prefill from "Duplicate" on AdminLiveSessions.vue. Merged field-by-field (not a
 // blind Object.assign) so a missing/invalid field falls back to this form's own defaults

@@ -14,6 +14,53 @@
 | **Phase 3** | Fairness & quality (subjects, shuffle, redirect loop) | ✅ Complete |
 | **Phase 4** | Admin UX overhaul (Dashboard, results, monitoring) | ✅ Complete |
 | **Phase 5** | Polish & production hardening | ✅ Complete |
+| **Pre-Deploy Review** | Multi-angle code review + bug fixes before shipping | ✅ Complete |
+
+---
+
+---
+
+# ✅ PRE-DEPLOY REVIEW (Complete)
+
+Ran a multi-angle review (correctness line-scan, removed-behavior audit, cross-file
+tracing, reuse/simplification/efficiency, altitude/conventions) across every file touched
+in Phases 1–5. Four real, confirmed bugs found and fixed:
+
+1. **`router/index.js`** — the live-exam reload-recovery guard (written before Phase 3.4
+   added the `examType` parameter to `bridgeLiveSessionToExamStore`) was never updated to
+   pass it. A NEET/KCET student reloading mid-exam would silently fall back to the JEE
+   3-subject layout. **Fixed** — now fetches `exam_type` the same way `ExamWaitingRoom.vue` does.
+2. **`ScheduleExam.vue`** — a reactive `watch()` on `exam_type` (added to reset duration
+   when the admin changes exam type) fired *after* the "Duplicate Session" prefill set both
+   fields, silently overwriting the duplicated session's custom duration back to that exam
+   type's default. **Fixed** — replaced with an explicit `@change` handler so programmatic
+   prefill assignment never triggers it.
+3. **`ExamResults.vue`** — the score-distribution chart didn't clamp negative bucket
+   indices; since JEE has negative marking, any student with a net-negative score would
+   crash the whole results page. **Fixed** — clamped both ends.
+4. **`LiveExamMonitor.vue`** — the new progress bar divided by `total_students_enrolled`
+   with no zero-guard (`NaN%` width on an edge-case empty session). **Fixed**.
+
+**⚠️ One pre-existing issue was surfaced that is NOT fixed and needs a decision before
+multi-admin deployment:** `AdminResumeRequests.vue`'s `loadRequests()` (and the Realtime
+badge in `AdminLayout.vue` added in Phase 4) query `exam_support_requests` with **no
+admin/institute scoping at all** — any logged-in admin can see and approve/reject every
+other admin's resume requests, including live-exam appeals with the live student's name
+and roll number. This predates this project's changes, but Phase 2 extended the same
+unscoped query with more PII, and Phase 4 put a Realtime feed on top of it. If this
+platform is (or ever becomes) multi-admin/multi-institute, this needs an `admin_id` filter
+added before deploy — I didn't add one because I can't confirm from this codebase whether
+`exam_support_requests`/`student_exam_sessions` reliably chain back to an `admin_id`
+without risking hiding legitimate requests if I guess the join wrong.
+
+Also noted (not blocking, left as follow-up debt): the Realtime+poll-fallback pattern is
+now hand-rolled three times with drifting intervals (AdminLayout.vue, LiveExamMonitor.vue,
+ExamWaitingRoom.vue) instead of one shared composable; `examSessionStore.js`'s
+`submitSupportRequest`/`restoreResumedSession` structurally duplicate `examStore.js`'s
+regular-exam versions (keyed off different tables) with a minor snapshot-shape drift
+(`is_marked` field present on one side, not the other — currently unused by any reader);
+and `ExamLayout.vue` repeats an `isLiveMode.value ? liveStore.X() : examStore.X()` ternary
+at three call sites instead of selecting the active store once.
 
 ---
 

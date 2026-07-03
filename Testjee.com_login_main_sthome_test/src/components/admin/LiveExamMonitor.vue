@@ -76,10 +76,10 @@
         </div>
         <div class="w-full h-3 bg-gray-800 rounded-full overflow-hidden flex gap-0.5">
           <div class="bg-green-500 h-full transition-all duration-700 ease-out rounded-l-full"
-            :style="`width: ${(sessionMeta.students_submitted / sessionMeta.total_students_enrolled) * 100}%`">
+            :style="`width: ${progressPct(sessionMeta.students_submitted)}%`">
           </div>
           <div class="bg-blue-500 h-full transition-all duration-700 ease-out"
-            :style="`width: ${(sessionMeta.students_in_progress / sessionMeta.total_students_enrolled) * 100}%`">
+            :style="`width: ${progressPct(sessionMeta.students_in_progress)}%`">
           </div>
         </div>
         <div class="flex gap-4 text-xs text-gray-500 mt-2">
@@ -211,6 +211,14 @@ let realtimeSub = null
 const timerDisplay = ref('00:00:00')
 
 const sessionId = parseInt(route.params.id)
+
+// Guards against NaN% width when total_students_enrolled is 0 (e.g. a session created
+// with no students yet)
+const progressPct = (count) => {
+  const total = sessionMeta.value?.total_students_enrolled
+  if (!total) return 0
+  return (count / total) * 100
+}
 
 const fetchRealtimeSnapshot = async () => {
   if (!adminStore.adminProfile?.admin_id) return
