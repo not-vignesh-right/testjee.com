@@ -392,38 +392,35 @@ onMounted(async () => {
     showInstructions.value = false // Skip instructions if resuming
   }
 
-  // 🔑 Initialize or resume exam session (prevents timer reset exploit)
+  // 🔑 Check if there is an active session to resume
   const sessionId = await examStore.initializeSession()
   
-  // If session is null (expired/submitted), don't load exam
-  if (!sessionId) {
-    console.log('⚠️ Session expired or submitted, not loading exam')
-    removeSecurityListeners()
-    return
-  }
-
-  // Check if a support request already exists for this session to enforce resume request limit
-  try {
-    const { data: existingApp } = await supabase
-      .from('exam_support_requests')
-      .select('request_id')
-      .eq('session_id', sessionId)
-      .maybeSingle()
-    if (existingApp) {
-      isResumedSession.value = true
+  if (sessionId) {
+    // If an active session exists (e.g. from page reload/resume), skip instructions
+    showInstructions.value = false
+    
+    // Check if a support request already exists for this session to enforce resume request limit
+    try {
+      const { data: existingApp } = await supabase
+        .from('exam_support_requests')
+        .select('request_id')
+        .eq('session_id', sessionId)
+        .maybeSingle()
+      if (existingApp) {
+        isResumedSession.value = true
+      }
+    } catch (err) {
+      console.warn('Error checking existing support request:', err)
     }
-  } catch (err) {
-    console.warn('Error checking existing support request:', err)
-  }
 
-  // 🚀 Load exam data once
-  await examStore.fetchExamData()
-
-  if (!showInstructions.value) {
-    // 🕒 Start global exam timer if resuming directly
+    // 🕒 Start global exam timer immediately for resumption
     examStore.startTimer()
     enforceFullScreen()
     await requestWakeLock()
+  } else {
+    // This is a fresh exam start! Instructions are shown.
+    // Fetch questions in the background so they are ready when they click start
+    await examStore.fetchExamData()
   }
 })
 
@@ -563,6 +560,15 @@ const resumeTest = async () => {
 // --- Exam Flow Mechanics ---
 
 async function beginExamFullScreen() {
+  // If no session exists yet, create it now! (Fresh start after accepting instructions)
+  if (!examStore.sessionId) {
+    const sessionId = await examStore.createNewSession()
+    if (!sessionId) {
+      alert('Failed to initialize exam session. Please try again.')
+      return
+    }
+  }
+
   showInstructions.value = false
   
   // Try to go fullscreen

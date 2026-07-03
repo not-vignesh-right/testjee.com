@@ -50,6 +50,7 @@ export const useExamStore = defineStore('exam', () => {
   // Actions
 
   // Initialize or resume exam session
+  // Initialize or resume exam session (does NOT create a new session automatically)
   const initializeSession = async () => {
     const authStore = useAuthStore()
     if (!authStore.studentId) {
@@ -148,7 +149,22 @@ export const useExamStore = defineStore('exam', () => {
         return existingSession.session_id
       }
 
-      // Create new session (fresh start)
+      return null // No active session exists
+    } catch (error) {
+      console.error('Failed to initialize session:', error)
+      return null
+    }
+  }
+
+  // Create new session (fresh start when student clicks start)
+  const createNewSession = async () => {
+    const authStore = useAuthStore()
+    if (!authStore.studentId) {
+      console.error('No student ID available')
+      return null
+    }
+
+    try {
       console.log('Creating new exam session...')
 
       // Reset all exam state for fresh start
@@ -189,7 +205,7 @@ export const useExamStore = defineStore('exam', () => {
 
       return newSession.session_id
     } catch (error) {
-      console.error('Failed to initialize session:', error)
+      console.error('Failed to create new session:', error)
       return null
     }
   }
@@ -652,6 +668,7 @@ export const useExamStore = defineStore('exam', () => {
     lastResult.value = null
     topicFilter.value = null // Reset topic filter for fresh exam
     isLoadingQuestions.value = false // Reset loading state
+    isResuming.value = false // Reset resumption flag
     // Reset time from config so resuming after a different exam type is correct
     remainingTime.value = examConfig.value.durationSeconds
     currentQuestionIndex.value = 0
@@ -1392,6 +1409,7 @@ export const useExamStore = defineStore('exam', () => {
 
     // Actions
     initializeSession,
+    createNewSession,
     fetchExamData,
     resetExamState,
     selectDraftAnswer,
