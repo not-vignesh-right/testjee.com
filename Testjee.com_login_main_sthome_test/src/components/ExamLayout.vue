@@ -23,12 +23,6 @@
                 <p class="text-xs text-amber-700 leading-relaxed">You have already used your one allowed resume for this session. The exam has been submitted with your current progress. No further resumptions are permitted.</p>
               </div>
             </template>
-            <template v-else-if="isLiveMode">
-              <div class="p-4 rounded-xl bg-blue-50 border border-blue-200 text-left mb-2">
-                <p class="text-sm font-bold text-blue-800 mb-1">Exam Submitted</p>
-                <p class="text-xs text-blue-700 leading-relaxed">Resume requests for live proctored sessions aren't available yet. If this was accidental, please contact your instructor directly.</p>
-              </div>
-            </template>
             <template v-else>
               <button 
                 @click="showAppealForm = true" 
@@ -513,26 +507,23 @@ onUnmounted(async () => {
 const submitAppeal = async () => {
   appealStatus.value = 'submitting'
   appealError.value = ''
-  
+
   // Use remaining time tracked in the store
   const remainingSeconds = examStore.remainingTime
-  
-  const res = await examStore.submitSupportRequest(
-    appealReason.value,
-    appealCustomMessage.value,
-    remainingSeconds
-  )
-  
+
+  const res = isLiveMode.value
+    ? await liveStore.submitSupportRequest(appealReason.value, appealCustomMessage.value, remainingSeconds)
+    : await examStore.submitSupportRequest(appealReason.value, appealCustomMessage.value, remainingSeconds)
+
   if (res.success) {
     if (res.alreadyExists) {
       // A request already exists for this session (duplicate click or race condition)
       // Fetch it and start polling its status
       try {
-        const { data: existing } = await supabase
-          .from('exam_support_requests')
-          .select('*')
-          .eq('session_id', examStore.sessionId)
-          .maybeSingle()
+        const query = supabase.from('exam_support_requests').select('*')
+        const { data: existing } = isLiveMode.value
+          ? await query.eq('student_session_id', liveStore.studentSessionId).maybeSingle()
+          : await query.eq('session_id', examStore.sessionId).maybeSingle()
         if (existing) {
           activeRequest.value = existing
           appealStatus.value = existing.status // 'pending', 'approved', or 'rejected'
@@ -600,8 +591,10 @@ const resumeTest = async () => {
   }
   
   if (!activeRequest.value) return
-  
-  const res = await examStore.restoreResumedSession(activeRequest.value)
+
+  const res = isLiveMode.value
+    ? await liveStore.restoreResumedSession(activeRequest.value)
+    : await examStore.restoreResumedSession(activeRequest.value)
   if (res.success) {
     // Mark: this is now a resumed session — no more appeals if they exit again
     isResumedSession.value = true
@@ -609,17 +602,20 @@ const resumeTest = async () => {
     // BUG 8 FIX: Temporarily suppress fullscreen-change grace period
     // while we are programmatically re-entering fullscreen after resume
     isEnteringFullscreenOnResume.value = true
-    
+
     // Re-enter full screen
     await enforceFullScreen()
-    
+
     // Short delay to let the fullscreenchange event fire and settle
     // before re-enabling the grace period listener
     setTimeout(() => { isEnteringFullscreenOnResume.value = false }, 1500)
-    
+
     // Restart timer (remainingTime already set by restoreResumedSession)
+    if (isLiveMode.value) {
+      examStore.remainingTime = liveStore.timeRemainingSeconds
+    }
     examStore.startTimer()
-    
+
     // Clear overlay state
     autoSubmitReason.value = ''
     showAppealForm.value = false

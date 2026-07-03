@@ -1,771 +1,570 @@
-# Complete Live Exam System — Deep Technical Implementation Plan
+# Live Exam System — Master Implementation Plan
+> **Working Mode:**  
+> This file is the single source of truth. Updated after every phase.  
+> Code reviewed and re-planned by senior engineer after Phase 1 completion.
 
 ---
 
-## Part 1: Root Cause Analysis (Every Bug, Exact Location)
+## Phase Status Tracker
 
-### The Core Architectural Problem
+| Phase | Goal | Status |
+|---|---|---|
+| **Phase 1** | Make exam work end-to-end | ✅ Complete |
+| **Phase 2** | Data integrity (credentials, results, appeals, submit) | ✅ Complete |
+| **Phase 3** | Fairness & quality (subjects, shuffle, redirect loop) | ✅ Complete |
+| **Phase 4** | Admin UX overhaul (Dashboard, results, monitoring) | ✅ Complete |
+| **Phase 5** | Polish & production hardening | ✅ Complete |
 
-The system has **two separate exam engines** that were never properly connected:
+---
 
-| Engine | Store | Tables | Used By |
+---
+
+# ✅ PHASE 1 — Critical Path (Complete)
+
+**Goal:** Student can login → wait in lobby → start exam → see questions in ExamLayout → submit → see results
+
+## Phase 1 Code Review — Senior Notes
+
+Phase 1 is architecturally sound. The bridge pattern is the right call — reusing ExamLayout.vue's anti-cheat, fullscreen enforcement, and grace period logic instead of rebuilding it in LiveExamInterface.vue is excellent engineering. Here is the full review.
+
+### ✅ What is Good (Do Not Touch)
+
+**`liveExamBridge.js`** — Clean and well-commented. The fallback `deriveSubjectFromNumber()` is a smart stopgap. The comment on line 9 correctly identifies the assumption about shuffle boundaries. Keep it.
+
+**`examSessionStore.js`** — The personal end time fix (BUG-04) is correctly implemented client-side. `calculateTimeRemaining()` now correctly prefers `personalEndTime` over `scheduledEndTime`. The `stopTimer()` guard in `startTimer()` prevents interval stacking.
+
+**`router/index.js`** — The BUG-14 live mode bypass is correctly placed BEFORE the `requiresAdminAuth` and `requiresAuth` blocks. Order matters here — do not move it.
+
+**`ExamWaitingRoom.vue`** — The polling approach using `student_exam_login` RPC (which is SECURITY DEFINER) is the right way to bypass RLS for lobby status checks. Direct table reads would break in a locked-down RLS environment. Good decision.
+
+**`adminStore.js`** — Token-only localStorage pattern is correct. Keeping the full profile only in memory is a good security principle. The `verify_admin_session` RPC re-validation on every route guard is the right move.
+
+---
+
+### ⚠️ Phase 1 Remaining Issues (Fix in Phase 2+)
+
+| ID | File | Issue | Phase Fix |
 |---|---|---|---|
-| **Regular Exam** | `examStore.js` | `exam_sessions`, `results` | `ExamLayout.vue` + all sub-components |
-| **Live Session Exam** | `examSessionStore.js` | `student_exam_sessions`, `live_exam_sessions` | `LiveExamInterface.vue` (custom, incomplete) |
-
-`ExamLayout.vue` is the production-grade UI with fullscreen, anti-cheat, grace period, appeal/resume system, wake lock, and emergency submit. `LiveExamInterface.vue` is a lightweight prototype that has **none of these**. The fix is to use `ExamLayout.vue` for live sessions too, powered by a bridge layer.
-
----
-
-### Bug Table (Line-Level Precision)
-
-#### 🔴 BUG-01 — Exam screen is always blank after student clicks "Start"
-**File:** `ExamWaitingRoom.vue` → `beginExam()` function  
-**Root Cause:** `store.startExam()` (calls `start_student_exam` RPC) returns only `questionOrder` — an array of question IDs. It does NOT return question content. The next required call is `store.loadQuestions()` (calls `get_student_exam_questions` RPC) which fetches the actual question text, choices, and images. This call is never made.  
-**Result:** `LiveExamInterface.vue` renders with `store.questions = []`. Everything is blank. The exam is technically started in DB but student sees nothing.
-
-```js
-// CURRENT (broken) - ExamWaitingRoom.vue beginExam()
-const res = await store.startExam()
-if (!res.success) throw new Error(res.error)
-router.push(`/live-exam/${route.params.sessionCode}/active`)
-
-// FIXED
-const res = await store.startExam()
-if (!res.success) throw new Error(res.error)
-const loadRes = await store.loadQuestions()  // ← THIS LINE IS MISSING
-if (!loadRes.success) throw new Error('Failed to load questions')
-// Then bridge + navigate (see Part 3)
-```
+| BUG-05 | `AdminResumeRequests.vue` | `approveRequest()` writes to `exam_sessions` not `student_exam_sessions` | P2 |
+| BUG-06 | `SessionCredentials.vue` | Fallback queries `live_exam_students` (table does not exist) | P2 |
+| BUG-07 | `ExamResults.vue` | `maxScore` crashes when `results` array is empty | P2 |
+| BUG-08 | `ExamSubmitConfirmation.vue` | `.size` on plain object always returns `undefined` | P2 |
+| BUG-09 | `ScheduleExam.vue` | Subjects hardcoded to JEE | P3 |
+| BUG-10 | `ScheduleExam.vue` | Biased `sort(() => 0.5 - Math.random())` shuffle | P3 |
+| BUG-11 | `StudentResults.vue` | Direct table read on `student_exam_sessions` blocked by RLS | P1 ✓ |
+| BUG-12 | `ExamWaitingRoom.vue` | 5s poll for lobby status | P5 |
+| BUG-13 | `AdminLiveSessions.vue` | Back button from monitor causes redirect loop | P3 |
 
 ---
 
-#### 🔴 BUG-02 — Double-start corrupts session
-**File:** `LiveExamInterface.vue` → `onMounted` → lines 367–372  
-**Root Cause:** If `store.examStatus !== 'in_progress'`, the component calls `store.startExam()` again as a "fallback". But `startExam()` calls `start_student_exam` RPC which sets a new `question_order` in the DB row, overwriting the already-set order. Time tracking also restarts. This can desync the student's question sequence from what the DB has.
+### 🔍 Senior Review: New Hidden Issues Found
 
+**NEW-01 — `ExamResults.vue` filters out non-submitted students**
+Line 193 filters to only `submitted` and `auto_submitted`. Students who never started are completely hidden. Admin needs to see the full picture.
+Fix: Remove the filter. Show all students. Add "Did Not Attempt" status display.
+
+**NEW-02 — `ExamResults.vue` — Export button is a dead stub**
+Line 32-35: "Export Excel (WIP)" button has no @click handler. Wire it up in Phase 2 or disable it.
+
+**NEW-03 — `AdminResumeRequests.vue` only loads regular exam appeals**
+The `loadRequests()` query joins `exam_sessions` and `students` — the regular tables. Live exam appeals won't appear because they come from `student_exam_sessions` and `temp_students`. This is why BUG-05 is symptomless — no data means no crash.
+
+**NEW-04 — `AdminLiveSessions.vue` redirect is unconditional on direct navigation**
+The `?noRedirect=true` only works from the back button. Navigating directly to `/admin/sessions` bypasses this protection and causes a loop.
+
+**NEW-05 — `SessionCredentials.vue` — `sessionStorage` is never cleared**
+`'newSessionCredentials'` key has no TTL. Old credentials from a previous session can silently appear.
+Fix: After reading from sessionStorage, immediately call `sessionStorage.removeItem('newSessionCredentials')`.
+
+**NEW-06 — `liveExamBridge.js` hardcodes `examType = 'JEE_MAIN_FULL'`**
+Line 78. When NEET/KCET support is added, this will cause wrong scoring and subject labels.
+
+**NEW-07 — `AdminLayout.vue` uses 30s polling for the badge**
+Should be replaced with Supabase Realtime in Phase 4.
+
+**NEW-08 — `ExamWaitingRoom.vue` uses `alert()` on exam start failure**
+Line 275: `alert()` in a Vue SPA is bad UX. Replace with an inline error message.
+
+---
+
+---
+
+# ✅ PHASE 2 — Data Integrity (Complete)
+
+**Goal:** Fix all data correctness bugs. Every admin-facing view shows real, correct, complete data.
+
+> **Senior Review Note:** The phase 2 implementations are flawless. As noted, ensure your Supabase schema actually has the `end_time` column in `student_exam_sessions` before running the migration, otherwise `approveRequest` will fail. You can add it via: `ALTER TABLE student_exam_sessions ADD COLUMN IF NOT EXISTS end_time TIMESTAMP WITH TIME ZONE;`
+
+> Implement in order. Each item below is self-contained. Complete and test one before starting the next.
+
+---
+
+## 2.1 — Fix `SessionCredentials.vue` (BUG-06 + NEW-05)
+
+**File:** `src/components/admin/SessionCredentials.vue` — lines 128-196
+
+**Fix A — Clear sessionStorage immediately after reading (NEW-05):**
 ```js
-// CURRENT (broken) — LiveExamInterface.vue onMounted
-if (store.examStatus !== 'in_progress') {
-  await store.startExam()   // ← WRONG: double-starts, corrupts question_order
+if (parsed.sessionCode && parsed.credentials?.length > 0) {
+  meta.value = parsed
+  loading.value = false
+  sessionStorage.removeItem('newSessionCredentials') // ADD THIS
+  return
 }
 ```
 
-**Fix:** Remove this fallback entirely. `ExamWaitingRoom.vue` is the ONLY place `startExam()` should be called. If a student navigates back and re-enters, `examSessionStore` already has `examStatus = 'in_progress'` in memory and the DB row is intact.
-
----
-
-#### 🔴 BUG-03 — Timer never starts for live exam
-**File:** `LiveExamInterface.vue` — the component calls `store.loadQuestions()` in `onMounted` but never calls `store.startTimer()`. The `examSessionStore.startTimer()` method IS defined and works correctly — it was just never called after questions loaded.  
-**File:** `examSessionStore.js` → `startExam()` → line 121: timer IS started here (`startTimer()` is called) — but since BUG-01 prevents questions from loading, the student sees a blank screen even though the timer is counting in the background. The timer silently runs to zero and auto-submits an empty exam.
-
-**Fix cascade:** BUG-01 fix → questions load → timer already running from `startExam()` ✅
-
----
-
-#### 🔴 BUG-04 — Timer based on wrong reference point
-**File:** `examSessionStore.js` → `calculateTimeRemaining()` → line 286  
-**Root Cause:** Uses `sessionDetails.scheduledEndTime` (the originally scheduled end). But when admin clicks **"Start Early"**, the exam starts before the scheduled time. The `scheduled_end_time` in the DB is still the original end, but the actual per-student end time is `student_exam_start_time + duration_minutes`. These are different times.
-
-**Example:** Session scheduled 10:00–13:00. Admin starts at 09:45. Student starts at 09:47. `scheduled_end_time` = 13:00. `student_actual_end` = 09:47 + 180min = 12:47. Student gets 13min extra time silently.
-
-**Fix:** `start_student_exam` RPC should return `personal_end_time = start_time + duration`. The store should use this for the countdown, not `scheduled_end_time`.
-
----
-
-#### 🔴 BUG-05 — Resume appeal writes to wrong table/column
-**File:** `AdminResumeRequests.vue` → `approveRequest()` → lines 258–262  
-**Root Cause:** The approve function updates `exam_sessions` table:
+**Fix B — Rewrite `fetchFromDatabase()` to use correct tables (BUG-06):**
 ```js
-const { error: sessErr } = await supabase
-  .from('exam_sessions')       // ← WRONG TABLE for live sessions
-  .update({ is_submitted: false, end_time: null })
-  .eq('session_id', req.session_id)  // ← req.session_id is a live-session FK
+const fetchFromDatabase = async () => {
+  try {
+    if (!adminStore.adminProfile?.admin_id) {
+      errorMsg.value = 'Admin session expired. Please log in again.'
+      return
+    }
+
+    // Step A: Get session metadata + admin_test_id
+    const { data: sessionData, error: sessionError } = await supabase
+      .from('live_exam_sessions')
+      .select('session_code, session_name, admin_id, admin_test_id')
+      .eq('live_session_id', sessionId)
+      .single()
+
+    if (sessionError || !sessionData) {
+      errorMsg.value = 'Session not found.'
+      return
+    }
+
+    if (sessionData.admin_id !== adminStore.adminProfile.admin_id) {
+      errorMsg.value = 'Access denied.'
+      return
+    }
+
+    // Step B: Fetch credentials from temp_students using admin_test_id
+    const { data: studentsData, error: studentsError } = await supabase
+      .from('temp_students')
+      .select('username, student_name, roll_number')
+      .eq('admin_test_id', sessionData.admin_test_id)
+      .order('created_date', { ascending: true })
+
+    if (studentsError) {
+      errorMsg.value = 'Failed to load student credentials.'
+      return
+    }
+
+    meta.value = {
+      sessionCode: sessionData.session_code,
+      sessionName: sessionData.session_name,
+      credentials: studentsData || []
+    }
+  } catch (err) {
+    errorMsg.value = 'An unexpected error occurred.'
+  } finally {
+    loading.value = false
+  }
+}
 ```
 
-The `exam_support_requests` table's `session_id` column (from `ExamLayout.vue`'s `submitSupportRequest`) references `exam_sessions.session_id` (regular exam table). But the live exam uses `student_exam_sessions` (separate table). If the column foreign key is different, this update silently does nothing.
-
-**Fix:** 
-- For **regular exam** appeals: update `exam_sessions` (current behavior ✅)
-- For **live exam** appeals: update `student_exam_sessions` WHERE `student_session_id = req.student_session_id`
-- The `exam_support_requests` table needs a `student_session_id` column added to distinguish the two types.
+**Test Checklist:**
+- [ ] Create session → lands on credentials page → correct students shown
+- [ ] Reload the credentials page → DB fallback runs → correct students still shown
+- [ ] Navigate away, come back → no stale data from previous session
 
 ---
 
-#### 🔴 BUG-06 — SessionCredentials uses wrong table name
-**File:** `SessionCredentials.vue` → `fetchFromDatabase()` → line 174  
-**Root Cause:** The DB fallback fetch queries `live_exam_students` table. But examining the `ExamLogin.vue` SQL fix snippet (line 233–236), the actual table is `temp_students` (with `admin_test_id` FK, joined to `live_exam_sessions` via `admin_test_id`).
+## 2.2 — Fix `ExamResults.vue` (BUG-07 + NEW-01 + NEW-02)
 
+**File:** `src/components/admin/ExamResults.vue`
+
+**Fix A — Null-safe `maxScore` (BUG-07):**
 ```js
-// CURRENT (broken)
-const { data: studentsData } = await supabase
-  .from('live_exam_students')   // ← TABLE DOES NOT EXIST
-  .select('username')
-  .eq('live_session_id', sessionId)
-
-// FIXED
-const { data: studentsData } = await supabase
-  .from('temp_students')        // ← Correct table
-  .select('username, student_name, roll_number')
-  .eq('admin_test_id', sessionData.admin_test_id)
-  .order('created_at', { ascending: true })
+// REPLACE the maxScore computed with:
+const maxScore = computed(() =>
+  results.value.find(r => r.max_score)?.max_score
+  ?? sessionMeta.value?.max_score
+  ?? 300
+)
 ```
 
----
-
-#### 🔴 BUG-07 — ExamResults crashes with no submissions
-**File:** `ExamResults.vue` → `maxScore` computed → line 205  
-**Root Cause:**
+**Fix B — Show ALL students, not just submitted (NEW-01):**
 ```js
-const maxScore = computed(() => {
-  if (results.value.length === 0) return 0
-  return results.value[0].max_score  // ← if results[0].max_score is undefined, returns undefined
+// REPLACE line 193:
+results.value = (resultsData || []).sort((a, b) => {
+  if (a.rank && b.rank) return a.rank - b.rank
+  if (a.rank) return -1
+  if (b.rank) return 1
+  return (a.student_name || '').localeCompare(b.student_name || '')
 })
 ```
-When session is live and no one has submitted yet, `results.value` is empty after the filter on line 193. `results.value[0]` is `undefined`. Even with the guard, `results.value[0].max_score` throws if somehow the guard is bypassed. Additionally `averageScore.toFixed(1)` on line 55 crashes if `averageScore` returns `NaN`.
 
-**Fix:** 
-```js
-const maxScore = computed(() => results.value[0]?.max_score ?? sessionMeta.value?.max_score ?? 300)
-const averageScore = computed(() => {
-  if (!results.value.length) return 0
-  return results.value.reduce((a, c) => a + (Number(c.score) || 0), 0) / results.value.length
-})
+Add "Did Not Attempt" badge in the status column:
+```html
+<span v-if="student.status === 'not_started'"
+  class="px-2 py-1 rounded text-xs font-bold uppercase bg-gray-100 text-gray-500">
+  Did Not Attempt
+</span>
 ```
+
+**Fix C — Wire up CSV Export (NEW-02):**
+Add `@click="exportCSV"` to the export button, then add this function:
+```js
+const exportCSV = () => {
+  const headers = ['Rank', 'Name', 'Roll No.', 'User ID', 'Score', 'Max Score', 'Percentage', 'Time Taken', 'Status']
+  const rows = results.value.map(s => [
+    s.rank ?? '-',
+    s.student_name ?? 'Anonymous',
+    s.roll_number ?? '-',
+    s.username,
+    s.score ?? '-',
+    maxScore.value,
+    s.percentage ? Number(s.percentage).toFixed(1) + '%' : '-',
+    formatDuration(s.time_taken_seconds),
+    s.status
+  ])
+  const csvContent = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${sessionMeta.value?.session_name ?? 'results'}_${Date.now()}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+```
+
+**Test Checklist:**
+- [ ] Open results before anyone submits → no crash, shows all students as "Did Not Attempt"
+- [ ] After submit → student row updates with score and rank
+- [ ] Export button → .csv file downloads with correct data
+- [ ] `maxScore` shows 300 when no submissions exist
 
 ---
 
-#### 🟡 BUG-08 — ExamSubmitConfirmation: markedForReview count is always 0
-**File:** `ExamSubmitConfirmation.vue` → line 45  
-**Root Cause:** `store.markedForReview` in `examSessionStore` is a plain object `{}`. The template checks `store.markedForReview.size` — `.size` is a `Map` property, not applicable to plain objects. Result: always `undefined`, the warning banner never shows.
+## 2.3 — Fix `AdminResumeRequests.vue` (BUG-05 + NEW-03)
 
-**Fix:**
+**File:** `src/components/admin/AdminResumeRequests.vue`
+
+**Required DB Change first — run in Supabase SQL editor:**
+```sql
+ALTER TABLE exam_support_requests 
+ADD COLUMN IF NOT EXISTS student_session_id INTEGER 
+REFERENCES student_exam_sessions(student_session_id);
+```
+
+**Fix `loadRequests()` to include `student_session_id`:**
 ```js
-// Template: replace .size with Object.keys()
+const { data, error } = await supabase
+  .from('exam_support_requests')
+  .select(`
+    request_id, session_id, student_session_id,
+    student_id, reason, custom_message,
+    remaining_time_seconds, answers, status, created_at,
+    exam_sessions(exam_type, start_time, total_duration_seconds),
+    students(student_name, email_id)
+  `)
+  .order('created_at', { ascending: false })
+```
+
+**Fix `approveRequest()` to write to the correct table:**
+```js
+async function approveRequest(req) {
+  actionLoadingId.value = req.request_id
+  actionResult.value[req.request_id] = null
+  try {
+    // 1. Mark request as approved
+    const { error: reqErr } = await supabase
+      .from('exam_support_requests')
+      .update({ status: 'approved', updated_at: new Date().toISOString() })
+      .eq('request_id', req.request_id)
+    if (reqErr) throw reqErr
+
+    // 2. Reopen the correct session table based on appeal type
+    if (req.student_session_id) {
+      // LIVE exam appeal
+      const { error: sessErr } = await supabase
+        .from('student_exam_sessions')
+        .update({ status: 'in_progress', end_time: null })
+        .eq('student_session_id', req.student_session_id)
+      if (sessErr) throw sessErr
+    } else {
+      // Regular exam appeal (legacy path — keep working)
+      const { error: sessErr } = await supabase
+        .from('exam_sessions')
+        .update({ is_submitted: false, end_time: null })
+        .eq('session_id', req.session_id)
+      if (sessErr) throw sessErr
+    }
+
+    actionResult.value[req.request_id] = {
+      success: true,
+      message: '✅ Approved! Session reopened. Student can now resume.'
+    }
+    const idx = requests.value.findIndex(r => r.request_id === req.request_id)
+    if (idx !== -1) requests.value[idx].status = 'approved'
+  } catch (err) {
+    actionResult.value[req.request_id] = { success: false, message: `❌ Failed: ${err.message}` }
+  } finally {
+    actionLoadingId.value = null
+  }
+}
+```
+
+**Test Checklist:**
+- [ ] Student in live exam gets auto-submitted → appeal submitted with `student_session_id`
+- [ ] Admin sees the pending request card
+- [ ] Admin approves → `student_exam_sessions` status updated to `in_progress`
+- [ ] Student can resume with answers intact
+- [ ] Regular exam appeal still works (old path unchanged)
+
+---
+
+## 2.4 — Fix `ExamSubmitConfirmation.vue` (BUG-08)
+
+**File:** `src/components/live-exam/ExamSubmitConfirmation.vue`
+
+```html
+<!-- BEFORE: -->
+v-if="store.markedForReview.size > 0"
+{{ store.markedForReview.size }} questions marked
+
+<!-- AFTER: -->
 v-if="Object.keys(store.markedForReview).length > 0"
-// Content: 
 {{ Object.keys(store.markedForReview).length }} questions marked
 ```
 
 ---
 
-#### 🟡 BUG-09 — ScheduleExam: subjects hardcoded, ignores category
-**File:** `ScheduleExam.vue` → `handleCreateSession()` → line 229  
-**Root Cause:**
-```js
-for (const subjectName of ['Physics', 'Chemistry', 'Mathematics']) { ... }
-```
-This is hardcoded. If admin selects NEET category, it still fetches Physics/Chemistry/Math (JEE subjects). NEET needs Physics/Chemistry/Botany/Zoology.
+---
 
-**Fix:** After selecting `category_id`, dynamically fetch which subjects belong to it:
-```js
-const { data: subjectRows } = await supabase
-  .from('questions')
-  .select('subjects!inner(subject_name)')
-  .eq('category_id', formData.value.category_id)
-  .limit(1000)
+# ✅ PHASE 3 — Fairness & Session Quality (Complete)
 
-const uniqueSubjects = [...new Set(subjectRows.map(r => r.subjects.subject_name))]
-```
-Or better: maintain a `category → examType` mapping that derives the subject list from `EXAM_CONFIGS`.
+**Goal:** Every exam type generates correct questions. No redirect loops. Shuffle is statistically fair.
+
+> **Implementation Note (3.1 deviated from the plan's literal snippet):** The plan's
+> `EXAM_SUBJECT_CONFIG` keyed by `category_name` strings ('JEE Main'/'NEET UG'/'KCET')
+> assumed those exist as rows in the `categories` table. They don't — `categories` only
+> tags which underlying question bank (JEE-pool vs NEET-pool) a question belongs to;
+> `category_id` is shared across multiple exam types (e.g. KCET Maths also pulls from the
+> JEE pool). The actual source of truth for subjects/question-counts/marking per exam type
+> is `EXAM_CONFIGS` in `examConfigs.js` — the same config the student dashboard already
+> uses. Implemented instead: a real "Exam Type" dropdown in `ScheduleExam.vue` sourced from
+> `EXAM_CONFIGS`, a new `exam_type` column on `live_exam_sessions` (see
+> `add-exam-type-to-live-sessions.sql`) plus an additive `set_live_session_exam_type` RPC to
+> persist the choice, and `ExamWaitingRoom.vue`/`liveExamBridge.js` now read that value back
+> through the bridge instead of hardcoding `JEE_MAIN_FULL`.
 
 ---
 
-#### 🟡 BUG-10 — Fisher-Yates shuffle missing (biased distribution)
-**File:** `ScheduleExam.vue` → line 243  
-**Root Cause:** `[...mcqs].sort(() => 0.5 - Math.random())` — this is a well-known incorrect shuffle. The distribution is non-uniform; some orderings appear more frequently than others. For a fair exam system, this matters.
+## 3.1 — Dynamic Subject Mapping (BUG-09)
 
-**Fix:** Fisher-Yates:
-```js
-const shuffle = (arr) => {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-```
-(Note: `examStore.js` already has a correct `shuffleArray` — reuse it)
+**Files:** `src/components/admin/ScheduleExam.vue`, `src/components/live-exam/ExamWaitingRoom.vue`, `src/stores/liveExamBridge.js`, `add-exam-type-to-live-sessions.sql`
+
+**Implementation:**
+Instead of hardcoding subjects, the question assembly loop is now fully config-driven.
+- `ScheduleExam.vue` uses a real Exam Type dropdown sourced from `EXAM_CONFIGS`.
+- Subjects, synonym-based subject lookup, per-subject MCQ/numeric counts, difficulty filters, and cross-category pools all now come from the config.
+- Added `add-exam-type-to-live-sessions.sql` which adds an `exam_type` column on `live_exam_sessions` (defaulting to `JEE_MAIN_FULL`) and a new `set_live_session_exam_type` RPC.
+- `ExamWaitingRoom.vue` reads that `exam_type` back and passes it through the bridge.
 
 ---
 
-#### 🟡 BUG-11 — StudentResults blocked by RLS
-**File:** `StudentResults.vue` → `onMounted` → line 125  
-**Root Cause:** Direct Supabase query to `student_exam_sessions` without a `SECURITY DEFINER` function. Row Level Security will prevent students from reading this table unless RLS policies explicitly allow it. If policies aren't set up, result is silently empty data or a permission error.
+## 3.2 — Fisher-Yates Shuffle (BUG-10)
 
-**Fix:** Create a Supabase RPC `get_my_live_exam_result(input_student_session_id)` with `SECURITY DEFINER` that returns the student's result safely.
+**File:** `src/components/admin/ScheduleExam.vue`
 
----
-
-#### 🟡 BUG-12 — ExamWaitingRoom: "Start Early" not detected fast enough
-**File:** `ExamWaitingRoom.vue` → polling interval: 5 seconds  
-**Root Cause:** Status polling runs every 5 seconds. When admin clicks "Start Early", up to 5 seconds pass before student's lobby updates. During that gap, students sit in lobby confused. Not a crash bug but a UX problem.
-
-**Fix:** Add a Supabase Realtime subscription on `live_exam_sessions` for this session code as a primary notification mechanism, with polling as fallback.
+**Implementation:**
+Replaced the biased `.sort(() => 0.5 - Math.random())` in both the MCQ and numeric selection with a proper Fisher-Yates shuffle function to ensure a statistically fair randomization of questions.
 
 ---
 
-#### 🟡 BUG-13 — Admin sessions list auto-redirects on back-button
-**File:** `AdminLiveSessions.vue` → `onMounted` → lines 214–220  
-**Root Cause:** When a live session exists, admin is forcibly redirected to the monitor. Using `?noRedirect=true` works only for manual navigation. After using browser back-button from the monitor, the URL won't have `?noRedirect=true` so admin is trapped in a redirect loop.
+## 3.3 — Fix Redirect Loop (BUG-13 + NEW-04)
 
-**Fix:** Use `router.replace` with a state flag:
-```js
-const hasSeenRedirect = sessionStorage.getItem(`redirected_${liveSession.live_session_id}`)
-if (liveSession && !hasSeenRedirect) {
-  sessionStorage.setItem(`redirected_${liveSession.live_session_id}`, '1')
-  router.replace(`/admin/sessions/${liveSession.live_session_id}/monitor`)
-}
-```
+**Files:** `src/components/admin/AdminLiveSessions.vue`, `src/components/admin/LiveExamMonitor.vue`
+
+**Implementation:**
+Redirect-to-monitor now happens at most once per session per tab via a `sessionStorage` guard. 
+Additionally, `LiveExamMonitor.vue` marks the session as "seen" the moment it mounts, ensuring that if an admin clicks "Back to Sessions List", they don't immediately bounce back to the monitor.
 
 ---
 
-#### 🟡 BUG-14 — ExamLayout.vue not usable for live sessions (auth guard)
-**File:** `router/index.js` → line 83, and `ExamLayout.vue` → `onMounted` → line 373  
-**Root Cause:** The `/exam` route has `meta: { requiresAuth: true }` which requires a Supabase authenticated user session. Live exam students are NOT authenticated via Supabase (they use temp student credentials via `examSessionStore`). Navigating to `/exam?mode=live` would fail the auth guard and redirect to login.
+## 3.4 — Fix Hardcoded Exam Type in Bridge (NEW-06)
 
-**Fix:** Add a bypass condition to the router guard:
-```js
-// router/index.js
-if (to.path === '/exam' && to.query.mode === 'live') {
-  // Live exam mode — student already authenticated via examSessionStore
-  // Verify examSessionStore has an active session
-  const liveStore = useExamSessionStore()
-  if (!liveStore.studentSessionId) return next('/live-exam') // No live session = redirect
-  return next() // Allow through
-}
-```
-And in `ExamLayout.vue` `onMounted`:
-```js
-// Instead of checking auth.isAuthenticated for live mode:
-if (isLiveMode.value) {
-  if (!liveStore.studentSessionId) {
-    router.push(`/live-exam`)
-    return
-  }
-  // Skip regular exam init
-  ...
-}
-```
+**File:** `src/stores/liveExamBridge.js`
+
+**Implementation:**
+The bridge function now accepts a real `examType` parameter (including in the subject-derivation fallback), defaulting to `JEE_MAIN_FULL` only when nothing better is available.
 
 ---
 
-## Part 2: Architecture — The Bridge Pattern (Definitive)
+---
 
-### Core Design
+# ✅ PHASE 4 — Admin UX Overhaul (Complete)
 
-```
-examSessionStore.js          examStore.js (ExamLayout engine)
-─────────────────            ──────────────────────────────
-loginToExam()         ──────────────────────────────────────
-startExam()           ──→  bridge:  questions, remainingTime,
-loadQuestions()       ──→           sessionId, answers,
-                                    questionStatuses
-                                          │
-                                          ▼
-                                   ExamLayout.vue
-                              (ALL security features active)
-                              - Fullscreen enforcement
-                              - Tab-switch detection
-                              - Grace period (10s warning)
-                              - Emergency submit
-                              - Wake Lock API
-                              - Appeal / resume form
-                              - Subject tabs via HeaderBar
-                              - Question palette
-                              - Mark for review
-                              - Numeric limit enforcement
-                              - Anti-copy/paste/F12
-```
+**Goal:** The admin panel feels like a professional product. Every page gives instant, actionable insight.
 
-### Data Mapping (examSessionStore → examStore)
-
-The live exam questions from `get_student_exam_questions` RPC return:
-```js
-// examSessionStore.questions[i] shape (from RPC)
-{
-  question_id: 42,
-  question_number: 1,
-  question_type: 'multiple_choice',
-  question_content: { text: '...', stem: '...' },
-  image_url: 'https://...',
-  selected_answer: 'a',    // previously saved
-  is_marked_for_review: false,
-  time_spent_seconds: 45,
-  choices: {
-    choice1: { text: 'Option A' },
-    choice2: { text: 'Option B' },
-    choice3: { text: 'Option C' },
-    choice4: { text: 'Option D' },
-    correct_answer: 'b'
-  }
-}
-```
-
-`examStore.questions[i]` shape (what ExamLayout's sub-components expect):
-```js
-{
-  id: 42,                          // maps from question_id
-  text: '...',                     // maps from question_content.text
-  image_url: 'https://...',
-  subject: 'Physics',              // ← needs to come from question_number grouping
-  topic: 'Optics',
-  question_type: 'multiple_choice',
-  options: [
-    { id: 'a', text: 'Option A' },
-    { id: 'b', text: 'Option B' },
-    { id: 'c', text: 'Option C' },
-    { id: 'd', text: 'Option D' },
-  ]
-}
-```
-
-**Key gap:** The live RPC doesn't return `subject` per question. The `get_student_exam_questions` RPC should be updated to `JOIN subjects ON questions.subject_id = subjects.subject_id` and return `subject_name`. This is a DB-level fix.
-
-### The Bridge Function (exact code)
-
-New file: `src/stores/liveExamBridge.js`
-
-```js
-import { useExamStore } from './examStore'
-import { useExamSessionStore } from './examSessionStore'
-import { EXAM_CONFIGS } from '../data/examConfigs'
-
-/**
- * Copies live exam session data into examStore so ExamLayout.vue can run it.
- * Call this AFTER examSessionStore.loadQuestions() has populated questions.
- */
-export async function bridgeLiveSessionToExamStore() {
-  const examStore = useExamStore()
-  const liveStore = useExamSessionStore()
-
-  if (!liveStore.questions || liveStore.questions.length === 0) {
-    throw new Error('No questions loaded in examSessionStore. Call loadQuestions() first.')
-  }
-
-  // --- 1. Build examStore-format questions ---
-  // Determine subject grouping from question_number ranges
-  // The RPC question_order determines how questions are grouped by subject.
-  // We rely on the question having a subject_name field (DB fix needed).
-  const mappedQuestions = liveStore.questions.map(q => ({
-    id: q.question_id,
-    text: q.question_content?.text || q.question_content?.stem || '',
-    image_url: q.image_url || null,
-    subject: q.subject_name || deriveSubjectFromNumber(q.question_number, liveStore.sessionDetails),
-    topic: q.topic_name || '',
-    question_type: q.question_type,
-    options: q.question_type === 'multiple_choice' ? [
-      { id: 'a', text: q.choices?.choice1?.text || q.choices?.choice1 || '' },
-      { id: 'b', text: q.choices?.choice2?.text || q.choices?.choice2 || '' },
-      { id: 'c', text: q.choices?.choice3?.text || q.choices?.choice3 || '' },
-      { id: 'd', text: q.choices?.choice4?.text || q.choices?.choice4 || '' },
-    ] : null,
-    correct_answer: q.choices?.correct_answer || null // Only used at submit
-  }))
-
-  // --- 2. Set questions ---
-  examStore.questions = mappedQuestions
-
-  // --- 3. Restore saved answers ---
-  examStore.userAnswers = { ...liveStore.answers }
-
-  // --- 4. Restore marked for review ---
-  const statuses = {}
-  mappedQuestions.forEach(q => {
-    statuses[q.id] = {
-      visited: true,
-      answered: !!liveStore.answers[q.question_id],
-      marked: !!liveStore.markedForReview[q.question_id]
-    }
-  })
-  examStore.questionStatuses = statuses
-
-  // --- 5. Set timer from server-authoritative end time ---
-  // Use personal end time (student's start + duration), NOT scheduled_end_time
-  const endTime = liveStore.sessionDetails.personalEndTime
-    || liveStore.sessionDetails.scheduledEndTime
-
-  const nowMs = Date.now()
-  const endMs = new Date(endTime).getTime()
-  examStore.remainingTime = Math.max(0, Math.floor((endMs - nowMs) / 1000))
-
-  // --- 6. Set sessionId for examStore submit to reference ---
-  // This is the live student_exam_sessions ID (NOT exam_sessions)
-  // Store it separately so ExamLayout knows which system to submit to
-  examStore.liveStudentSessionId = liveStore.studentSessionId
-  examStore.isLiveMode = true
-
-  // --- 7. Set exam type for marking scheme ---
-  // Derive from session category — map category_id to exam type
-  examStore.examType = liveStore.sessionDetails.examType || 'JEE_MAIN_FULL'
-
-  console.log(`✅ Bridge complete: ${mappedQuestions.length} questions, ${examStore.remainingTime}s remaining`)
-}
-```
+> **Implementation Note:** 4.1–4.6 implemented largely as specified, with two deliberate
+> deviations. (1) 4.2/4.3's Realtime subscriptions keep a slow fallback poll (60s/15s
+> instead of removing polling outright) — Realtime requires replication to be enabled per
+> table in the Supabase dashboard (Database → Replication) and I can't confirm that's done;
+> without a fallback the badge/tracker would silently freeze if it isn't. (2) 4.6's
+> duplicate-session prefill can't reliably read `duration_minutes`/`exam_type` off
+> `get_admin_live_sessions`'s return shape (outside my visibility) — it derives duration
+> from the scheduled start/end window as a fallback and leaves `exam_type` for
+> `ScheduleExam.vue` to default if absent, merging prefill fields individually rather than
+> blindly overwriting the form.
 
 ---
 
-## Part 3: ExamLayout.vue Changes (Exact)
+## 4.1 — `AdminHome.vue` — Live Now Banner
 
-### New State Variables
-```js
-import { useRoute } from 'vue-router'
-import { useExamSessionStore } from '../stores/examSessionStore'
-
-const route = useRoute()
-const liveStore = useExamSessionStore()
-
-// Live mode detection
-const isLiveMode = computed(() => examStore.isLiveMode === true)
-const liveSessionCode = computed(() => route.query.sessionCode)
-```
-
-### onMounted Override for Live Mode
-```js
-onMounted(async () => {
-  // LIVE MODE: questions already loaded and bridged by ExamWaitingRoom
-  if (isLiveMode.value) {
-    if (!liveStore.studentSessionId) {
-      router.push('/live-exam')
-      return
-    }
-    setupSecurityListeners()
-    showInstructions.value = false  // Skip instructions — lobby was the instructions
-    isResumedSession.value = false
-    examStore.startTimer()          // Timer uses examStore.remainingTime (already set by bridge)
-    enforceFullScreen()
-    await requestWakeLock()
-    return  // ← CRITICAL: Skip the rest of onMounted
-  }
-  
-  // Regular exam flow (unchanged below this point)
-  if (!auth.isAuthenticated) return
-  setupSecurityListeners()
-  ...
-})
-```
-
-### Submit Override for Live Mode
-```js
-// Override submitExam to route to live results
-const handleExamSubmit = async (isAuto = false) => {
-  if (isLiveMode.value) {
-    examStore.isManuallySubmitting = !isAuto
-    // Flush time tracking for current question first
-    const currQ = examStore.currentQuestion
-    if (currQ && examStore.currentStartTime) {
-      const elapsed = (Date.now() - examStore.currentStartTime) / 1000
-      examStore.timeSpent[currQ.id] = (examStore.timeSpent[currQ.id] || 0) + elapsed
-    }
-    // Submit via live exam store (writes to student_exam_sessions + score calc)
-    const res = await liveStore.submitExam(isAuto)
-    if (res.success) {
-      examStore.isSubmitted = true
-      router.push(`/live-exam/${liveSessionCode.value}/results`)
-    }
-    return
-  }
-  // Regular submit (unchanged)
-  await examStore.submitExam()
-}
-```
-
-### Appeal System for Live Mode
-The existing `submitAppeal` function in `ExamLayout.vue` calls `examStore.submitSupportRequest()` which inserts to `exam_support_requests` table with `session_id = examStore.sessionId`.
-
-In live mode, we need to insert with `student_session_id = liveStore.studentSessionId` as well.
-
-**Modified `submitSupportRequest` call in live mode:**
-```js
-const submitAppeal = async () => {
-  if (isLiveMode.value) {
-    // Live mode: use examSessionStore's studentSessionId
-    const res = await liveStore.submitSupportRequest(
-      appealReason.value,
-      appealCustomMessage.value,
-      examStore.remainingTime,
-      examStore.userAnswers,
-      examStore.questions
-    )
-    // ... rest same
-    return
-  }
-  // Regular mode (unchanged)
-  ...
-}
-```
+**Implementation:**
+Added a dynamic "Live Now" banner above the Stats Grid. It detects the active live session (via `get_admin_live_sessions`), displays the elapsed time using a local timer based on `scheduled_start_time`, and provides a quick link to open the monitor.
 
 ---
 
-## Part 4: New ExamWaitingRoom.vue `beginExam()` (Complete)
+## 4.2 & 4.3 — Realtime Subscriptions (NEW-07 & Progress Tracker)
 
-```js
-import { useExamStore } from '../../stores/examStore'
-import { bridgeLiveSessionToExamStore } from '../../stores/liveExamBridge'
+**Files:** `src/components/admin/AdminLayout.vue`, `src/components/admin/LiveExamMonitor.vue`
 
-const beginExam = async () => {
-  loadingStart.value = true
-  
-  try {
-    // Step 1: Start exam in DB — gets question_order, creates student_exam_sessions row
-    const startRes = await store.startExam()
-    if (!startRes.success) throw new Error(startRes.error || 'Failed to start exam')
-
-    // Step 2: Load question content (text, choices, images) from DB
-    const loadRes = await store.loadQuestions()
-    if (!loadRes.success) throw new Error('Failed to load questions from server')
-
-    // Step 3: Bridge data into examStore for ExamLayout.vue
-    await bridgeLiveSessionToExamStore()
-
-    // Step 4: Navigate to the full exam UI (ExamLayout.vue with live mode)
-    router.push(`/exam?mode=live&sessionCode=${route.params.sessionCode}`)
-
-  } catch(err) {
-    console.error('Failed to begin exam:', err)
-    alert(err.message || 'Could not start exam. Please refresh and try again.')
-    loadingStart.value = false
-  }
-}
-```
+**Implementation:**
+- **Resume Badge (`AdminLayout.vue`):** Added a Supabase Realtime subscription to `exam_support_requests` to instantly update the pending requests badge.
+- **Progress Tracker (`LiveExamMonitor.vue`):** Added a Realtime subscription to `student_exam_sessions` to instantly refresh the progress bar and student statuses.
+- **Safety Fallback:** Kept a slow fallback poll (60s and 15s respectively) just in case Supabase Replication isn't enabled for these tables in the dashboard, preventing the UI from silently freezing.
 
 ---
 
-## Part 5: New Admin Features (Complete List)
+## 4.4 — `ExamResults.vue` — Search Filter + Score Distribution Chart
 
-### Existing Features (Keep + Fix)
-1. Dashboard with test/student usage bars
-2. Session list with tabs (All/Scheduled/Live/Completed)
-3. Schedule New Exam form
-4. Session Credentials printable page
-5. Live Monitor with force-end
-6. Results leaderboard
-7. Resume requests queue
-
-### New Features to Add
-
-#### 📊 Feature: Real-Time Dashboard Enhancement
-**Location:** `AdminHome.vue`  
-**What:** Add a "Live Activity" card that appears when any session is live
-- Shows: session name, enrolled/in-progress/submitted counts
-- One-click "Go to Monitor" button
-- Auto-disappears when no live sessions
-- Pending resume requests count with direct link
-
-#### 📤 Feature: Export Results to Excel/CSV
-**Location:** `ExamResults.vue` — replace the "Export Excel (WIP)" stub  
-**What:** Generate and download CSV of the leaderboard  
-```js
-const exportCSV = () => {
-  const rows = [
-    ['Rank', 'Student Name', 'Roll Number', 'Score', 'Max Score', 'Percentage', 'Time Taken', 'Status'],
-    ...results.value.map(s => [
-      s.rank, s.student_name, s.roll_number,
-      s.score, maxScore.value,
-      Number(s.percentage).toFixed(1) + '%',
-      formatDuration(s.time_taken_seconds),
-      s.status
-    ])
-  ]
-  const csv = rows.map(r => r.join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href = url
-  a.download = `${sessionMeta.value.session_name}_results.csv`
-  a.click()
-}
-```
-
-#### 📋 Feature: Session Duplication
-**Location:** `AdminLiveSessions.vue` — add "Duplicate" action on completed sessions  
-**What:** Admin clicks "Duplicate" → pre-fills `ScheduleExam.vue` form with same category, duration, student count, instructions. Admin just picks a new start time and creates.
-
-#### 🔔 Feature: Real-Time Resume Request Notifications
-**Location:** `AdminLayout.vue` badge + new toast system  
-**What:** Use Supabase Realtime subscription on `exam_support_requests` instead of polling every 30s
-```js
-// In AdminLayout.vue
-const subscription = supabase
-  .channel('resume-requests')
-  .on('postgres_changes', {
-    event: 'INSERT',
-    schema: 'public',
-    table: 'exam_support_requests',
-    filter: 'status=eq.pending'
-  }, (payload) => {
-    pendingResumeCount.value++
-    showToast(`New resume request from ${payload.new.student_name}`)
-  })
-  .subscribe()
-```
-
-#### 📈 Feature: Per-Student Answer Breakdown in Results
-**Location:** `ExamResults.vue` — expandable row  
-**What:** Click a student row → expand to show subject-wise breakdown:
-- Physics: 12/20 correct, 4 wrong, 4 unattempted
-- Chemistry: 15/20 correct, 2 wrong, 3 unattempted
-- Math: 10/25 correct, 8 wrong, 7 unattempted
-
-#### ⏱️ Feature: Session Countdown in Admin Header
-**Location:** `AdminLayout.vue`  
-**What:** When a live session exists, show a live elapsed-time counter in the header for any admin page (not just the monitor)
-
-#### 🛑 Feature: Cancel/Archive Session
-**Location:** `AdminLiveSessions.vue` — for scheduled sessions  
-**What:** Allow admin to cancel a not-yet-started session, freeing up the student slots
-
-#### 📱 Feature: Share Credentials via WhatsApp/Copy Link
-**Location:** `SessionCredentials.vue`  
-**What:** Generate a shareable link `https://testjee.com/live-exam/{SESSION_CODE}` with a one-click copy button and WhatsApp share button
-
-#### 📊 Feature: Live Monitor Progress Bar
-**Location:** `LiveExamMonitor.vue`  
-**What:** Replace the dummy "activity feed" with a real progress bar showing % submitted
-
-#### 📝 Feature: Pre-Exam Instructions Editor
-**Location:** `ScheduleExam.vue`  
-**What:** The instructions textarea should use a rich text editor (or at least support line breaks). The `ExamWaitingRoom` should display these instructions to students in the lobby.
-
-#### 🔍 Feature: Search/Filter in Results Leaderboard
-**Location:** `ExamResults.vue`  
-**What:** Client-side search by student name or roll number in the results table
-
-#### 🏷️ Feature: Session Tags/Labels
-**Location:** `AdminLiveSessions.vue`, `ScheduleExam.vue`  
-**What:** Optional label field (e.g., "Batch A", "Morning Slot") visible in the sessions list
-
-#### 📊 Feature: Score Distribution Histogram
-**Location:** `ExamResults.vue`  
-**What:** Simple bar chart showing how many students scored in each range (0-60, 60-120, 120-180, 180-240, 240-300)
+**Implementation:**
+- **Search Filter:** Added a client-side search query over the full leaderboard array (filtering by name, roll number, or username).
+- **Score Distribution:** Implemented a pure CSS bucketed bar chart that derives 10 proportional buckets based on the `max_score` and automatically scales height percentages without needing any external chart libraries.
 
 ---
 
-## Part 6: New Supabase RPCs Needed
+## 4.5 & 4.6 — Session Actions & Duplicate Session
 
-### RPC-1: `get_student_live_result(input_student_session_id)`
+**Files:** `src/components/admin/SessionCredentials.vue`, `src/components/admin/AdminLiveSessions.vue`, `src/components/admin/ScheduleExam.vue`
+
+**Implementation:**
+- **Share Options:** Added "Copy Link" and "WhatsApp Share" buttons that automatically formulate the login URL and session code.
+- **Duplicate Session:** Clicking duplicate sets a `prefillExamSession` in `sessionStorage` containing the core details (calculating duration fallback from start/end times). `ScheduleExam.vue` detects this on mount and safely merges the fields instead of a blind overwrite, leaving `exam_type` to default naturally.
+
+---
+
+---
+
+# ✅ PHASE 5 — Production Hardening (Complete)
+
+| # | Task | Why Critical | Status |
+|---|---|---|---|
+| 5.1 | Replace `alert()` in `ExamWaitingRoom.vue` with inline error (NEW-08) | Professional UX | ✅ Fixed |
+| 5.2 | Page reload recovery — sessionStorage bridge restore in `ExamLayout.vue` | Student reload during exam must not lose session | ✅ Already done (see note) |
+| 5.3 | Lobby status polling → Supabase Realtime (BUG-12) | Instant start detection, no 5s delay | ✅ Fixed |
+| 5.4 | Session tags/batch labels in ScheduleExam | Multi-batch management | ✅ Fixed |
+| 5.5 | Pre-exam instructions panel in lobby from session config | Students read rules before starting | ✅ Fixed (best-effort) |
+| 5.6 | Cancel/Archive scheduled session | Clean up unused sessions | ✅ Fixed (conservative) |
+| 5.7 | Pass category name through bridge for non-JEE subject derivation | Correct subject tabs for NEET/KCET | ✅ Already done (via Phase 3.1) |
+
+> **Implementation Notes:**
+> - **5.2** was already solved by an earlier commit (outside this plan) that intercepts
+>   `/exam?mode=live` reloads directly in `router/index.js`'s guard — re-running
+>   `loginToExam()` → `loadQuestions()` → `bridgeLiveSessionToExamStore()` using
+>   `sessionStorage`'s saved username + the URL's `sessionCode` before the component even
+>   mounts. `ExamLayout.vue`'s existing "attempt fullscreen, then grace-period-if-it-fails"
+>   logic (used for the regular exam's resume case too) handles the rest. No changes made
+>   here — re-implementing the plan's sessionStorage-flag snippet on top would have been
+>   redundant/conflicting with a working mechanism.
+> - **5.7** was already solved in Phase 3.1, which went further than "pass category name" —
+>   it passes the actual resolved `exam_type` (JEE/NEET/KCET variant) end-to-end through
+>   `live_exam_sessions.exam_type` → `ExamWaitingRoom.vue` → `liveExamBridge.js`.
+> - **5.3**: kept the existing 5s poll alongside the new Realtime subscription (same
+>   Realtime-replication-can't-be-confirmed reasoning as Phase 4).
+> - **5.6**: conservative by design — `cancel_live_exam_session` only flips `status` to
+>   `'cancelled'`. It does **not** decrement any admin quota counters
+>   (`tests_created`/`students_created`), since I can't verify from this codebase what
+>   `create_live_exam_session_custom` increments or by how much — guessing wrong here would
+>   silently corrupt an admin's quota. If you want cancelling to free up slots, decrement
+>   those columns in `add-batch-label-and-cancel-support.sql` once you've confirmed the
+>   exact counter semantics.
+> - **5.4/5.5**: `batch_label` and `instructions` are only shown where the underlying RPC
+>   (`get_admin_live_sessions` / `student_exam_login`) actually returns those columns — both
+>   are outside my visibility, so these degrade gracefully (simply don't render) rather than
+>   erroring if the columns aren't selected by those RPCs yet.
+
+---
+
+---
+
+# Part: All Bugs Reference (Master List)
+
+| ID | Severity | File | Description | Phase | Status |
+|---|---|---|---|---|---|
+| BUG-01 | 🔴 Critical | `ExamWaitingRoom.vue` | `loadQuestions()` never called | P1 | ✅ Fixed |
+| BUG-02 | 🔴 Critical | `LiveExamInterface.vue` | Double `startExam()` corrupts question order | P1 | ✅ Fixed |
+| BUG-03 | 🔴 Critical | `LiveExamInterface.vue` | Timer runs, questions never load | P1 | ✅ Fixed |
+| BUG-04 | 🔴 Critical | `examSessionStore.js` | Timer uses scheduledEndTime not personalEndTime | P1 | ✅ Fixed |
+| BUG-05 | 🔴 Critical | `AdminResumeRequests.vue` | Approve writes to wrong table | P2 | ✅ Fixed |
+| BUG-06 | 🔴 Critical | `SessionCredentials.vue` | Queries non-existent table | P2 | ✅ Fixed |
+| BUG-07 | 🔴 Critical | `ExamResults.vue` | Crashes when no submissions exist | P2 | ✅ Fixed |
+| BUG-08 | 🟡 Medium | `ExamSubmitConfirmation.vue` | `.size` on plain object = undefined | P2 | ✅ Fixed |
+| BUG-09 | 🟡 Medium | `ScheduleExam.vue` | Subjects hardcoded to JEE | P3 | ✅ Fixed |
+| BUG-10 | 🟡 Medium | `ScheduleExam.vue` | Biased shuffle | P3 | ✅ Fixed |
+| BUG-11 | 🟡 Medium | `StudentResults.vue` | RLS blocks direct table read | P1 | ✅ Fixed |
+| BUG-12 | 🟡 Medium | `ExamWaitingRoom.vue` | 5s poll delay in lobby | P5 | ✅ Fixed |
+| BUG-13 | 🟡 Medium | `AdminLiveSessions.vue` | Redirect loop on back navigation | P3 | ✅ Fixed |
+| BUG-14 | 🔴 Critical | `router/index.js` | Auth guard blocks live students | P1 | ✅ Fixed |
+| NEW-01 | 🟡 Medium | `ExamResults.vue` | Absentees hidden from leaderboard | P2 | ✅ Fixed |
+| NEW-02 | 🟡 Medium | `ExamResults.vue` | Export button is a dead stub | P2 | ✅ Fixed |
+| NEW-03 | 🔴 Critical | `AdminResumeRequests.vue` | Live exam appeals not visible | P2 | ✅ Fixed |
+| NEW-04 | 🟡 Medium | `AdminLiveSessions.vue` | Redirect loop not protected from direct URL | P3 | ✅ Fixed |
+| NEW-05 | 🟡 Medium | `SessionCredentials.vue` | Stale sessionStorage shows old credentials | P2 | ✅ Fixed |
+| NEW-06 | 🟡 Medium | `liveExamBridge.js` | Exam type hardcoded to JEE_MAIN_FULL | P3 | ✅ Fixed |
+| NEW-07 | 🟢 Low | `AdminLayout.vue` | Resume badge uses 30s poll instead of Realtime | P4 | ✅ Fixed |
+| NEW-08 | 🟢 Low | `ExamWaitingRoom.vue` | Uses alert() on exam start failure | P5 | ✅ Fixed |
+
+---
+
+## Part: Supabase Changes Required
+
+### Schema Change (needed before Phase 2.3)
 ```sql
-CREATE OR REPLACE FUNCTION get_student_live_result(input_student_session_id integer)
-RETURNS TABLE(
-  score numeric, max_score integer, percentage numeric,
-  rank integer, time_taken_seconds integer,
-  student_name text, roll_number text, status text
-)
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    ses.score, ses.max_score, ses.percentage,
-    ses.rank, ses.time_taken_seconds,
-    ts.student_name, ts.roll_number, ses.status::text
-  FROM student_exam_sessions ses
-  JOIN temp_students ts ON ts.temp_student_id = ses.temp_student_id
-  WHERE ses.student_session_id = input_student_session_id;
-END; $$;
+ALTER TABLE exam_support_requests 
+ADD COLUMN IF NOT EXISTS student_session_id INTEGER 
+REFERENCES student_exam_sessions(student_session_id);
 ```
 
-### RPC-2: `submit_live_exam_support_request(...)` 
-Similar to current `exam_support_requests` insert but includes `student_session_id` column.
+### RPC-1: `get_student_live_result` — ✅ Already created
 
-### Schema Change: `exam_support_requests`
-Add column: `student_session_id INTEGER REFERENCES student_exam_sessions(student_session_id)` to distinguish live vs regular appeals.
+### RPC-2: `get_student_exam_questions` — Add `subject_name` (Phase 3)
+```sql
+JOIN subjects s ON q.subject_id = s.subject_id
+-- Add s.subject_name to SELECT
+```
 
-### RPC-3: Update `get_student_exam_questions` to return subject_name
-Add `JOIN subjects s ON q.subject_id = s.subject_id` and return `s.subject_name` in the result set.
-
-### RPC-4: Update `start_student_exam` to return `personal_end_time`
-Return `now() + (duration_minutes * interval '1 minute')` as `personal_end_time`.
-
----
-
-## Part 7: Complete File Change Map
-
-| File | Action | Why |
-|---|---|---|
-| `ExamWaitingRoom.vue` | MODIFY | Fix BUG-01: add loadQuestions() + bridge + reroute |
-| `ExamLayout.vue` | MODIFY | Fix BUG-14: isLiveMode bypass, override submit/appeal |
-| `liveExamBridge.js` | CREATE NEW | Bridge utility function |
-| `router/index.js` | MODIFY | Fix BUG-14: live mode bypass guard |
-| `examSessionStore.js` | MODIFY | Add submitSupportRequest(), fix timer reference |
-| `AdminResumeRequests.vue` | MODIFY | Fix BUG-05: correct table for live session approval |
-| `SessionCredentials.vue` | MODIFY | Fix BUG-06: correct table name (temp_students) |
-| `ExamResults.vue` | MODIFY | Fix BUG-07: null safety + export CSV |
-| `ExamSubmitConfirmation.vue` | MODIFY | Fix BUG-08: markedForReview count |
-| `ScheduleExam.vue` | MODIFY | Fix BUG-09/10: dynamic subjects + Fisher-Yates |
-| `AdminLiveSessions.vue` | MODIFY | Fix BUG-13: session redirect loop |
-| `StudentResults.vue` | MODIFY | Fix BUG-11: use new RPC for results |
-| `AdminHome.vue` | MODIFY | New: live session status card |
-| `AdminLayout.vue` | MODIFY | New: Realtime badge, header countdown |
-| `LiveExamInterface.vue` | KEEP | Kept as fallback, no changes needed |
-| `LiveExamMonitor.vue` | MODIFY | New: real progress bar |
-| Supabase DB | MODIFY | New RPCs + schema changes |
+### RPC-3: `start_student_exam` — Add server-side `personal_end_time` (Phase 5, low priority)
+```sql
+now() + (les.duration_minutes * interval '1 minute') AS personal_end_time
+```
 
 ---
 
-## Part 8: Implementation Phases
+## Part: File Change Map
 
-### Phase 1 — Critical Path (Make Exam Work)
-**Goal:** Student can login → wait → start → see questions → submit → see results
-
-1. Fix `ExamWaitingRoom.vue` `beginExam()` (BUG-01)
-2. Create `liveExamBridge.js`
-3. Modify `router/index.js` for live mode bypass (BUG-14)
-4. Modify `ExamLayout.vue` for live mode (isLiveMode, submit override)
-5. Update `start_student_exam` RPC to return `personal_end_time`
-6. Update `get_student_exam_questions` RPC to return `subject_name`
-7. Create `get_student_live_result` RPC
-8. Fix `StudentResults.vue` to use new RPC (BUG-11)
-
-### Phase 2 — Data Integrity
-**Goal:** Approval/resume works, credentials load, results don't crash
-
-9. Fix `AdminResumeRequests.vue` approve logic (BUG-05)
-10. Add `student_session_id` to `exam_support_requests` schema
-11. Fix `examSessionStore.js` to call `submitSupportRequest` correctly
-12. Fix `SessionCredentials.vue` table name (BUG-06)
-13. Fix `ExamResults.vue` null safety (BUG-07)
-14. Fix `ExamSubmitConfirmation.vue` markedForReview (BUG-08)
-
-### Phase 3 — Quality & Fairness
-**Goal:** Correct exam for all categories, fair question distribution
-
-15. Fix `ScheduleExam.vue` dynamic subjects (BUG-09)
-16. Fix `ScheduleExam.vue` Fisher-Yates shuffle (BUG-10)
-17. Fix `AdminLiveSessions.vue` redirect loop (BUG-13)
-18. Fix timer to use `personal_end_time` (BUG-04)
-
-### Phase 4 — Admin Features
-**Goal:** Admin has a professional, complete exam management dashboard
-
-19. `AdminHome.vue` live activity card
-20. `ExamResults.vue` CSV export + per-student breakdown
-21. `AdminLayout.vue` Realtime badge + countdown
-22. `SessionCredentials.vue` share link + copy button
-23. `AdminLiveSessions.vue` duplicate session action
-24. `LiveExamMonitor.vue` real progress bar
-
-### Phase 5 — Polish
-**Goal:** Production-ready experience
-
-25. `ExamWaitingRoom.vue` Realtime subscription (replace polling)
-26. Score distribution histogram in results
-27. Search/filter in leaderboard
-28. Session tags/labels
-29. Pre-exam instruction rich text in lobby
-
----
-
-## Part 9: End-to-End Test Script (13 steps)
-
-1. **Admin login** → `/admin` → Dashboard shows 0 sessions
-2. **Create session** → Schedule New Exam → Pick "JEE Main" category, "Test Batch A", 3 students, 30min, tomorrow 10:00 → Submit → **Verify:** credentials page shows 3 unique usernames + session code
-3. **Verify DB:** `live_exam_sessions` has 1 row status='scheduled', `temp_students` has 3 rows with `admin_test_id`
-4. **Student A login** → `/live-exam/{code}` → Enter username → Enter name + roll (first time) → Lobby shows countdown, "Waiting for instructor"
-5. **Student B login** → Same flow → Both students in lobby simultaneously
-6. **Admin starts exam** → Sessions list → "Start Early" on scheduled session → Confirm → Session becomes 'live' → Admin auto-redirected to monitor
-7. **Student lobby update** → Within 5 seconds (realtime or poll), both students see "Exam is now LIVE!" green button
-8. **Student A begins** → Click "Start Exam Now" → **Should land on ExamLayout.vue** → Fullscreen enforced → Questions visible with Physics/Chemistry/Math subject tabs → Timer shows remaining time
-9. **Verify:** Question palette visible, Mark for Review works, subject navigation works
-10. **Student A tab-switches** → Grace period overlay appears (10s countdown) → If no return: auto-submit → Appeal form appears → Student submits appeal
-11. **Admin resume request** → AdminResumeRequests shows pending request → Admin approves → Student sees "Approved!" message → Can resume exam
-12. **Student B submits voluntarily** → Confirm modal shows answered/unanswered counts → Submit → Redirects to StudentResults showing score (rank pending until session ends)
-13. **Admin force-ends exam** → LiveExamMonitor → "FORCE END EXAM EARLY" → All remaining auto-submitted → Redirected to ExamResults → Leaderboard shows Student A and B with ranks, scores, and percentages
+| File | Phase | Action | Reason |
+|---|---|---|---|
+| `SessionCredentials.vue` | P2 | MODIFY | BUG-06: correct table; NEW-05: clear stale sessionStorage |
+| `ExamResults.vue` | P2 | MODIFY | BUG-07: null safety; NEW-01: show all; NEW-02: CSV export |
+| `AdminResumeRequests.vue` | P2 | MODIFY | BUG-05: correct table; NEW-03: load live appeals |
+| `ExamSubmitConfirmation.vue` | P2 | MODIFY | BUG-08: Object.keys().length |
+| `ScheduleExam.vue` | P3 | MODIFY | BUG-09: dynamic subjects; BUG-10: Fisher-Yates |
+| `AdminLiveSessions.vue` | P3 | MODIFY | BUG-13 + NEW-04: per-session redirect flag |
+| `liveExamBridge.js` | P3 | MODIFY | NEW-06: pass exam type dynamically |
+| `AdminHome.vue` | P4 | MODIFY | Feature: Live Now banner |
+| `AdminLayout.vue` | P4 | MODIFY | Feature: Realtime resume badge |
+| `LiveExamMonitor.vue` | P4 | MODIFY | Feature: real progress bar + Realtime tracker |
+| `ExamResults.vue` | P4 | MODIFY | Feature: search + score distribution chart |
+| `SessionCredentials.vue` | P4 | MODIFY | Feature: copy link + WhatsApp share |
+| `AdminLiveSessions.vue` | P4 | MODIFY | Feature: duplicate session |
+| `ExamWaitingRoom.vue` | P5 | MODIFY | NEW-08: inline error; BUG-12: Realtime lobby |
+| `ExamLayout.vue` | P5 | MODIFY | 5.2: page reload recovery |
+| Supabase DB | P2 | SCHEMA | exam_support_requests.student_session_id column |
+| Supabase DB | P3 | RPC | get_student_exam_questions + subject_name |

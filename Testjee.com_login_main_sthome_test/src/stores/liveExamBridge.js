@@ -8,12 +8,11 @@ import { EXAM_CONFIGS } from '../data/examConfigs'
 // RPC is updated we derive the subject from the question's position within that fixed layout.
 // NOTE: this assumes start_student_exam only shuffles questions WITHIN each subject's block,
 // not across the whole paper — if that's not true, this grouping will mislabel subjects.
-const LIVE_EXAM_SUBJECT_LAYOUT = EXAM_CONFIGS.JEE_MAIN_FULL.subjects
-
-function deriveSubjectFromNumber(questionNumber, totalQuestions) {
-  const blockSize = Math.ceil(totalQuestions / LIVE_EXAM_SUBJECT_LAYOUT.length) || 1
-  const index = Math.min(Math.floor((questionNumber - 1) / blockSize), LIVE_EXAM_SUBJECT_LAYOUT.length - 1)
-  return LIVE_EXAM_SUBJECT_LAYOUT[index] || 'General'
+function deriveSubjectFromNumber(questionNumber, totalQuestions, examType) {
+  const subjects = (EXAM_CONFIGS[examType] ?? EXAM_CONFIGS.JEE_MAIN_FULL).subjects
+  const blockSize = Math.ceil(totalQuestions / subjects.length) || 1
+  const index = Math.min(Math.floor((questionNumber - 1) / blockSize), subjects.length - 1)
+  return subjects[index] || 'General'
 }
 
 /**
@@ -21,7 +20,7 @@ function deriveSubjectFromNumber(questionNumber, totalQuestions) {
  * grace period, appeal, question palette, etc.) can run it instead of the bare-bones
  * LiveExamInterface.vue. Call this AFTER examSessionStore.loadQuestions() has populated questions.
  */
-export function bridgeLiveSessionToExamStore(sessionCode) {
+export function bridgeLiveSessionToExamStore(sessionCode, examType = 'JEE_MAIN_FULL') {
   const examStore = useExamStore()
   const liveStore = useExamSessionStore()
 
@@ -35,7 +34,7 @@ export function bridgeLiveSessionToExamStore(sessionCode) {
     id: q.question_id,
     text: q.question_content?.text || q.question_content?.stem || q.question_content || '',
     image_url: q.image_url || null,
-    subject: q.subject_name || deriveSubjectFromNumber(q.question_number, totalQuestions),
+    subject: q.subject_name || deriveSubjectFromNumber(q.question_number, totalQuestions, examType),
     topic: q.topic_name || '',
     question_type: q.question_type,
     options: q.question_type === 'multiple_choice' ? [
@@ -75,7 +74,10 @@ export function bridgeLiveSessionToExamStore(sessionCode) {
   examStore.isSubmitted = false
   examStore.isLiveMode = true
   examStore.liveSessionCode = sessionCode
-  examStore.examType = 'JEE_MAIN_FULL'
+  // NEW-06: was hardcoded. Still defaults to JEE_MAIN_FULL because there's currently no
+  // per-session exam-type value stored anywhere upstream (see BUG-09) — callers can pass
+  // a real value once ScheduleExam.vue/live_exam_sessions actually track one.
+  examStore.examType = examType
 
   console.log(`✅ Live exam bridged: ${mappedQuestions.length} questions, ${examStore.remainingTime}s remaining`)
 }

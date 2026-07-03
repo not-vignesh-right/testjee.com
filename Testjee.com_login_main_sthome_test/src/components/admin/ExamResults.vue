@@ -29,9 +29,9 @@
         </div>
         
         <div class="flex items-center gap-3">
-           <button class="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 shadow-sm transition-colors gap-2 cursor-pointer">
+           <button @click="exportCSV" class="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 shadow-sm transition-colors gap-2 cursor-pointer">
               <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-              Export Excel (WIP)
+              Export CSV
            </button>
         </div>
       </div>
@@ -44,7 +44,7 @@
              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
              <h3 class="text-sm font-medium">Students Appeared</h3>
            </div>
-           <div class="text-2xl font-bold text-gray-900">{{ results.length }} <span class="text-sm font-normal text-gray-500">of {{ sessionMeta.total_students_enrolled }}</span></div>
+           <div class="text-2xl font-bold text-gray-900">{{ submittedResults.length }} <span class="text-sm font-normal text-gray-500">of {{ sessionMeta.total_students_enrolled }}</span></div>
         </div>
         
         <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
@@ -72,11 +72,34 @@
         </div>
       </div>
 
+      <!-- Score Distribution -->
+      <div v-if="submittedResults.length > 0" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 class="font-bold text-gray-900 mb-4">Score Distribution</h3>
+        <div class="flex items-end gap-1 h-24">
+          <div v-for="bucket in scoreBuckets" :key="bucket.label"
+            class="flex-1 bg-blue-500 hover:bg-blue-400 rounded-t transition-all cursor-default"
+            :style="`height: ${bucket.heightPct}%`"
+            :title="`${bucket.label}: ${bucket.count} students`">
+          </div>
+        </div>
+        <div class="flex gap-1 mt-1 text-xs text-gray-400">
+          <span v-for="bucket in scoreBuckets" :key="bucket.label" class="flex-1 text-center truncate">{{ bucket.label }}</span>
+        </div>
+      </div>
+
       <!-- Master Leaderboard Table -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div class="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 class="text-lg font-bold text-gray-900">Student Rankings & Leaderboard</h2>
-          <!-- Search omitted for now, UI scaffolding placeholder -->
+          <div class="relative w-full sm:w-64">
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search by name, roll no, or user ID..."
+              class="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
+            />
+            <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          </div>
         </div>
 
         <div class="overflow-x-auto">
@@ -92,7 +115,7 @@
                </tr>
              </thead>
              <tbody class="divide-y divide-gray-100">
-                <tr v-for="student in results" :key="student.username" class="hover:bg-gray-50/80 transition-colors group">
+                <tr v-for="student in filteredResults" :key="student.username" class="hover:bg-gray-50/80 transition-colors group">
                    
                    <td class="p-4 text-center">
                      <div class="flex items-center justify-center">
@@ -118,7 +141,7 @@
                         'bg-orange-100 text-orange-800 border-orange-200': student.status === 'auto_submitted'
                       }"
                      >
-                      {{ student.status === 'auto_submitted' ? 'Auto-Sub' : student.status.replace('_', ' ') }}
+                      {{ student.status === 'not_started' ? 'Did Not Attempt' : student.status === 'auto_submitted' ? 'Auto-Sub' : student.status.replace('_', ' ') }}
                      </span>
                    </td>
                    
@@ -136,9 +159,9 @@
                    </td>
                    
                 </tr>
-                <tr v-if="results.length === 0">
+                <tr v-if="filteredResults.length === 0">
                    <td colspan="6" class="p-12 text-center text-gray-500">
-                      No results data found.
+                      {{ searchQuery.trim() ? 'No students match your search.' : 'No results data found.' }}
                    </td>
                 </tr>
              </tbody>
@@ -190,7 +213,14 @@ onMounted(async () => {
        input_live_session_id: sessionId
     })
     
-    results.value = resultsData?.filter(r => r.status === 'submitted' || r.status === 'auto_submitted') || []
+    // NEW-01 fix: show every enrolled student (including those who never started),
+    // not just ones who submitted — sorted rank-first, then unranked alphabetically.
+    results.value = (resultsData || []).slice().sort((a, b) => {
+      if (a.rank && b.rank) return a.rank - b.rank
+      if (a.rank) return -1
+      if (b.rank) return 1
+      return (a.student_name || '').localeCompare(b.student_name || '')
+    })
 
   } catch (err) {
     console.error('Results load error:', err)
@@ -199,28 +229,90 @@ onMounted(async () => {
   }
 })
 
+// BUG-07 / NEW-01 fix: `results` now includes every enrolled student (not just those who
+// submitted), so the leaderboard table can show "Did Not Attempt" rows. But the summary
+// stats below must stay scoped to students who actually have a score — otherwise a session
+// with 2/20 submissions would show a misleadingly crashed average.
+const submittedResults = computed(() =>
+  results.value.filter(r => r.status === 'submitted' || r.status === 'auto_submitted')
+)
+
 // Computed Analytics
-const maxScore = computed(() => {
-   if (results.value.length === 0) return 0
-   return results.value[0].max_score // Assume uniformly fetched
-})
+const maxScore = computed(() =>
+  results.value.find(r => r.max_score)?.max_score ?? sessionMeta.value?.max_score ?? 300
+)
 
 const averageScore = computed(() => {
-   if (results.value.length === 0) return 0
-   const sum = results.value.reduce((acc, curr) => acc + (Number(curr.score) || 0), 0)
-   return sum / results.value.length
+   if (submittedResults.value.length === 0) return 0
+   const sum = submittedResults.value.reduce((acc, curr) => acc + (Number(curr.score) || 0), 0)
+   return sum / submittedResults.value.length
 })
 
 const highestScore = computed(() => {
-  if (results.value.length === 0) return 0
-  return Math.max(...results.value.map(s => Number(s.score) || 0))
+  if (submittedResults.value.length === 0) return 0
+  return Math.max(...submittedResults.value.map(s => Number(s.score) || 0))
 })
 
 const passRateText = computed(() => {
-  if (results.value.length === 0) return 0
-  const passes = results.value.filter(s => (Number(s.percentage) || 0) >= 40)
-  return ((passes.length / results.value.length) * 100).toFixed(1)
+  if (submittedResults.value.length === 0) return 0
+  const passes = submittedResults.value.filter(s => (Number(s.percentage) || 0) >= 40)
+  return ((passes.length / submittedResults.value.length) * 100).toFixed(1)
 })
+
+// 4.4: Search filter over the full leaderboard (including "Did Not Attempt" rows)
+const searchQuery = ref('')
+const filteredResults = computed(() => {
+  if (!searchQuery.value.trim()) return results.value
+  const q = searchQuery.value.toLowerCase()
+  return results.value.filter(s =>
+    (s.student_name ?? '').toLowerCase().includes(q) ||
+    (s.roll_number ?? '').toLowerCase().includes(q) ||
+    (s.username ?? '').toLowerCase().includes(q)
+  )
+})
+
+// 4.4: Score distribution (pure CSS, no chart library) — scoped to submitted students only
+const scoreBuckets = computed(() => {
+  const bucketCount = 10
+  if (!submittedResults.value.length || !maxScore.value) return []
+  const step = maxScore.value / bucketCount
+  const buckets = Array.from({ length: bucketCount }, (_, i) => ({
+    label: `${Math.round(i * step)}-${Math.round((i + 1) * step)}`,
+    count: 0
+  }))
+  submittedResults.value.forEach(s => {
+    if (s.score == null) return
+    // Clamp both ends: JEE-style negative marking means score can go below 0, which would
+    // otherwise produce a negative index and crash on buckets[idx].count++ below.
+    const idx = Math.max(0, Math.min(Math.floor(Number(s.score) / step), bucketCount - 1))
+    buckets[idx].count++
+  })
+  const maxCount = Math.max(...buckets.map(b => b.count), 1)
+  return buckets.map(b => ({ ...b, heightPct: (b.count / maxCount) * 100 }))
+})
+
+const exportCSV = () => {
+  const headers = ['Rank', 'Name', 'Roll No.', 'User ID', 'Score', 'Max Score', 'Percentage', 'Time Taken', 'Status']
+  const rows = results.value.map(s => [
+    s.rank ?? '-',
+    s.student_name ?? 'Anonymous',
+    s.roll_number ?? '-',
+    s.username,
+    s.score ?? '-',
+    maxScore.value,
+    s.percentage ? Number(s.percentage).toFixed(1) + '%' : '-',
+    formatDuration(s.time_taken_seconds),
+    s.status
+  ])
+  const csvContent = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${sessionMeta.value?.session_name ?? 'results'}_${Date.now()}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 const formatDuration = (totalSeconds) => {
   if (totalSeconds == null) return '-'

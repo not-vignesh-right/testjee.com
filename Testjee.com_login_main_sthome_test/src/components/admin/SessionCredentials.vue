@@ -31,13 +31,29 @@
           <h1 class="text-2xl font-bold text-gray-900">Session Credentials</h1>
           <p class="text-sm text-gray-500 mt-0.5">Distribute these User IDs to students before the exam.</p>
         </div>
-        <button
-          @click="printCredentials"
-          class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors w-full sm:w-auto justify-center"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-          Print / Save PDF
-        </button>
+        <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+          <button
+            @click="copyLink"
+            class="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors flex-1 sm:flex-none justify-center"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+            {{ copySuccess ? 'Copied!' : 'Copy Link' }}
+          </button>
+          <button
+            @click="shareWhatsApp"
+            class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors flex-1 sm:flex-none justify-center"
+          >
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 004.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm5.83 14.11c-.24.68-1.4 1.3-1.93 1.36-.52.06-1 .27-3.36-.7-2.85-1.18-4.68-4.05-4.82-4.24-.14-.19-1.15-1.53-1.15-2.92 0-1.39.73-2.07.99-2.35.26-.28.57-.35.76-.35h.55c.18 0 .42-.07.65.5.24.57.81 1.98.88 2.13.07.14.11.31.02.5-.09.19-.14.31-.28.47-.14.16-.29.36-.42.48-.14.14-.28.29-.12.57.16.28.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.22 1.37.28.14.44.12.6-.07.16-.19.68-.79.87-1.06.18-.28.36-.23.6-.14.24.09 1.55.73 1.81.86.26.14.44.2.5.31.06.12.06.65-.18 1.33z"/></svg>
+            Share on WhatsApp
+          </button>
+          <button
+            @click="printCredentials"
+            class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors flex-1 sm:flex-none justify-center"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            Print / Save PDF
+          </button>
+        </div>
       </div>
 
       <!-- Printable Area Start -->
@@ -105,7 +121,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../../lib/supabase'
 import { useAdminStore } from '../../stores/adminStore'
@@ -134,6 +150,9 @@ onMounted(async () => {
       if (parsed.sessionCode && parsed.credentials?.length > 0) {
         meta.value = parsed
         loading.value = false
+        // NEW-05 fix: clear immediately so a later, unrelated session doesn't
+        // accidentally pick up these stale credentials from sessionStorage.
+        sessionStorage.removeItem('newSessionCredentials')
         return
       }
     } catch {
@@ -152,10 +171,10 @@ const fetchFromDatabase = async () => {
       return
     }
 
-    // Fetch session metadata (session_code, session_name)
+    // Fetch session metadata (session_code, session_name, admin_test_id)
     const { data: sessionData, error: sessionError } = await supabase
       .from('live_exam_sessions')
-      .select('session_code, session_name, admin_id')
+      .select('session_code, session_name, admin_id, admin_test_id')
       .eq('live_session_id', sessionId)
       .single()
 
@@ -170,12 +189,13 @@ const fetchFromDatabase = async () => {
       return
     }
 
-    // Fetch student credentials for this session
+    // BUG-06 fix: student credentials live in temp_students (keyed by admin_test_id),
+    // not the non-existent `live_exam_students` table.
     const { data: studentsData, error: studentsError } = await supabase
-      .from('live_exam_students')
-      .select('username')
-      .eq('live_session_id', sessionId)
-      .order('created_at', { ascending: true })
+      .from('temp_students')
+      .select('username, student_name, roll_number')
+      .eq('admin_test_id', sessionData.admin_test_id)
+      .order('created_date', { ascending: true })
 
     if (studentsError) {
       errorMsg.value = 'Failed to load student credentials from the database.'
@@ -198,6 +218,30 @@ const fetchFromDatabase = async () => {
 
 const printCredentials = () => {
   window.print()
+}
+
+// 4.5: Copy link + WhatsApp share
+const sessionLink = computed(() => `https://login.testjee.com/live-exam/${meta.value.sessionCode}`)
+const copySuccess = ref(false)
+
+const copyLink = async () => {
+  try {
+    await navigator.clipboard.writeText(sessionLink.value)
+    copySuccess.value = true
+    setTimeout(() => { copySuccess.value = false }, 2000)
+  } catch (err) {
+    console.error('Failed to copy link:', err)
+  }
+}
+
+const shareWhatsApp = () => {
+  const text = encodeURIComponent(
+    `📝 *Exam Session: ${meta.value.sessionName}*\n` +
+    `🔗 Link: ${sessionLink.value}\n` +
+    `🔑 Session Code: ${meta.value.sessionCode}\n\n` +
+    `Login with your assigned User ID.`
+  )
+  window.open(`https://wa.me/?text=${text}`, '_blank')
 }
 </script>
 

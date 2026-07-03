@@ -203,19 +203,25 @@ const filteredRequests = computed(() => {
 async function loadRequests() {
   loading.value = true
   try {
+    // NEW-03 fix: also embed student_exam_sessions -> temp_students so live-exam appeals
+    // (which have no student_id/exam_sessions row) show up with the right student identity
+    // instead of silently being invisible.
     const { data, error } = await supabase
       .from('exam_support_requests')
-      .select('request_id,session_id,student_id,reason,custom_message,remaining_time_seconds,answers,status,created_at,exam_sessions(exam_type,start_time,total_duration_seconds),students(student_name,email_id)')
+      .select('request_id,session_id,student_session_id,student_id,reason,custom_message,remaining_time_seconds,answers,status,created_at,exam_sessions(exam_type,start_time,total_duration_seconds),students(student_name,email_id),student_exam_sessions(temp_students(student_name,roll_number))')
       .order('created_at', { ascending: false })
 
     if (error) throw error
 
-    requests.value = (data || []).map(r => ({
-      ...r,
-      exam_type: r.exam_sessions?.exam_type,
-      student_name: r.students?.student_name,
-      student_email: r.students?.email_id,
-    }))
+    requests.value = (data || []).map(r => {
+      const liveStudent = r.student_exam_sessions?.temp_students
+      return {
+        ...r,
+        exam_type: r.exam_sessions?.exam_type ?? (r.student_session_id ? 'Live Exam' : null),
+        student_name: r.students?.student_name ?? liveStudent?.student_name,
+        student_email: r.students?.email_id ?? (liveStudent ? `Roll: ${liveStudent.roll_number || '—'}` : null),
+      }
+    })
   } catch (err) {
     console.error('Error loading resume requests:', err)
   } finally {
@@ -234,13 +240,23 @@ async function approveRequest(req) {
       .eq('request_id', req.request_id)
     if (reqErr) throw reqErr
 
-    // 2. CRITICAL (BUG 2 FIX): Reopen the exam session in the DB
-    //    Without this, initializeSession() would create a brand-new session
-    const { error: sessErr } = await supabase
-      .from('exam_sessions')
-      .update({ is_submitted: false, end_time: null })
-      .eq('session_id', req.session_id)
-    if (sessErr) throw sessErr
+    // 2. Reopen the correct session table based on appeal type (BUG-05 fix).
+    //    Without this, the student's session stays closed and they can never resume.
+    if (req.student_session_id) {
+      // LIVE exam appeal
+      const { error: sessErr } = await supabase
+        .from('student_exam_sessions')
+        .update({ status: 'in_progress', end_time: null })
+        .eq('student_session_id', req.student_session_id)
+      if (sessErr) throw sessErr
+    } else {
+      // Regular exam appeal (unchanged path)
+      const { error: sessErr } = await supabase
+        .from('exam_sessions')
+        .update({ is_submitted: false, end_time: null })
+        .eq('session_id', req.session_id)
+      if (sessErr) throw sessErr
+    }
 
     actionResult.value[req.request_id] = {
       success: true,

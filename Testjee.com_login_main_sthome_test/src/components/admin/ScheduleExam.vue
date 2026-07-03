@@ -26,22 +26,22 @@
           <div class="space-y-6">
             
             <div class="form-group">
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Exam Category <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Exam Type <span class="text-red-500">*</span></label>
               <div class="relative">
-                <select 
-                  v-model="formData.category_id" 
+                <select
+                  v-model="formData.exam_type"
                   required
                   class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors appearance-none text-gray-700 font-medium"
                 >
-                  <option value="" disabled>Select a category...</option>
-                  <option v-for="cat in availableCategories" :key="cat.category_id" :value="cat.category_id">
-                    {{ cat.category_name }}
+                  <option v-for="opt in examTypeOptions" :key="opt.key" :value="opt.key">
+                    {{ opt.title }}
                   </option>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </div>
               </div>
+              <p class="text-xs text-gray-500 ml-1 mt-1.5">Determines the subjects, question mix, and marking scheme for this session.</p>
             </div>
 
             <div class="form-group">
@@ -101,6 +101,17 @@
             </div>
 
             <div class="form-group">
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Batch Label (Optional)</label>
+              <input
+                v-model="formData.batch_label"
+                type="text"
+                placeholder="e.g. Batch A, Morning Slot"
+                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors placeholder-gray-400"
+              />
+              <p class="text-xs text-gray-500 ml-1 mt-1.5">Shown on the sessions list to help distinguish multiple batches.</p>
+            </div>
+
+            <div class="form-group">
               <label class="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Instructions (Optional)</label>
               <textarea 
                 v-model="formData.instructions" 
@@ -143,17 +154,25 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../../lib/supabase'
 import { useAdminStore } from '../../stores/adminStore'
+import { EXAM_CONFIGS, getExamConfig } from '../../data/examConfigs'
 
 const router = useRouter()
 const adminStore = useAdminStore()
 
 const loading = ref(false)
 const errorMsg = ref('')
-const availableCategories = ref([])
+
+// BUG-09 fix: previously the category dropdown only tagged which question bank
+// (JEE-pool vs NEET-pool) to pull from, while the assembly loop below still always built
+// a hardcoded Physics/Chemistry/Mathematics paper regardless of what was picked — so
+// choosing NEET actually produced a broken/empty JEE-shaped exam. This replaces it with a
+// real Exam Type selector driven by the same EXAM_CONFIGS used by the student dashboard,
+// which is the actual source of truth for subjects/question counts/marking per exam type.
+const examTypeOptions = Object.entries(EXAM_CONFIGS).map(([key, cfg]) => ({ key, title: cfg.title }))
 
 // Enforce min datetime to local current time
 const minDateTime = computed(() => {
@@ -163,12 +182,38 @@ const minDateTime = computed(() => {
 })
 
 const formData = ref({
-  category_id: '',
+  exam_type: 'JEE_MAIN_FULL',
   session_name: '',
+  batch_label: '',
   start_time: minDateTime.value,
-  duration_minutes: 180,
+  duration_minutes: Math.round(EXAM_CONFIGS.JEE_MAIN_FULL.durationSeconds / 60),
   num_students: 20,
   instructions: 'Please do not refresh the page during the exam. Avoid switching tabs as your session may be monitored.'
+})
+
+// Reset duration to the exam type's default whenever it changes (admin can still tweak it)
+watch(() => formData.value.exam_type, (newType) => {
+  formData.value.duration_minutes = Math.round(getExamConfig(newType).durationSeconds / 60)
+})
+
+// 4.6: Prefill from "Duplicate" on AdminLiveSessions.vue. Merged field-by-field (not a
+// blind Object.assign) so a missing/invalid field falls back to this form's own defaults
+// instead of overwriting them with undefined or an exam_type that isn't in EXAM_CONFIGS.
+onMounted(() => {
+  const prefill = sessionStorage.getItem('prefillExamSession')
+  if (!prefill) return
+  try {
+    const parsed = JSON.parse(prefill)
+    if (parsed.session_name) formData.value.session_name = parsed.session_name
+    if (parsed.duration_minutes) formData.value.duration_minutes = parsed.duration_minutes
+    if (parsed.num_students) formData.value.num_students = parsed.num_students
+    if (parsed.exam_type && EXAM_CONFIGS[parsed.exam_type]) formData.value.exam_type = parsed.exam_type
+    if (parsed.instructions) formData.value.instructions = parsed.instructions
+    if (parsed.batch_label) formData.value.batch_label = parsed.batch_label
+  } catch (err) {
+    console.warn('Failed to apply session prefill:', err)
+  }
+  sessionStorage.removeItem('prefillExamSession')
 })
 
 // Max student cap calculated dynamically from the current profile
@@ -182,25 +227,15 @@ const isSubmitDisabled = computed(() => {
   return formData.value.num_students > availableStudentLimit.value || formData.value.num_students < 1
 })
 
-onMounted(async () => {
-  await fetchAvailableCategories()
-})
-
-const fetchAvailableCategories = async () => {
-  try {
-    const { data, error } = await supabase.from('categories').select('*')
-      
-    if (error) throw error
-    availableCategories.value = data || []
-    
-    // Auto select first category if available
-    if (availableCategories.value.length > 0) {
-      formData.value.category_id = availableCategories.value[0].category_id
-    }
-  } catch (err) {
-    console.error('Error fetching categories:', err)
-    errorMsg.value = 'Failed to load exam categories. Please refresh the page.'
+// BUG-10 fix: `.sort(() => 0.5 - Math.random())` is a well-known biased shuffle —
+// some orderings are far more likely than others. Fisher-Yates is uniform.
+function shuffleArray(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
   }
+  return a
 }
 
 const handleCreateSession = async () => {
@@ -215,54 +250,78 @@ const handleCreateSession = async () => {
 
   try {
     const inputDate = new Date(formData.value.start_time)
+    const examConfig = getExamConfig(formData.value.exam_type)
+    const categoryIds = Array.isArray(examConfig.categoryId) ? examConfig.categoryId : [examConfig.categoryId]
 
-    // 1. Generate Question IDs for the session
+    // 1. Resolve subject_ids for every canonical subject via its synonyms (e.g. NEET's
+    // "Botany" canonical name also matches rows literally named "Biology" in some pools)
+    const allSynonymNames = Array.from(new Set(Object.values(examConfig.subjectNameSynonyms).flat()))
     const { data: subjectsData, error: subjectsError } = await supabase
         .from('subjects')
         .select('subject_id, subject_name')
-        .in('subject_name', ['Physics', 'Chemistry', 'Mathematics'])
-    
+        .in('subject_name', allSynonymNames)
+
     if (subjectsError) throw subjectsError
-    
+
+    const lookupIdsFor = (canonicalName) => {
+      const candidates = examConfig.subjectNameSynonyms[canonicalName] || [canonicalName]
+      return (subjectsData || []).filter(s => candidates.includes(s.subject_name)).map(s => s.subject_id)
+    }
+
+    const mcqTarget = examConfig.questionsPerSubject.mcq
+    const numTarget = examConfig.hasNumeric ? examConfig.questionsPerSubject.numeric : 0
     const assembledQuestionIds = []
-    
-    for (const subjectName of ['Physics', 'Chemistry', 'Mathematics']) {
-      const subject = subjectsData.find(s => s.subject_name === subjectName)
-      if (!subject) continue
-      
-      // Fetch MCQs randomly
-      const { data: mcqs } = await supabase
-        .from('questions')
-        .select('question_id')
-        .eq('category_id', formData.value.category_id)
-        .eq('subject_id', subject.subject_id)
-        .eq('question_type', 'multiple_choice')
-        .limit(200)
-        
-      if (mcqs && mcqs.length) {
-         const shuffled = [...mcqs].sort(() => 0.5 - Math.random())
-         assembledQuestionIds.push(...shuffled.slice(0, 20).map(q => q.question_id))
+
+    for (const subjectName of examConfig.subjects) {
+      const subjectIds = lookupIdsFor(subjectName)
+      if (subjectIds.length === 0) {
+        console.warn(`No subject_id found for "${subjectName}" (exam type ${formData.value.exam_type})`)
+        continue
       }
-      
-      // Fetch Numericals randomly
-      const { data: nums } = await supabase
-        .from('questions')
-        .select('question_id')
-        .eq('category_id', formData.value.category_id)
-        .eq('subject_id', subject.subject_id)
-        .eq('question_type', 'numeric')
-        .limit(50)
-        
-      if (nums && nums.length) {
-         const shuffled = [...nums].sort(() => 0.5 - Math.random())
-         assembledQuestionIds.push(...shuffled.slice(0, 5).map(q => q.question_id))
+
+      // Split the per-subject target evenly across every mapped subject_id (e.g. a
+      // "Biology" canonical subject that maps to both Botany and Zoology rows)
+      const subCount = subjectIds.length
+      for (let i = 0; i < subCount; i++) {
+        const subId = subjectIds[i]
+        const subMcqTarget = Math.floor(mcqTarget / subCount) + (i < (mcqTarget % subCount) ? 1 : 0)
+        const subNumTarget = Math.floor(numTarget / subCount) + (i < (numTarget % subCount) ? 1 : 0)
+
+        if (subMcqTarget > 0) {
+          let mcqQuery = supabase
+            .from('questions')
+            .select('question_id')
+            .in('category_id', categoryIds)
+            .eq('subject_id', subId)
+            .eq('question_type', 'multiple_choice')
+          if (examConfig.difficultyFilter && examConfig.difficultyFilter.length > 0) {
+            mcqQuery = mcqQuery.in('difficulty', examConfig.difficultyFilter)
+          }
+          const { data: mcqs } = await mcqQuery.limit(Math.max(subMcqTarget * 5, 200))
+          if (mcqs && mcqs.length) {
+            assembledQuestionIds.push(...shuffleArray(mcqs).slice(0, subMcqTarget).map(q => q.question_id))
+          }
+        }
+
+        if (subNumTarget > 0) {
+          const { data: nums } = await supabase
+            .from('questions')
+            .select('question_id')
+            .in('category_id', categoryIds)
+            .eq('subject_id', subId)
+            .eq('question_type', 'numeric')
+            .limit(Math.max(subNumTarget * 5, 50))
+          if (nums && nums.length) {
+            assembledQuestionIds.push(...shuffleArray(nums).slice(0, subNumTarget).map(q => q.question_id))
+          }
+        }
       }
     }
-    
+
     if (assembledQuestionIds.length === 0) {
-      throw new Error("No questions found for this Category. Add questions first.")
+      throw new Error("No questions found for this Exam Type. Add questions first.")
     }
-    
+
     // 2. Transmit to secure RPC wrapper
     const { data, error } = await supabase.rpc('create_live_exam_session_custom', {
       input_admin_id: adminStore.adminProfile.admin_id,
@@ -281,7 +340,32 @@ const handleCreateSession = async () => {
 
     // Assuming the RPC returns array with one record
     const result = data[0]
-    
+
+    // Persist the chosen exam type (BUG-09 / NEW-06) via a separate additive RPC — best
+    // effort so exam creation still succeeds even if that migration hasn't been run yet.
+    try {
+      await supabase.rpc('set_live_session_exam_type', {
+        input_admin_id: adminStore.adminProfile.admin_id,
+        input_live_session_id: result.live_session_id,
+        input_exam_type: formData.value.exam_type
+      })
+    } catch (typeErr) {
+      console.warn('Could not persist exam_type on live session (non-fatal):', typeErr)
+    }
+
+    // 5.4: Persist the optional batch label the same best-effort way
+    if (formData.value.batch_label?.trim()) {
+      try {
+        await supabase.rpc('set_live_session_batch_label', {
+          input_admin_id: adminStore.adminProfile.admin_id,
+          input_live_session_id: result.live_session_id,
+          input_batch_label: formData.value.batch_label.trim()
+        })
+      } catch (labelErr) {
+        console.warn('Could not persist batch_label on live session (non-fatal):', labelErr)
+      }
+    }
+
     // Pass session data to SessionCredentials route
     // Note: Use navigation state or session storage for large credential payloads
     sessionStorage.setItem('newSessionCredentials', JSON.stringify({
@@ -291,7 +375,7 @@ const handleCreateSession = async () => {
     }))
 
     router.push(`/admin/sessions/${result.live_session_id}/credentials`)
-    
+
   } catch (err) {
     console.error('Failed to create live exam wrapper:', err)
     errorMsg.value = err.message || 'Server failed to build session constraints. Verify constraints.'

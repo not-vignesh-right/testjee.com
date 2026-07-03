@@ -2,7 +2,23 @@
   "permissions": {
     "allow": [
       "Bash(grep -i \"\\\\.sql$\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Skill(code-review)",
+      "Skill(code-review:*)",
+      "Bash(cp /tmp/full_diff.txt \"C:\\\\Users\\\\vigne\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--vignesh-files-Work-Gyanedge-GTA-testjee-com-Testjee-com-login-main-sthome-test\\\\e35830cf-053f-4dfb-b13c-1450d2174612\\\\scratchpad\\\\full_diff.txt\" 2>&1 || echo \"copy failed, will use git diff directly\")",
+      "Read(//d/vignesh/files/Work/Gyanedge/GTA/testjee.com/**)",
+      "Bash(cd \"/d/vignesh/files/Work/Gyanedge/GTA/testjee.com\" && grep -n \"isLiveMode\\\\|liveStore\\\\|studentSessionId\\\\|const examStore\" Testjee.com_login_main_sthome_test/src/components/ExamLayout.vue | head -80)",
+      "Bash(ls *.sql)",
+      "Bash(ls Testjee.com_login_main_sthome_test/*.sql)",
+      "Bash(cd \"/d/vignesh/files/Work/Gyanedge/GTA/testjee.com\" && wc -l Testjee.com_login_main_sthome_test/src/components/admin/AdminResumeRequests.vue)",
+      "Bash(cd \"/d/vignesh/files/Work/Gyanedge/GTA/testjee.com\" && sed -n '1,60p' \"Testjee.com_login_main_sthome_test/src/components/admin/LiveExamMonitor.vue\" | tail -40)",
+      "Bash(pkill -f \"vite --port 5173\")",
+      "Bash(cd \"/d/vignesh/files/Work/Gyanedge/GTA/testjee.com\" && grep -n \"fetchRealtimeSnapshot\\\\s*=\" -A 40 \"Testjee.com_login_main_sthome_test/src/components/admin/LiveExamMonitor.vue\" | head -60)",
+      "Bash(cd \"/d/vignesh/files/Work/Gyanedge/GTA/testjee.com\" && sed -n '190,230p' Testjee.com_login_main_sthome_test/src/components/admin/AdminLayout.vue)",
+      "Bash(find \"d:\\\\vignesh\\\\files\\\\Work\\\\Gyanedge\\\\GTA\\\\testjee.com\" -iname \"*.md\" 2>/dev/null | grep -i claude *)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
     ]
   }
 }

@@ -176,6 +176,7 @@ const handleLogout = () => {
 // Pending resume requests badge count
 const pendingResumeCount = ref(0)
 let badgePollInterval = null
+let realtimeSub = null
 
 async function fetchPendingCount() {
   try {
@@ -189,12 +190,36 @@ async function fetchPendingCount() {
 
 onMounted(async () => {
   await fetchPendingCount()
-  // Poll every 30s to update the badge
-  badgePollInterval = setInterval(fetchPendingCount, 30000)
+
+  // NEW-07: Realtime subscription instead of 30s polling — updates within ~1s of a
+  // student submitting or an admin actioning an appeal.
+  realtimeSub = supabase
+    .channel('admin-resume-watch')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'exam_support_requests'
+    }, () => {
+      pendingResumeCount.value++
+    })
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'exam_support_requests'
+    }, () => {
+      fetchPendingCount()
+    })
+    .subscribe()
+
+  // Safety-net fallback: Realtime requires replication to be enabled on this table in the
+  // Supabase dashboard (Database → Replication). Keep a slow poll so the badge doesn't get
+  // permanently stuck if that hasn't been turned on.
+  badgePollInterval = setInterval(fetchPendingCount, 60000)
 })
 
 onUnmounted(() => {
   if (badgePollInterval) clearInterval(badgePollInterval)
+  if (realtimeSub) supabase.removeChannel(realtimeSub)
 })
 </script>
 

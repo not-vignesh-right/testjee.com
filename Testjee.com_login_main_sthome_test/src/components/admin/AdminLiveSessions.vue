@@ -17,8 +17,8 @@
 
     <!-- Filters/Tabs -->
     <div class="bg-white rounded-t-xl border-b border-gray-200 px-6 pt-4 flex gap-6 overflow-x-auto no-scrollbar shadow-sm">
-      <button 
-        v-for="tab in ['All', 'Scheduled', 'Live', 'Completed']" 
+      <button
+        v-for="tab in ['All', 'Scheduled', 'Live', 'Completed', 'Cancelled']"
         :key="tab"
         @click="activeTab = tab.toLowerCase()"
         class="pb-4 text-sm font-medium transition-colors relative whitespace-nowrap"
@@ -65,19 +65,24 @@
                   :class="{
                     'bg-yellow-100 text-yellow-800 border-yellow-200': session.status === 'scheduled',
                     'bg-red-100 text-red-800 border-red-200 animate-pulse': session.status === 'live',
-                    'bg-green-100 text-green-800 border-green-200': session.status === 'completed'
+                    'bg-green-100 text-green-800 border-green-200': session.status === 'completed',
+                    'bg-gray-100 text-gray-500 border-gray-200': session.status === 'cancelled'
                   }"
                 >
                   <span v-if="session.status === 'live'" class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5 align-middle"></span>
                   {{ session.status }}
                 </span>
-                
+
+                <span v-if="session.batch_label" class="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200">
+                  {{ session.batch_label }}
+                </span>
+
                 <span class="text-sm font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200">
                    Code: {{ session.session_code }}
                 </span>
               </div>
-              
-              <h3 class="text-xl font-bold text-gray-900 mb-1 group-hover:text-blue-700 transition-colors">
+
+              <h3 class="text-xl font-bold text-gray-900 mb-1 group-hover:text-blue-700 transition-colors" :class="{ 'line-through opacity-50': session.status === 'cancelled' }">
                 {{ session.session_name }}
               </h3>
               <p class="text-sm text-gray-500 font-medium mb-4 flex items-center gap-1.5">
@@ -131,11 +136,17 @@
                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                      Start Early
                    </button>
-                   <button 
+                   <button
                      @click="router.push(`/admin/sessions/${session.live_session_id}/credentials`)"
                      class="flex-1 sm:flex-none px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-all flex items-center justify-center"
                    >
                      View Setup
+                   </button>
+                   <button
+                     @click="cancelSession(session)"
+                     class="px-4 py-2 bg-white border border-red-200 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-50 transition-all flex items-center justify-center"
+                   >
+                     Cancel
                    </button>
                  </template>
 
@@ -152,7 +163,7 @@
 
                  <!-- Completed State Actions -->
                  <template v-else-if="session.status === 'completed'">
-                   <button 
+                   <button
                      @click="router.push(`/admin/sessions/${session.live_session_id}/results`)"
                      class="flex-1 sm:flex-none px-4 py-2 bg-green-50 text-green-700 border border-green-200 text-sm font-semibold rounded-lg hover:bg-green-100 transition-all flex items-center justify-center gap-2"
                    >
@@ -160,6 +171,16 @@
                      View Results
                    </button>
                  </template>
+
+                 <!-- Duplicate action — available for any session state as a template to reuse -->
+                 <button
+                   @click="duplicateSession(session)"
+                   title="Duplicate as a new session"
+                   class="px-3 py-2 bg-white border border-gray-300 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5"
+                 >
+                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                   <span class="hidden sm:inline">Duplicate</span>
+                 </button>
 
                </div>
 
@@ -174,12 +195,11 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { supabase } from '../../lib/supabase'
 import { useAdminStore } from '../../stores/adminStore'
 
 const router = useRouter()
-const route = useRoute()
 const adminStore = useAdminStore()
 const loading = ref(true)
 const rawSessions = ref([])
@@ -209,11 +229,15 @@ const fetchSessions = async () => {
 onMounted(async () => {
   await fetchSessions()
   
-  // If there is an active live session, and we are not explicitly bypassing the redirection,
-  // automatically redirect straight to the live monitor page!
-  if (route.query.noRedirect !== 'true') {
-    const liveSession = rawSessions.value.find(s => s.status === 'live')
-    if (liveSession) {
+  // BUG-13 / NEW-04 fix: redirect to the live monitor at most once per session per tab,
+  // tracked via sessionStorage. The old `?noRedirect=true` query param only protected the
+  // back-button case — navigating here directly (e.g. via bookmark or the nav link) had no
+  // query param and re-triggered the redirect every time, trapping the admin in a loop.
+  const liveSession = rawSessions.value.find(s => s.status === 'live')
+  if (liveSession) {
+    const seenKey = `seen_live_redirect_${liveSession.live_session_id}`
+    if (!sessionStorage.getItem(seenKey)) {
+      sessionStorage.setItem(seenKey, '1')
       router.replace(`/admin/sessions/${liveSession.live_session_id}/monitor`)
       return
     }
@@ -246,6 +270,50 @@ const startExam = async (sessionId) => {
   } catch (err) {
     console.error('Failed to start exam:', err)
     alert(err.message || 'Failed to start exam')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 4.6: Duplicate session — prefills ScheduleExam.vue so the admin just picks a new time
+const duplicateSession = (session) => {
+  // get_admin_live_sessions may or may not expose duration_minutes/exam_type directly
+  // (those live on live_exam_sessions but this RPC is outside our control) — derive
+  // duration from the scheduled window as a fallback, and let ScheduleExam.vue default
+  // exam_type if it isn't present rather than prefilling something wrong.
+  const durationMinutes = session.duration_minutes
+    ?? (session.scheduled_start_time && session.scheduled_end_time
+      ? Math.round((new Date(session.scheduled_end_time) - new Date(session.scheduled_start_time)) / 60000)
+      : undefined)
+
+  sessionStorage.setItem('prefillExamSession', JSON.stringify({
+    session_name: `${session.session_name} (Copy)`,
+    duration_minutes: durationMinutes,
+    num_students: session.total_students_enrolled,
+    exam_type: session.exam_type,
+    instructions: session.instructions,
+    batch_label: session.batch_label
+  }))
+  router.push('/admin/sessions/new')
+}
+
+// 5.6: Cancel a not-yet-started session. Conservative — only flips status to 'cancelled'
+// server-side; does not free up admin quota (see add-batch-label-and-cancel-support.sql).
+const cancelSession = async (session) => {
+  if (!confirm(`Cancel "${session.session_name}"? Students will no longer be able to log in with these credentials.`)) return
+
+  loading.value = true
+  try {
+    const { data, error } = await supabase.rpc('cancel_live_exam_session', {
+      input_admin_id: adminStore.adminProfile.admin_id,
+      input_live_session_id: session.live_session_id
+    })
+    if (error) throw error
+    if (!data) throw new Error('Session could not be cancelled (it may have already started).')
+    await fetchSessions()
+  } catch (err) {
+    console.error('Failed to cancel session:', err)
+    alert(err.message || 'Failed to cancel session')
   } finally {
     loading.value = false
   }

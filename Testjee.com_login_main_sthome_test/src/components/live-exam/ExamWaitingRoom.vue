@@ -93,6 +93,21 @@
              <div v-show="canStartExam" class="absolute inset-0 bg-gradient-to-t from-green-50 to-transparent pointer-events-none opacity-50 z-0"></div>
           </div>
 
+          <!-- Inline Error (NEW-08: replaces alert() on start failure) -->
+          <div v-if="startError" class="max-w-md mx-auto mb-8 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-700 text-sm font-medium">
+             <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+             {{ startError }}
+          </div>
+
+          <!-- Admin-configured Instructions (5.5) — only shown if the session actually has some -->
+          <div v-if="store.sessionDetails.instructions" class="bg-amber-50/60 rounded-xl p-6 border border-amber-100 mb-6">
+             <h4 class="font-bold text-amber-900 mb-3 flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Instructions From Your Instructor
+             </h4>
+             <p class="text-sm text-amber-900/80 font-medium whitespace-pre-line">{{ store.sessionDetails.instructions }}</p>
+          </div>
+
           <!-- Instructions Panel -->
           <div class="bg-blue-50/50 rounded-xl p-6 border border-blue-100">
              <h4 class="font-bold text-blue-900 mb-4 flex items-center gap-2">
@@ -136,9 +151,11 @@ const route = useRoute()
 const store = useExamSessionStore()
 
 const loadingStart = ref(false)
+const startError = ref('')
 const pollInterval = ref(null)
 const countdownInterval = ref(null)
 const startCountdownDisplay = ref('00:00:00')
+let realtimeSub = null
 
 // Detect mobile/tablet devices — block from starting exam
 const isMobile = ref(false)
@@ -169,11 +186,25 @@ onMounted(() => {
 
   startCountdownTimers()
   startStatusPolling()
+
+  // BUG-12: Realtime fast-path — detects "Start Early" instantly instead of waiting up to
+  // 5s for the next poll. Kept the poll running too as a fallback, since this table's
+  // anon-read/Realtime access can't be confirmed without DB visibility (see checkStatusSafely).
+  realtimeSub = supabase
+    .channel(`lobby-${route.params.sessionCode}`)
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'live_exam_sessions',
+      filter: `session_code=eq.${route.params.sessionCode}`
+    }, () => checkStatusSafely())
+    .subscribe()
 })
 
 onUnmounted(() => {
   if (pollInterval.value) clearInterval(pollInterval.value)
   if (countdownInterval.value) clearInterval(countdownInterval.value)
+  if (realtimeSub) supabase.removeChannel(realtimeSub)
   window.removeEventListener('resize', checkDevice)
 })
 
@@ -252,6 +283,7 @@ const startCountdownTimers = () => {
 
 const beginExam = async () => {
   loadingStart.value = true
+  startError.value = ''
   try {
     // Step 1: Start exam in DB — gets question_order, creates/activates student_exam_sessions row
     const startRes = await store.startExam()
@@ -262,17 +294,31 @@ const beginExam = async () => {
     const loadRes = await store.loadQuestions()
     if (!loadRes.success) throw new Error('Failed to load questions from server')
 
-    // Step 3: Bridge live session data into examStore so ExamLayout.vue (fullscreen,
+    // Step 3: Best-effort fetch of the session's exam type (BUG-09/NEW-06) — falls back to
+    // the bridge's JEE_MAIN_FULL default if the column/migration isn't present yet.
+    let examType
+    try {
+      const { data: examTypeData } = await supabase
+        .from('live_exam_sessions')
+        .select('exam_type')
+        .eq('session_code', route.params.sessionCode)
+        .maybeSingle()
+      examType = examTypeData?.exam_type
+    } catch (typeErr) {
+      console.warn('Could not fetch exam_type for session (non-fatal):', typeErr)
+    }
+
+    // Step 4: Bridge live session data into examStore so ExamLayout.vue (fullscreen,
     // anti-cheat, grace period, question palette) can run the exam instead of the
     // lightweight LiveExamInterface.vue.
-    bridgeLiveSessionToExamStore(route.params.sessionCode)
+    bridgeLiveSessionToExamStore(route.params.sessionCode, examType)
 
-    // Step 4: Navigate to the full exam UI
+    // Step 5: Navigate to the full exam UI
     router.push(`/exam?mode=live&sessionCode=${route.params.sessionCode}`)
 
   } catch(err) {
     console.error('Failed to begin', err)
-    alert(err.message || 'Failed to start exam. Server might still be preparing.')
+    startError.value = err.message || 'Failed to start exam. Server might still be preparing.'
     loadingStart.value = false
   }
 }

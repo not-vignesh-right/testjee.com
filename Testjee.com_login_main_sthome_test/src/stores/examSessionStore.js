@@ -87,7 +87,10 @@ export const useExamSessionStore = defineStore('examSession', () => {
                 rollNumber: info.roll_number,
                 hasFilledDetails: info.has_filled_details,
                 sessionStatus: info.session_status,
-                canStart: info.can_start
+                canStart: info.can_start,
+                // 5.5: best-effort — only populated if student_exam_login's RPC already
+                // returns this column. Not present on all deployments (can't verify from here).
+                instructions: info.instructions ?? null
             }
 
             // If the exam is in_progress, fetch start_time to calculate personalEndTime correctly for reload/resume
@@ -305,6 +308,97 @@ export const useExamSessionStore = defineStore('examSession', () => {
     }
 
 
+    /**
+     * 7. Submit Support Request (Phase 2.3 — live-exam counterpart to examStore's
+     * submitSupportRequest, keyed by student_session_id instead of session_id/student_id)
+     */
+    const submitSupportRequest = async (reason, customMessage, remainingSeconds) => {
+        if (!studentSessionId.value) {
+            return { success: false, error: 'Session not initialized' }
+        }
+
+        try {
+            // Prevent duplicate requests for the same live session
+            const { data: existingRequest } = await supabase
+                .from('exam_support_requests')
+                .select('request_id, status')
+                .eq('student_session_id', studentSessionId.value)
+                .maybeSingle()
+
+            if (existingRequest) {
+                if (existingRequest.status === 'pending' || existingRequest.status === 'approved') {
+                    return { success: true, data: [existingRequest], alreadyExists: true }
+                }
+                return { success: false, error: 'You have already used your resume limit for this session.' }
+            }
+
+            const answersArray = questions.value.map(q => ({
+                question_id: q.question_id,
+                answer: answers.value[q.question_id] || null,
+                time_taken: Math.floor(timeSpent.value[q.question_id] || 0)
+            }))
+
+            const { data, error } = await supabase
+                .from('exam_support_requests')
+                .insert({
+                    student_session_id: studentSessionId.value,
+                    reason,
+                    custom_message: customMessage,
+                    remaining_time_seconds: remainingSeconds,
+                    answers: answersArray,
+                    status: 'pending'
+                })
+                .select()
+
+            if (error) throw error
+            return { success: true, data }
+        } catch (err) {
+            console.error('Failed to submit live support request:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
+    /**
+     * 8. Restore Resumed Session — called after admin approves a live-exam resume request.
+     * Unlike the regular exam, questions/answers are already DB-backed (saved continuously
+     * via saveAnswer), so there's no snapshot to restore — just re-arm the timer and status.
+     */
+    const restoreResumedSession = async (request) => {
+        try {
+            const { data: dbRequest, error: reqErr } = await supabase
+                .from('exam_support_requests')
+                .select('status')
+                .eq('request_id', request.request_id)
+                .single()
+
+            if (reqErr || !dbRequest) throw new Error('Support request not found.')
+            if (dbRequest.status !== 'approved') throw new Error('This request is no longer approved.')
+
+            const remaining = request.remaining_time_seconds
+            if (!remaining || remaining <= 0) {
+                return { success: false, error: 'Session time has already expired.' }
+            }
+
+            // Give back exactly the time remaining when the appeal was filed, starting now.
+            sessionDetails.value.personalEndTime = new Date(Date.now() + remaining * 1000).toISOString()
+            timeRemainingSeconds.value = remaining
+            examStatus.value = 'in_progress'
+            isTimeUpAlertGiver.value = false
+            startTimer()
+
+            // Consume the request so it can't be reused
+            await supabase
+                .from('exam_support_requests')
+                .update({ status: 'completed' })
+                .eq('request_id', request.request_id)
+
+            return { success: true }
+        } catch (err) {
+            console.error('Failed to restore resumed live session:', err)
+            return { success: false, error: err.message }
+        }
+    }
+
     // ------------------------------------------------------------------------
     // Setup & Utility
     // ------------------------------------------------------------------------
@@ -406,6 +500,8 @@ export const useExamSessionStore = defineStore('examSession', () => {
         saveAnswer,
         navigateToQuestion,
         submitExam,
+        submitSupportRequest,
+        restoreResumedSession,
         resetStore,
         calculateTimeRemaining,
         startTimer,

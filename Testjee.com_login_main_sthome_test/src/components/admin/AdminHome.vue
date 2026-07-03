@@ -18,6 +18,25 @@
           <p class="mt-1 text-sm text-gray-500">Monitor your institute's test and student capacity.</p>
         </div>
 
+        <!-- Live Now Banner -->
+        <div v-if="liveSession" class="mb-8 bg-gradient-to-r from-red-600 to-red-700 rounded-2xl p-6 text-white shadow-lg shadow-red-900/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <div class="w-3 h-3 bg-white rounded-full animate-pulse shrink-0"></div>
+            <div>
+              <p class="text-red-200 text-xs font-bold uppercase tracking-widest">Live Now</p>
+              <h3 class="text-xl font-black">{{ liveSession.session_name }}</h3>
+              <p class="text-red-200 text-sm mt-0.5">
+                {{ liveSession.students_submitted }} / {{ liveSession.total_students_enrolled }} submitted
+                · Elapsed: {{ liveElapsedDisplay }}
+              </p>
+            </div>
+          </div>
+          <button @click="router.push(`/admin/sessions/${liveSession.live_session_id}/monitor`)"
+            class="shrink-0 px-5 py-2.5 bg-white text-red-700 font-bold rounded-xl text-sm hover:bg-red-50 transition-colors shadow-sm">
+            → Open Monitor
+          </button>
+        </div>
+
         <!-- Stats Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           
@@ -102,13 +121,46 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminStore } from '../../stores/adminStore'
+import { supabase } from '../../lib/supabase'
 
 const router = useRouter()
 const adminStore = useAdminStore()
 const loading = ref(true)
+
+// Live Now banner
+const liveSession = ref(null)
+const liveElapsedDisplay = ref('00:00:00')
+let liveTimerInterval = null
+
+async function fetchLiveSession() {
+  if (!adminStore.adminProfile?.admin_id) return
+  try {
+    const { data } = await supabase.rpc('get_admin_live_sessions', {
+      input_admin_id: adminStore.adminProfile.admin_id
+    })
+    liveSession.value = data?.find(s => s.status === 'live') ?? null
+
+    if (liveTimerInterval) {
+      clearInterval(liveTimerInterval)
+      liveTimerInterval = null
+    }
+    // Note: uses scheduled_start_time, so like BUG-04, "Start Early" makes this elapsed
+    // display run ahead of the student's actual start — informational only, not scoring.
+    if (liveSession.value?.scheduled_start_time) {
+      const start = new Date(liveSession.value.scheduled_start_time).getTime()
+      liveTimerInterval = setInterval(() => {
+        const diff = Math.max(0, Math.floor((Date.now() - start) / 1000))
+        const h = Math.floor(diff / 3600), m = Math.floor((diff % 3600) / 60), s = diff % 60
+        liveElapsedDisplay.value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      }, 1000)
+    }
+  } catch (err) {
+    console.error('Failed to fetch live session for banner:', err)
+  }
+}
 
 const testsPercentage = computed(() => {
   if (!adminStore.adminProfile || adminStore.adminProfile.max_tests === 0) return 0
@@ -126,9 +178,14 @@ onMounted(async () => {
   try {
     // Refresh session to get latest stats when component loads
     await adminStore.loadSession()
+    await fetchLiveSession()
   } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  if (liveTimerInterval) clearInterval(liveTimerInterval)
 })
 
 </script>

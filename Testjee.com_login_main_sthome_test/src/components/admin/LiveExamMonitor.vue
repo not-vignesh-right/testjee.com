@@ -14,7 +14,7 @@
       <!-- Back Button to standard sessions list -->
       <div class="mb-4">
         <button 
-          @click="router.push('/admin/sessions?noRedirect=true')"
+          @click="router.push('/admin/sessions')"
           class="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors bg-white px-3.5 py-2 rounded-xl border border-gray-200 shadow-sm"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
@@ -68,6 +68,27 @@
         </div>
       </div>
 
+      <!-- Real Progress Bar -->
+      <div class="bg-gray-900 rounded-xl px-6 py-4 mb-6 border border-gray-800">
+        <div class="flex justify-between text-xs font-semibold text-gray-400 mb-2">
+          <span>Exam Progress</span>
+          <span>{{ sessionMeta.students_submitted }} of {{ sessionMeta.total_students_enrolled }} submitted</span>
+        </div>
+        <div class="w-full h-3 bg-gray-800 rounded-full overflow-hidden flex gap-0.5">
+          <div class="bg-green-500 h-full transition-all duration-700 ease-out rounded-l-full"
+            :style="`width: ${(sessionMeta.students_submitted / sessionMeta.total_students_enrolled) * 100}%`">
+          </div>
+          <div class="bg-blue-500 h-full transition-all duration-700 ease-out"
+            :style="`width: ${(sessionMeta.students_in_progress / sessionMeta.total_students_enrolled) * 100}%`">
+          </div>
+        </div>
+        <div class="flex gap-4 text-xs text-gray-500 mt-2">
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 block"></span>Submitted</span>
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500 block"></span>In Progress</span>
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-600 block"></span>Waiting</span>
+        </div>
+      </div>
+
       <!-- Live Activities Log & Control -->
       <div class="flex flex-col lg:flex-row gap-6 mb-6">
         
@@ -115,7 +136,7 @@
         <div class="w-full lg:w-2/3 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-[600px]">
            <div class="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 rounded-t-xl">
              <h3 class="font-bold text-gray-900">Live Status Tracker</h3>
-             <span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded border border-gray-300">Polling every 10s</span>
+             <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded border border-green-200 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>Live</span>
            </div>
 
            <div class="flex-1 overflow-auto relative p-0">
@@ -185,6 +206,7 @@ const sessionMeta = ref(null)
 const liveResults = ref([])
 const pollInterval = ref(null)
 const timerInterval = ref(null)
+let realtimeSub = null
 
 const timerDisplay = ref('00:00:00')
 
@@ -227,6 +249,11 @@ const fetchRealtimeSnapshot = async () => {
 }
 
 onMounted(async () => {
+  // BUG-13 / NEW-04: mark this live session as "seen" the moment the monitor is visited
+  // (by any path — auto-redirect or a direct link), so AdminLiveSessions.vue's guard won't
+  // force-redirect back here when the admin clicks "Back to Sessions List".
+  sessionStorage.setItem(`seen_live_redirect_${sessionId}`, '1')
+
   await fetchRealtimeSnapshot()
   
   if (sessionMeta.value && sessionMeta.value.scheduled_start_time) {
@@ -238,15 +265,28 @@ onMounted(async () => {
      }, 1000)
   }
 
-  // 10 second poll for the status tracker
+  // 4.3: Realtime subscription for near-instant updates on student status changes
+  realtimeSub = supabase
+    .channel(`monitor-${sessionId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'student_exam_sessions',
+      filter: `live_session_id=eq.${sessionId}`
+    }, () => fetchRealtimeSnapshot())
+    .subscribe()
+
+  // Safety-net fallback poll — Realtime requires replication enabled on this table in the
+  // Supabase dashboard (Database → Replication); keep polling (slower) in case it isn't.
   pollInterval.value = setInterval(() => {
     fetchRealtimeSnapshot()
-  }, 10000)
+  }, 15000)
 })
 
 onUnmounted(() => {
   if (pollInterval.value) clearInterval(pollInterval.value)
   if (timerInterval.value) clearInterval(timerInterval.value)
+  if (realtimeSub) supabase.removeChannel(realtimeSub)
 })
 
 const endExamEarly = async () => {
