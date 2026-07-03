@@ -56,6 +56,35 @@
         </div>
       </div>
 
+      <!-- Admin Controls: kept visually distinct from the Copy/WhatsApp/Print row above,
+           since those are distribution actions and these are session lifecycle actions.
+           Only shown while the session hasn't started yet. -->
+      <div v-if="meta.status === 'scheduled'" class="mb-6 bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <p class="text-sm font-bold text-gray-700">Admin Controls</p>
+          <p class="text-xs text-gray-500 mt-0.5">Manage this session directly from here — no need to go back to the sessions list.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            @click="cancelSession"
+            :disabled="actionLoading"
+            class="px-4 py-2 bg-white border border-red-300 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            Cancel Session
+          </button>
+          <button
+            @click="forceStartExam"
+            :disabled="actionLoading"
+            class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50"
+          >
+            Force Start Exam
+          </button>
+        </div>
+      </div>
+      <div v-if="actionError" class="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm font-medium">
+        {{ actionError }}
+      </div>
+
       <!-- Printable Area Start -->
       <div id="credentials-printable-area" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden divide-y divide-gray-200">
 
@@ -135,8 +164,11 @@ const errorMsg = ref('')
 const meta = ref({
   sessionCode: '',
   sessionName: '',
-  credentials: []
+  credentials: [],
+  status: null
 })
+const actionLoading = ref(false)
+const actionError = ref('')
 
 const sessionId = parseInt(route.params.id)
 
@@ -148,11 +180,12 @@ onMounted(async () => {
       const parsed = JSON.parse(savedData)
       // Validate the stored data is for THIS session via code presence
       if (parsed.sessionCode && parsed.credentials?.length > 0) {
-        meta.value = parsed
+        meta.value = { ...parsed, status: meta.value.status }
         loading.value = false
         // NEW-05 fix: clear immediately so a later, unrelated session doesn't
         // accidentally pick up these stale credentials from sessionStorage.
         sessionStorage.removeItem('newSessionCredentials')
+        await fetchStatus()
         return
       }
     } catch {
@@ -164,6 +197,22 @@ onMounted(async () => {
   await fetchFromDatabase()
 })
 
+// Fetched separately (and always, regardless of which path populated `meta`) so the Admin
+// Controls bar reflects the session's real current status even if it was started/cancelled
+// in another tab since this page first loaded its credentials.
+const fetchStatus = async () => {
+  try {
+    const { data } = await supabase
+      .from('live_exam_sessions')
+      .select('status')
+      .eq('live_session_id', sessionId)
+      .maybeSingle()
+    meta.value.status = data?.status ?? null
+  } catch (err) {
+    console.warn('Could not fetch session status (non-fatal):', err)
+  }
+}
+
 const fetchFromDatabase = async () => {
   try {
     if (!adminStore.adminProfile?.admin_id) {
@@ -171,10 +220,10 @@ const fetchFromDatabase = async () => {
       return
     }
 
-    // Fetch session metadata (session_code, session_name, admin_test_id)
+    // Fetch session metadata (session_code, session_name, admin_test_id, status)
     const { data: sessionData, error: sessionError } = await supabase
       .from('live_exam_sessions')
-      .select('session_code, session_name, admin_id, admin_test_id')
+      .select('session_code, session_name, admin_id, admin_test_id, status')
       .eq('live_session_id', sessionId)
       .single()
 
@@ -205,7 +254,8 @@ const fetchFromDatabase = async () => {
     meta.value = {
       sessionCode: sessionData.session_code,
       sessionName: sessionData.session_name,
-      credentials: studentsData || []
+      credentials: studentsData || [],
+      status: sessionData.status
     }
 
   } catch (err) {
@@ -218,6 +268,50 @@ const fetchFromDatabase = async () => {
 
 const printCredentials = () => {
   window.print()
+}
+
+// Item 2 (Upcoming Enhancements): session lifecycle controls right on this page, so the
+// admin doesn't have to navigate back to the sessions list right after creating a session.
+const cancelSession = async () => {
+  if (!confirm(`Cancel "${meta.value.sessionName}"? Students will no longer be able to log in with these credentials.`)) return
+  actionLoading.value = true
+  actionError.value = ''
+  try {
+    // cancel_live_exam_session is token-verified (see harden-admin-rpc-security.sql)
+    const { data, error } = await supabase.rpc('cancel_live_exam_session', {
+      p_token: adminStore.getToken(),
+      input_live_session_id: sessionId
+    })
+    if (error) throw error
+    if (!data) throw new Error('Session could not be cancelled (it may have already started).')
+    router.push('/admin/sessions')
+  } catch (err) {
+    console.error('Failed to cancel session:', err)
+    actionError.value = err.message || 'Failed to cancel session'
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+const forceStartExam = async () => {
+  if (!confirm('Start this exam now? All enrolled students will be able to begin immediately.')) return
+  actionLoading.value = true
+  actionError.value = ''
+  try {
+    // admin_start_exam is a pre-existing RPC not yet hardened to token-based auth (see
+    // harden-admin-rpc-security.sql's "Still NOT fixed" note) — still takes input_admin_id.
+    const { error } = await supabase.rpc('admin_start_exam', {
+      input_admin_id: adminStore.adminProfile.admin_id,
+      input_live_session_id: sessionId
+    })
+    if (error) throw error
+    router.push(`/admin/sessions/${sessionId}/monitor`)
+  } catch (err) {
+    console.error('Failed to start exam:', err)
+    actionError.value = err.message || 'Failed to start exam'
+  } finally {
+    actionLoading.value = false
+  }
 }
 
 // 4.5: Copy link + WhatsApp share

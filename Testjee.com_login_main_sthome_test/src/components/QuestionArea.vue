@@ -47,9 +47,9 @@
         </div>
         
         <!-- Question Text (shown if no image or as supplement) -->
-        <div v-if="examStore.currentQuestion.text" class="prose max-w-none">
+        <div v-if="questionText" class="prose max-w-none">
           <p class="text-lg text-gray-800 leading-relaxed">
-            {{ examStore.currentQuestion.text }}
+            {{ questionText }}
           </p>
         </div>
       </div>
@@ -151,6 +151,16 @@ import FooterNav from './FooterNav.vue'
 
 import { ref, watch, computed } from 'vue'
 const examStore = useExamStore()
+
+// Item 3 (Upcoming Enhancements): some rows have no real question text and the raw
+// Supabase storage URL ends up in the `text` field instead, rendering as ugly link text
+// right under the image. Hide it when it's clearly not real question text.
+const questionText = computed(() => {
+  const q = examStore.currentQuestion
+  if (!q?.text) return ''
+  if (q.text === q.image_url || q.text.includes('supabase.co')) return ''
+  return q.text
+})
 
 const numericDraft = computed({
   get() {

@@ -69,9 +69,9 @@
             <div class="flex-1 overflow-y-auto px-6 md:px-10 py-8 custom-scrollbar">
               
               <!-- Content Blocks -->
-              <div class="prose max-w-none mb-10 text-gray-800 text-lg leading-relaxed select-none question-content-renderer">
+              <div v-if="questionText" class="prose max-w-none mb-10 text-gray-800 text-lg leading-relaxed select-none question-content-renderer">
                  <!-- Directly using text for now, but should support HTML ideally if JSONB implies markdown/html -->
-                 {{ currentQuestion.question_content?.text || currentQuestion.question_content }}
+                 {{ questionText }}
               </div>
 
                <div v-if="currentQuestion.image_url" class="mb-10 max-w-lg mx-auto border border-gray-200 rounded-lg overflow-hidden shadow-sm">
@@ -270,6 +270,19 @@ const localSelectedAnswer = ref(null)
 const localIsMarked = ref(false)
 
 const currentQuestion = computed(() => store.currentQuestion)
+
+// Item 3 (Upcoming Enhancements): question_content sometimes has no real .text, so this
+// used to fall back to rendering the whole question_content value — which for some rows is
+// just the raw Supabase storage URL, showing up as ugly link text under the image. Hide it
+// when it's clearly not real question text.
+const questionText = computed(() => {
+  const q = currentQuestion.value
+  if (!q) return ''
+  const text = q.question_content?.text || q.question_content
+  if (typeof text !== 'string') return text || ''
+  if (text === q.image_url || text.includes('supabase.co')) return ''
+  return text
+})
 
 // When question changes, sync localIsMarked from store using question_id
 watch(() => store.currentQuestionNumber, () => {

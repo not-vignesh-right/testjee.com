@@ -175,10 +175,11 @@ const errorMsg = ref('')
 // which is the actual source of truth for subjects/question counts/marking per exam type.
 const examTypeOptions = Object.entries(EXAM_CONFIGS).map(([key, cfg]) => ({ key, title: cfg.title }))
 
-// Enforce min datetime to local current time
+// Enforce min datetime to now + 5 minutes — gives admins a natural buffer to share
+// credentials and students to join the lobby before the scheduled time actually hits.
 const minDateTime = computed(() => {
   const now = new Date()
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset() + 5)
   return now.toISOString().slice(0, 16)
 })
 

@@ -5,6 +5,29 @@
 
 ---
 
+# ✅ Upcoming Enhancements (Complete)
+
+**1. Default Schedule Time (`ScheduleExam.vue`)** — `minDateTime` now computes `now + 5
+minutes` instead of `now` (the `formData.start_time` default follows automatically, since it
+initializes from `minDateTime.value`).
+
+**2. Session Lifecycle Controls (`SessionCredentials.vue`)** — added an "Admin Controls" bar
+between the distribution-actions row (Copy/WhatsApp/Print) and the printable credentials
+area, shown only while `meta.status === 'scheduled'`:
+- **Cancel Session** → `cancel_live_exam_session(p_token, ...)` (token-verified) → redirects to `/admin/sessions` on success.
+- **Force Start Exam** → `admin_start_exam(input_admin_id, ...)` → redirects to the monitor page on success. Note: `admin_start_exam` is one of the five pre-existing RPCs *not* hardened to token-based auth (see the Security Hardening section above) — still takes `input_admin_id`, matching how `AdminLiveSessions.vue`'s own "Start Early" button already calls it.
+- `meta.status` is now fetched in both load paths (added to the DB-fallback's existing `select()`; a small dedicated `fetchStatus()` call for the sessionStorage fast-path, which never carried a status) so the bar reflects reality even if the session was started/cancelled from another tab since this page loaded.
+
+**3. Hide Supabase Links in Exam View (`LiveExamInterface.vue` & `QuestionArea.vue`)** — both
+question-text renderers (`currentQuestion.question_content?.text || currentQuestion.question_content`
+in the live-mode fallback interface, `examStore.currentQuestion.text` in the shared
+`QuestionArea.vue` used by `ExamLayout.vue`) now route through a `questionText` computed
+that hides the text block entirely when it exactly matches `image_url` or contains
+`supabase.co` — some question rows have no real `.text`, and the raw storage URL was
+rendering as link text under the image.
+
+---
+
 ## Part 1: Admin System Complete Reference
 
 Everything the admin panel touches: every table, every RPC, every page, and how they fit together. 
@@ -195,10 +218,76 @@ $$;
 GRANT EXECUTE ON FUNCTION get_admin_pending_appeals(integer) TO anon, authenticated;
 ```
 
-**Client-side wiring (done):**
+**Client-side wiring (done, then superseded — see below):**
 - `AdminResumeRequests.vue`'s `loadRequests()` calls `get_admin_pending_appeals` with `p_admin_id: adminStore.adminProfile.admin_id` instead of the old unfiltered `.from('exam_support_requests').select(...)`. The RPC already returns the flat `exam_type`/`student_name`/`student_email` shape the template expects, so no template changes were needed.
 - `AdminLayout.vue`'s badge count is now derived from the same scoped RPC (`fetchPendingCount()` calls it and filters `status === 'pending'` client-side), guarded against `adminStore.adminProfile` not being loaded yet.
 - The Realtime subscription on `exam_support_requests` (which can't filter on the deep join needed for scoping) was changed from an unscoped optimistic increment to a pure "something changed → refetch the scoped count" trigger (`event: '*'` → `fetchPendingCount()`), so the displayed number is always correctly scoped even though the trigger itself fires for every admin's activity.
+
+---
+
+---
+
+# ✅ SECURITY HARDENING: Token-Verified Admin RPCs (Complete)
+
+**Why this was needed even after the scoping fix above:** scoping the *query results* by
+`admin_id` doesn't help if the RPC itself trusts a client-supplied `admin_id` integer
+instead of verifying who's actually calling. This app has no Supabase Auth session for
+admins (`auth.uid()` doesn't exist here) — admins authenticate via a custom 64-char token
+(`admin_login`/`verify_admin_session`, stored in `localStorage`). Every admin RPC in the
+codebase (12 call sites, confirmed via grep — including the 3 I added in earlier fixes)
+passed `admin_id` as a plain parameter:
+
+```js
+supabase.rpc('cancel_live_exam_session', { input_admin_id: adminStore.adminProfile.admin_id, ... })
+```
+
+Since these RPCs are `SECURITY DEFINER` and granted to `anon`, and `admin_id` is a small
+sequential integer, anyone holding the public anon key (trivially extractable from the
+bundled JS) can skip the login page entirely and call these RPCs directly via `fetch`/curl
+with a guessed `admin_id` (1, 2, 3...). This is a well-known Supabase misconfiguration
+class: an RPC that trusts a client-supplied identity parameter instead of deriving identity
+from a verified session.
+
+**Also found while fixing this:** `AdminResumeRequests.vue`'s `approveRequest()`/`confirmReject()`
+were raw client-side `.update()` calls with **zero ownership check** — even the read-scoped
+version from the previous fix only hid other admins' requests from the *list view*; the
+actual approve/reject actions had no check preventing a call with any `request_id` at all.
+
+**The fix (`harden-admin-rpc-security.sql`):** every RPC I control now takes a session
+`p_token TEXT` instead of `admin_id`, and derives `admin_id` itself by calling the existing
+`verify_admin_session(p_token)` internally — reusing it as the single source of truth for
+"is this a real, current admin session" rather than re-implementing token validation:
+
+- `get_admin_pending_appeals(p_token)` — signature changed from `(p_admin_id INTEGER)`, old one dropped.
+- `approve_appeal(p_token, p_request_id)` / `reject_appeal(p_token, p_request_id)` — **new**, replace the unchecked raw updates. For live-exam appeals, verifies the caller owns the underlying `live_exam_sessions` row before touching anything; regular-exam appeals still have no ownership concept in the schema, but now at least require a valid admin session (previously required no authentication at all).
+- `set_live_session_exam_type`, `set_live_session_batch_label`, `cancel_live_exam_session` — retrofitted the same way (these are mine from earlier phases, so safe to rewrite with full knowledge of their prior bodies).
+
+**`adminStore.js`** gained `getToken()` (reads `localStorage.getItem('adminToken')`) so components pass the token instead of reaching into `adminProfile.admin_id`.
+
+**Deliberately NOT done — RLS as defense-in-depth:** I considered enabling Row Level
+Security with deny-all policies on `exam_support_requests`/`student_exam_sessions`/
+`live_exam_sessions`/`temp_students` so that even a bypassed-RPC attack couldn't read/write
+these tables directly. Checked first, and found concrete reasons not to rush it:
+`examSessionStore.js` and `ExamWaitingRoom.vue` do several **direct, unguarded** client-side
+reads/writes on these exact tables from the student side (`submitSupportRequest`,
+`restoreResumedSession`, the `personalEndTime` fetch, the lobby status/exam-type fallback
+reads) — and temp-students have the identical "no real Supabase Auth session" problem
+admins had. A blanket deny-all policy would break these live student flows, which I can't
+test interactively in this environment. Properly closing this requires giving temp-students
+the same kind of verified-session mechanism admins now have — a separate, dedicated design
+task, not a policy bolted on here.
+
+**Still NOT fixed — outside my control:** `admin_start_exam`, `create_live_exam_session_custom`,
+`admin_end_exam_and_calculate_ranks`, `get_admin_live_sessions`, `get_session_results` are
+pre-existing RPCs whose bodies aren't in this codebase, called by every admin page the exact
+same `input_admin_id: adminStore.adminProfile.admin_id` way — meaning they almost certainly
+have the identical vulnerability. I can't safely rewrite functions I've never seen the body
+of. The fix is mechanical and identical for each: change the first parameter from
+`input_admin_id INTEGER` to `p_token TEXT`, add
+`SELECT admin_id INTO v_admin_id FROM verify_admin_session(p_token) LIMIT 1; IF v_admin_id
+IS NULL THEN RAISE EXCEPTION ...` at the top of the function body, then replace every use of
+the old parameter with `v_admin_id`. Whoever owns those five RPCs needs to apply this same
+three-line change to each before this is fully closed.
 
 ---
 
