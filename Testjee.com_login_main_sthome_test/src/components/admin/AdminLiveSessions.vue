@@ -304,8 +304,9 @@ const cancelSession = async (session) => {
 
   loading.value = true
   try {
+    // Security fix: token-verified, not a trusted admin_id — see harden-admin-rpc-security.sql.
     const { data, error } = await supabase.rpc('cancel_live_exam_session', {
-      input_admin_id: adminStore.adminProfile.admin_id,
+      p_token: adminStore.getToken(),
       input_live_session_id: session.live_session_id
     })
     if (error) throw error

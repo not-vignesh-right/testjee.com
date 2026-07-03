@@ -179,12 +179,13 @@ let badgePollInterval = null
 let realtimeSub = null
 
 async function fetchPendingCount() {
-  if (!adminStore.adminProfile?.admin_id) return
+  const token = adminStore.getToken()
+  if (!token) return
   try {
-    // Security fix: was an unscoped head-count over ALL admins' requests. Now derived from
-    // the same admin-scoped RPC as AdminResumeRequests.vue (see add-admin-scoped-appeals-rpc.sql).
+    // Security fix: was an unscoped head-count over ALL admins' requests, then briefly an
+    // admin_id-trusted RPC. Now token-verified — see harden-admin-rpc-security.sql.
     const { data } = await supabase.rpc('get_admin_pending_appeals', {
-      p_admin_id: adminStore.adminProfile.admin_id
+      p_token: token
     })
     pendingResumeCount.value = (data || []).filter(r => r.status === 'pending').length
   } catch {}

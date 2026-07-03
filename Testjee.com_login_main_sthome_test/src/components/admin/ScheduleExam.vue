@@ -347,9 +347,10 @@ const handleCreateSession = async () => {
 
     // Persist the chosen exam type (BUG-09 / NEW-06) via a separate additive RPC — best
     // effort so exam creation still succeeds even if that migration hasn't been run yet.
+    // Security fix: token-verified, not a trusted admin_id — see harden-admin-rpc-security.sql.
     try {
       await supabase.rpc('set_live_session_exam_type', {
-        input_admin_id: adminStore.adminProfile.admin_id,
+        p_token: adminStore.getToken(),
         input_live_session_id: result.live_session_id,
         input_exam_type: formData.value.exam_type
       })
@@ -361,7 +362,7 @@ const handleCreateSession = async () => {
     if (formData.value.batch_label?.trim()) {
       try {
         await supabase.rpc('set_live_session_batch_label', {
-          input_admin_id: adminStore.adminProfile.admin_id,
+          p_token: adminStore.getToken(),
           input_live_session_id: result.live_session_id,
           input_batch_label: formData.value.batch_label.trim()
         })

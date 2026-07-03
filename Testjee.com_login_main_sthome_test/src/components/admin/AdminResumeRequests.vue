@@ -203,16 +203,16 @@ const filteredRequests = computed(() => {
 })
 
 async function loadRequests() {
-  if (!adminStore.adminProfile?.admin_id) return
+  const token = adminStore.getToken()
+  if (!token) return
   loading.value = true
   try {
-    // Security fix: scoped via get_admin_pending_appeals RPC instead of an unfiltered
-    // direct table select — live-exam appeals are now restricted to the admin who owns
-    // that live session (regular-exam appeals have no admin-ownership concept in the
-    // schema, so they remain visible to all admins, unchanged). See
-    // add-admin-scoped-appeals-rpc.sql.
+    // Security fix: scoped via get_admin_pending_appeals RPC, which verifies this admin's
+    // session token itself (via verify_admin_session) rather than trusting a client-supplied
+    // admin_id — a raw integer parameter could otherwise be guessed/enumerated by anyone
+    // holding the public anon key, bypassing login entirely. See harden-admin-rpc-security.sql.
     const { data, error } = await supabase.rpc('get_admin_pending_appeals', {
-      p_admin_id: adminStore.adminProfile.admin_id
+      p_token: token
     })
 
     if (error) throw error
@@ -229,30 +229,17 @@ async function approveRequest(req) {
   actionLoadingId.value = req.request_id
   actionResult.value[req.request_id] = null
   try {
-    // 1. Update support request status to 'approved'
-    const { error: reqErr } = await supabase
-      .from('exam_support_requests')
-      .update({ status: 'approved', updated_at: new Date().toISOString() })
-      .eq('request_id', req.request_id)
-    if (reqErr) throw reqErr
-
-    // 2. Reopen the correct session table based on appeal type (BUG-05 fix).
-    //    Without this, the student's session stays closed and they can never resume.
-    if (req.student_session_id) {
-      // LIVE exam appeal
-      const { error: sessErr } = await supabase
-        .from('student_exam_sessions')
-        .update({ status: 'in_progress', end_time: null })
-        .eq('student_session_id', req.student_session_id)
-      if (sessErr) throw sessErr
-    } else {
-      // Regular exam appeal (unchanged path)
-      const { error: sessErr } = await supabase
-        .from('exam_sessions')
-        .update({ is_submitted: false, end_time: null })
-        .eq('session_id', req.session_id)
-      if (sessErr) throw sessErr
-    }
+    // Security fix: was two raw client-side .update() calls with NO ownership check at
+    // all — any admin (or, given the RPC-trust issue above, anyone with the anon key) could
+    // approve/reject ANY request by request_id. Now a single token-verified RPC that checks
+    // the caller owns the live session before touching anything. See harden-admin-rpc-security.sql.
+    const token = adminStore.getToken()
+    const { data, error } = await supabase.rpc('approve_appeal', {
+      p_token: token,
+      p_request_id: req.request_id
+    })
+    if (error) throw error
+    if (!data) throw new Error('Approval did not go through')
 
     actionResult.value[req.request_id] = {
       success: true,
@@ -281,11 +268,13 @@ async function confirmReject(req) {
   actionLoadingId.value = req.request_id
   actionResult.value[req.request_id] = null
   try {
-    const { error } = await supabase
-      .from('exam_support_requests')
-      .update({ status: 'rejected', updated_at: new Date().toISOString() })
-      .eq('request_id', req.request_id)
+    const token = adminStore.getToken()
+    const { data, error } = await supabase.rpc('reject_appeal', {
+      p_token: token,
+      p_request_id: req.request_id
+    })
     if (error) throw error
+    if (!data) throw new Error('Rejection did not go through')
 
     actionResult.value[req.request_id] = {
       success: true,

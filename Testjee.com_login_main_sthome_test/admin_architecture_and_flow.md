@@ -1,20 +1,84 @@
-# Live Exam System — Master Implementation Plan
-> **Working Mode:**  
-> This file is the single source of truth. Updated after every phase.  
-> Code reviewed and re-planned by senior engineer after Phase 1 completion.
+# 📖 Live Exam Admin System — Architecture & Working Flow
+
+> **Document Purpose:**  
+> This file serves as the complete reference for the Admin architecture, working flows, Supabase table connections, and RPCs. It is the single source of truth for understanding how the admin system operates. 
 
 ---
 
-## Phase Status Tracker
+## Part 1: Admin System Complete Reference
 
-| Phase | Goal | Status |
-|---|---|---|
-| **Phase 1** | Make exam work end-to-end | ✅ Complete |
-| **Phase 2** | Data integrity (credentials, results, appeals, submit) | ✅ Complete |
-| **Phase 3** | Fairness & quality (subjects, shuffle, redirect loop) | ✅ Complete |
-| **Phase 4** | Admin UX overhaul (Dashboard, results, monitoring) | ✅ Complete |
-| **Phase 5** | Polish & production hardening | ✅ Complete |
-| **Pre-Deploy Review** | Multi-angle code review + bug fixes before shipping | ✅ Complete |
+Everything the admin panel touches: every table, every RPC, every page, and how they fit together. 
+
+## Admin-Related Tables
+
+| Table | Purpose | Key columns | Written by | Read by |
+|---|---|---|---|---|
+| `admins` | One row per institute/admin account | `admin_id` (PK, integer), `institute_name`, `username`, `password`, `max_tests`, `max_students`, `tests_created`, `students_created`, `is_active` | `admin_login`/signup RPC (not in this codebase) | `adminStore.js` (login, loadSession) |
+| `admin_tests` | Groups temp students + regular exam sessions created for a specific test batch | `admin_test_id` (PK) | `create_live_exam_session_custom` RPC (inferred) | `temp_students.admin_test_id`, `exam_sessions.admin_test_id` FK targets |
+| `live_exam_sessions` | One row per scheduled/live/completed **live exam session** | `live_session_id` (PK), `session_code`, `session_name`, `admin_id`, `admin_test_id`, `status` (`scheduled`/`live`/`completed`/`cancelled`), `scheduled_start_time`, `scheduled_end_time`, `exam_type` (added Phase 3), `batch_label` (added Phase 5), `instructions` (assumed, unconfirmed) | `create_live_exam_session_custom`, `admin_start_exam`, `admin_end_exam_and_calculate_ranks`, `set_live_session_exam_type`, `set_live_session_batch_label`, `cancel_live_exam_session` | `get_admin_live_sessions`, `student_exam_login`, `SessionCredentials.vue`, `ExamWaitingRoom.vue` |
+| `temp_students` | One row per student credential generated for a live session (NOT the same as `students`) | `temp_student_id` (PK, integer), `admin_id`, `admin_test_id`, `username`, `password`, `student_name`, `roll_number`, `has_appeared`, `created_date` | `create_live_exam_session_custom` | `SessionCredentials.vue` (fallback), `student_exam_login` RPC, `get_admin_pending_appeals` |
+| `student_exam_sessions` | One row per student's attempt at a live exam — the live-mode equivalent of `exam_sessions` | `student_session_id` (PK), `temp_student_id`, `live_session_id`, `status` (`not_started`/`in_progress`/`submitted`/`auto_submitted`), `start_time`, `end_time`, `score`, `max_score`, `percentage`, `rank`, `time_taken_seconds` | `start_student_exam`, `save_student_answer`, `submit_student_exam`, `admin_end_exam_and_calculate_ranks`, `AdminResumeRequests.vue`'s `approveRequest()` | `get_session_results`, `get_student_live_result`, `get_admin_pending_appeals` |
+| `exam_support_requests` | "Resume request" appeals from BOTH regular and live exams — one shared table, two different join paths | `request_id` (PK), `session_id` (regular-exam path), `student_id` (regular-exam path), `student_session_id` (live-exam path, added Phase 2), `reason`, `custom_message`, `remaining_time_seconds`, `answers` (JSON snapshot), `status` (`pending`/`approved`/`rejected`/`completed`), `created_at` | `examStore.js`'s `submitSupportRequest` (regular), `examSessionStore.js`'s `submitSupportRequest` (live), `AdminResumeRequests.vue`'s approve/reject | `get_admin_pending_appeals` (admin-scoped, see Security Hotfix below) |
+| `exam_sessions` | Regular (self-serve, non-live) student exam attempts — **no admin ownership column at all** | `session_id` (PK), `student_id`, `exam_type`, `start_time`, `end_time`, `total_duration_seconds`, `is_submitted`, `temp_student_id`, `admin_test_id` | `examStore.js` | `examStore.js`, `get_admin_pending_appeals` (joined for regular-exam appeal display only) |
+| `students` | Self-serve authenticated students (Supabase Auth) — separate identity system from `temp_students` | `student_id` (PK), `supabase_user_id`, `is_approved`, `student_name`, `email_id` | signup/auth flow (not in this codebase) | `get_admin_pending_appeals` (regular-exam appeal display) |
+| `categories` | Tags a question as belonging to the JEE-pool (1) or NEET-pool (2) question bank — **not** the same concept as "exam type" | `category_id` (PK), `category_name` | seed data | `ScheduleExam.vue` (indirectly, via `EXAM_CONFIGS[examType].categoryId`) |
+| `questions` / `subjects` / `topics` / `choices` | The question bank | — | admin question-upload flow (not in this codebase) | `ScheduleExam.vue` (assembling a live paper), `examStore.js` (regular exam) |
+
+**The two-engine split, in one line:** `exam_sessions`/`exam_support_requests.session_id` = regular self-serve exams (owned by nobody, any admin can help). `student_exam_sessions`/`live_exam_sessions`/`temp_students`/`exam_support_requests.student_session_id` = admin-scheduled live batch exams (owned by the admin who scheduled them). `exam_support_requests` is the one table where both paths meet.
+
+## Admin Authentication
+
+`adminStore.js` — token-only pattern, not Supabase Auth:
+1. `login(username, password)` → `admin_login` RPC → returns a 64-char `session_token` + profile. Only the token goes into `localStorage`; the profile (`admin_id`, quotas, etc.) lives in memory only (`adminProfile` ref).
+2. Every `/admin/*` route load re-validates via `router/index.js`'s guard calling `adminStore.loadSession()` → `verify_admin_session` RPC with the stored token. Invalid/expired token → `logout()` (clears token + profile) → redirected to `/`.
+3. Nothing here was touched by this project's phases — documented for completeness since every other flow below depends on `adminStore.adminProfile.admin_id` being populated first.
+
+## Admin Flows
+
+### 1. Dashboard (`AdminHome.vue`)
+- On mount: `adminStore.loadSession()` (refresh quota numbers) → `get_admin_live_sessions` RPC, finds the one with `status === 'live'` (if any) for the "Live Now" banner.
+- Banner elapsed-time counter ticks off `scheduled_start_time` (informational only — see BUG-04 caveat: if the admin used "Start Early," this runs ahead of the student's actual start).
+- Quota bars read `adminStore.adminProfile.{tests_created,max_tests,students_created,max_students}` directly — no additional query.
+
+### 2. Sessions List (`AdminLiveSessions.vue`)
+- `fetchSessions()` → `get_admin_live_sessions` RPC → `rawSessions`, polled every 10s (no Realtime here — session status changes aren't currently latency-sensitive enough to warrant it).
+- Auto-redirects to the Monitor page the first time a `live` session is seen per browser tab (`sessionStorage` key `seen_live_redirect_<id>`, also set by `LiveExamMonitor.vue` on its own mount so "Back to Sessions List" doesn't bounce the admin right back).
+- Per-row actions by status:
+  - **scheduled** → Start Early (`admin_start_exam` RPC) / View Setup (→ credentials page) / Cancel (`cancel_live_exam_session` RPC — flips `status` to `cancelled`, does **not** touch `admins.tests_created`/`students_created`, see Phase 5 note)
+  - **live** → Monitor Live (→ `LiveExamMonitor.vue`)
+  - **completed** → View Results (→ `ExamResults.vue`)
+  - **any status** → Duplicate (prefills `ScheduleExam.vue` via `sessionStorage['prefillExamSession']`)
+
+### 3. Schedule New Exam (`ScheduleExam.vue`)
+1. Admin picks an **Exam Type** (JEE Main / NEET UG / KCET ×4) from `EXAM_CONFIGS` (`src/data/examConfigs.js`) — this drives subjects, per-subject MCQ/numeric counts, difficulty filter, and `categoryId` (which underlying question pool(s) to draw from). This replaced the original hardcoded-JEE-only assembly (BUG-09).
+2. `handleCreateSession()` resolves subject_ids via synonym lookup against `subjects`, pulls candidate `questions` rows per subject (respecting `categoryId` and `difficultyFilter`), Fisher-Yates shuffles (BUG-10 fix), and slices to the exam type's target counts.
+3. Assembled question ID list → `create_live_exam_session_custom` RPC (admin_id, name, start time, duration, num_students, instructions, question_ids) → creates the `live_exam_sessions` row + generates `temp_students` credentials + increments the admin's quota counters (inferred, not directly observed).
+4. Best-effort follow-up calls: `set_live_session_exam_type` (persists the chosen exam type) and, if provided, `set_live_session_batch_label`. Both wrapped in try/catch so exam creation still succeeds even if either RPC/migration is missing.
+5. Redirects to `SessionCredentials.vue`, passing the just-created credentials via `sessionStorage['newSessionCredentials']` (cleared immediately on read — NEW-05 fix — so stale creds never leak into a later session).
+
+### 4. Session Credentials (`SessionCredentials.vue`)
+- Fast path: reads `sessionStorage['newSessionCredentials']` (only present right after creation).
+- Fallback (reload, or navigating here later): `live_exam_sessions` (verify `admin_id` ownership) → `temp_students` filtered by `admin_test_id` (BUG-06 fix — previously queried a nonexistent `live_exam_students` table).
+- Copy Link / WhatsApp Share buttons build a `login.testjee.com/live-exam/{session_code}` URL from the session code.
+
+### 5. Live Monitor (`LiveExamMonitor.vue`)
+- `get_admin_live_sessions` (session meta) + `get_session_results` (per-student snapshot), driven by a Realtime subscription on `student_exam_sessions` filtered to this `live_session_id` (falls back to a 15s poll if Realtime isn't actually connecting — see the Cloudflare Worker proxy caveat).
+- Real progress bar (submitted/in-progress/waiting, guarded against `total_students_enrolled === 0`).
+- "FORCE END EXAM EARLY" → `admin_end_exam_and_calculate_ranks` RPC → auto-submits every remaining in-progress student and computes final ranks → redirects to Results.
+
+### 6. Results (`ExamResults.vue`)
+- Same `get_admin_live_sessions` + `get_session_results` pair. Shows **every** enrolled student including "Did Not Attempt" rows (NEW-01 fix), but the average/highest/pass-rate stat cards are scoped to only students who actually have a `submitted`/`auto_submitted` row (so a session with 2 of 20 submissions doesn't show a misleadingly crashed average).
+- Search box filters the table client-side by name/roll/username. Score-distribution histogram buckets `submittedResults` by score (clamped both ends — negative scores from JEE-style negative marking used to crash this, fixed in the Pre-Deploy Review).
+- Export CSV button — client-side blob download, no server round-trip.
+
+### 7. Resume Requests (`AdminResumeRequests.vue`)
+- `get_admin_pending_appeals` RPC (admin-scoped — see Security Hotfix section above) replaces what was originally an unfiltered direct table query.
+- **Approve**: sets `exam_support_requests.status = 'approved'`, then reopens the correct underlying session — `student_exam_sessions.status = 'in_progress'` for live appeals (keyed by `student_session_id`), or `exam_sessions.is_submitted = false` for regular appeals (keyed by `session_id`) — branching on which ID is present (BUG-05 fix; previously always wrote to `exam_sessions`, silently no-oping for every live appeal).
+- **Reject**: sets `status = 'rejected'`, no session changes.
+- The student-side counterpart (submitting the appeal, and resuming once approved) lives in `examStore.js`/`examSessionStore.js` and `ExamLayout.vue` — see Phase 2.3b below.
+
+### 8. Global Admin Layout (`AdminLayout.vue`)
+- Nav shell + logout. Resume-request pending-count badge: `get_admin_pending_appeals` (admin-scoped), refreshed on a Realtime `postgres_changes` event (any INSERT/UPDATE on `exam_support_requests` triggers a refetch — the event itself carries no admin_id to filter on, so it's used purely as a "something changed" signal, never as a source of truth for the count) with a 60s poll as a safety net.
 
 ---
 
@@ -64,47 +128,40 @@ at three call sites instead of selecting the active store once.
 
 ---
 
-# ✅ SECURITY HOTFIX: Multi-Admin Scoping (Complete)
+# ✅ SECURITY HOTFIX: Multi-Admin Scoping (Complete — Implemented & Deployed)
 
-> **Implementation Note:** The drafted RPC below had three bugs that would have made it
-> fail to create (or fail at call time) against the actual schema — `p_admin_id`/`student_id`
-> typed `UUID` where `schema.sql` confirms `admins.admin_id`/`students.student_id` are
-> `integer`; `ts.temp_id` referencing a column that doesn't exist (`temp_students`' PK is
-> `temp_student_id`); and `es.admin_id` referencing a column `exam_sessions` doesn't have at
-> all. That last point also settles the "business rule" question raised in the note below:
-> regular self-serve exams have no admin-ownership concept anywhere in the schema, so only
-> the live-exam path can be (and now is) scoped — regular-exam appeals stay visible to all
-> admins, unchanged from before. Corrected RPC is in `add-admin-scoped-appeals-rpc.sql`.
-> `AdminResumeRequests.vue` and `AdminLayout.vue` now call it instead of the unscoped query;
-> the Realtime badge subscription (which can't filter on the deep join) is now a pure
-> "something changed, refetch the scoped count" trigger rather than an unscoped increment.
+**The Issue (as originally raised):** `AdminResumeRequests.vue` and `AdminLayout.vue` queried `exam_support_requests` globally without an `admin_id` filter. In a multi-admin/multi-institute deployment, Admin A would see Admin B's students' PII (names, roll numbers) in the pending appeals list, and could approve/reject requests for exams they don't own.
 
-**The Issue:** `AdminResumeRequests.vue` and `AdminLayout.vue` query `exam_support_requests` globally without an `admin_id` filter. If this is deployed in a Multi-Tenant/SaaS environment (multiple independent institutes), Admin A will see Admin B's students' PII (Names, Roll Numbers) in the pending appeals list.
+**What the first draft of the fix got wrong:** an earlier draft RPC had three bugs verified against `schema.sql` that would have made it fail to create (or fail at call time):
+- `p_admin_id`/`student_id` typed `UUID` — `admins.admin_id` and `students.student_id` are actually `integer`.
+- `ts.temp_id` — `temp_students`' primary key is `temp_student_id`, not `temp_id`. This column doesn't exist.
+- `es.admin_id` — `exam_sessions` (the regular-exam table) has **no `admin_id` column at all**. Regular self-serve student exams aren't owned by any admin — there's no ownership concept to filter on for that path. This also settles the "business rule" question: regular-exam appeals stay visible to all admins (unchanged), and only the live-exam path (which does have a real owner via `live_exam_sessions.admin_id`) gets scoped.
 
-**The Fix:**
-Do not filter this on the frontend `select()` statement—the table joins are too deep and complex to write cleanly in Vue. Instead, create a dedicated PostgreSQL RPC to fetch the requests scoped securely to the logged-in admin.
-
-**1. Create the RPC in Supabase (SQL):**
+**The corrected RPC that is actually running** (`add-admin-scoped-appeals-rpc.sql`, confirmed run in Supabase):
 ```sql
-CREATE OR REPLACE FUNCTION get_admin_pending_appeals(p_admin_id UUID)
+CREATE OR REPLACE FUNCTION get_admin_pending_appeals(p_admin_id INTEGER)
 RETURNS TABLE (
-  request_id INT,
-  session_id INT,
-  student_session_id INT,
-  student_id UUID,
+  request_id INTEGER,
+  session_id INTEGER,
+  student_session_id INTEGER,
+  student_id INTEGER,
   reason TEXT,
   custom_message TEXT,
-  remaining_time_seconds INT,
+  remaining_time_seconds INTEGER,
   answers JSONB,
   status TEXT,
   created_at TIMESTAMPTZ,
   exam_type TEXT,
   student_name TEXT,
   student_email TEXT
-) AS $$
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
+  SELECT
     esr.request_id,
     esr.session_id,
     esr.student_session_id,
@@ -117,36 +174,50 @@ BEGIN
     esr.created_at,
     COALESCE(es.exam_type, 'Live Exam') AS exam_type,
     COALESCE(st.student_name, ts.student_name) AS student_name,
-    COALESCE(st.email_id, 'Roll: ' || ts.roll_number) AS student_email
+    COALESCE(st.email_id, 'Roll: ' || COALESCE(ts.roll_number, '-')) AS student_email
   FROM exam_support_requests esr
-  -- Join path for Live Exams:
+  -- Join path for live exams
   LEFT JOIN student_exam_sessions ses ON esr.student_session_id = ses.student_session_id
   LEFT JOIN live_exam_sessions les ON ses.live_session_id = les.live_session_id
-  LEFT JOIN temp_students ts ON ses.temp_student_id = ts.temp_id
-  -- Join path for Regular Exams:
+  LEFT JOIN temp_students ts ON ses.temp_student_id = ts.temp_student_id
+  -- Join path for regular exams
   LEFT JOIN exam_sessions es ON esr.session_id = es.session_id
   LEFT JOIN students st ON esr.student_id = st.student_id
-  -- Filter by the admin who owns the live session, OR (if regular exams belong to global admins) adjust logic here:
-  WHERE les.admin_id = p_admin_id OR es.admin_id = p_admin_id; 
+  WHERE
+    -- Live-exam appeal: only visible to the admin who owns that live session
+    (esr.student_session_id IS NOT NULL AND les.admin_id = p_admin_id)
+    -- Regular-exam appeal: no admin ownership exists in the schema for this path,
+    -- so it stays visible to all admins (unchanged from before this fix)
+    OR (esr.student_session_id IS NULL AND esr.session_id IS NOT NULL);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-```
-*(Note: You will need to verify if `exam_sessions` actually has an `admin_id` column for the regular exam path. If regular exams are self-assigned and don't belong to a specific admin, you must decide a business rule for who sees them).*
+$$;
 
-**2. Update `AdminResumeRequests.vue`:**
-Swap the complex `supabase.from('exam_support_requests').select(...)` query in `loadRequests()` to instead call:
-```js
-const { data, error } = await supabase.rpc('get_admin_pending_appeals', {
-  p_admin_id: adminStore.adminProfile.admin_id
-})
+GRANT EXECUTE ON FUNCTION get_admin_pending_appeals(integer) TO anon, authenticated;
 ```
 
-**3. Update `AdminLayout.vue` (Realtime Badge):**
-You cannot use standard Supabase Realtime `postgres_changes` to filter by a deeply joined `admin_id`. Instead of `postgres_changes`, you should either:
-- Rely strictly on the fallback poll interval (calling the new RPC).
-- OR, broadcast a custom Realtime event from a database trigger when a request is inserted, containing the `admin_id` in the payload, and have the client listen to that specific broadcast.
+**Client-side wiring (done):**
+- `AdminResumeRequests.vue`'s `loadRequests()` calls `get_admin_pending_appeals` with `p_admin_id: adminStore.adminProfile.admin_id` instead of the old unfiltered `.from('exam_support_requests').select(...)`. The RPC already returns the flat `exam_type`/`student_name`/`student_email` shape the template expects, so no template changes were needed.
+- `AdminLayout.vue`'s badge count is now derived from the same scoped RPC (`fetchPendingCount()` calls it and filters `status === 'pending'` client-side), guarded against `adminStore.adminProfile` not being loaded yet.
+- The Realtime subscription on `exam_support_requests` (which can't filter on the deep join needed for scoping) was changed from an unscoped optimistic increment to a pure "something changed → refetch the scoped count" trigger (`event: '*'` → `fetchPendingCount()`), so the displayed number is always correctly scoped even though the trigger itself fires for every admin's activity.
 
 ---
+
+---
+
+# 📜 Historical Implementation Log
+
+> **Note:** The sections below this point represent the historical, phase-by-phase implementation log that built the system described above. They are preserved here for context on why certain architectural decisions were made.
+
+## Phase Status Tracker
+
+| Phase | Goal | Status |
+|---|---|---|
+| **Phase 1** | Make exam work end-to-end | ✅ Complete |
+| **Phase 2** | Data integrity (credentials, results, appeals, submit) | ✅ Complete |
+| **Phase 3** | Fairness & quality (subjects, shuffle, redirect loop) | ✅ Complete |
+| **Phase 4** | Admin UX overhaul (Dashboard, results, monitoring) | ✅ Complete |
+| **Phase 5** | Polish & production hardening | ✅ Complete |
+| **Pre-Deploy Review** | Multi-angle code review + bug fixes before shipping | ✅ Complete |
 
 ---
 

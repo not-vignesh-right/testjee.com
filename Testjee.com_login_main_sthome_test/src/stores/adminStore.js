@@ -80,11 +80,17 @@ export const useAdminStore = defineStore('admin', () => {
         localStorage.removeItem('adminToken')
     }
 
+    // Security fix: RPCs that mutate or read admin-scoped data must verify identity from
+    // this token server-side (via verify_admin_session), not trust a client-supplied
+    // admin_id integer — see harden-admin-rpc-security.sql for why.
+    const getToken = () => localStorage.getItem('adminToken')
+
     return {
         adminProfile,
         isAuthenticated,
         login,
         loadSession,
-        logout
+        logout,
+        getToken
     }
 })
