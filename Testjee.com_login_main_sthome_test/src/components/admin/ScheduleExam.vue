@@ -289,6 +289,77 @@ const handleCreateSession = async () => {
     const numTarget = examConfig.hasNumeric ? examConfig.questionsPerSubject.numeric : 0
     const assembledQuestionIds = []
 
+    // Track unique images across the entire exam paper to avoid duplicates
+    const currentExamImageUrls = new Set()
+
+    const selectUniformlyFromTopics = (candidates, targetArray, limit) => {
+      if (!candidates || candidates.length === 0) return
+
+      // 1. Group candidates by topic_id (fallback to 'no_topic')
+      const topicGroups = {}
+      candidates.forEach(q => {
+        const topicId = q.topic_id !== null && q.topic_id !== undefined ? String(q.topic_id) : 'no_topic'
+        if (!topicGroups[topicId]) topicGroups[topicId] = []
+        topicGroups[topicId].push(q)
+      })
+
+      // 2. Shuffle questions inside each topic group
+      Object.keys(topicGroups).forEach(topicId => {
+        topicGroups[topicId] = shuffleArray(topicGroups[topicId])
+      })
+
+      const imageDuplicateBackups = []
+
+      // 3. Round-robin selection
+      while (targetArray.length < limit) {
+        let activeTopicIds = Object.keys(topicGroups).filter(topicId => topicGroups[topicId].length > 0)
+        if (activeTopicIds.length === 0) break
+
+        activeTopicIds = shuffleArray(activeTopicIds)
+
+        for (const topicId of activeTopicIds) {
+          if (targetArray.length >= limit) break
+
+          // Find first question with unique image in this topic group
+          let foundIdx = -1
+          for (let idx = 0; idx < topicGroups[topicId].length; idx++) {
+            const q = topicGroups[topicId][idx]
+            const imgUrl = q.image_url
+            if (imgUrl && imgUrl.trim() !== '') {
+              if (currentExamImageUrls.has(imgUrl.trim())) {
+                continue
+              }
+            }
+            foundIdx = idx
+            break
+          }
+
+          if (foundIdx !== -1) {
+            const q = topicGroups[topicId].splice(foundIdx, 1)[0]
+            const imgUrl = q.image_url
+            if (imgUrl && imgUrl.trim() !== '') {
+              currentExamImageUrls.add(imgUrl.trim())
+            }
+            targetArray.push(q)
+          } else {
+            // All have duplicate images, move first to backup
+            const backupQ = topicGroups[topicId].shift()
+            if (backupQ) {
+              imageDuplicateBackups.push(backupQ)
+            }
+          }
+        }
+      }
+
+      // Fallback to duplicate images if target array is still not filled
+      if (targetArray.length < limit && imageDuplicateBackups.length > 0) {
+        const shuffledBackups = shuffleArray(imageDuplicateBackups)
+        while (targetArray.length < limit && shuffledBackups.length > 0) {
+          targetArray.push(shuffledBackups.shift())
+        }
+      }
+    }
+
     for (const subjectName of examConfig.subjects) {
       const subjectIds = lookupIdsFor(subjectName)
       if (subjectIds.length === 0) {
@@ -307,29 +378,33 @@ const handleCreateSession = async () => {
         if (subMcqTarget > 0) {
           let mcqQuery = supabase
             .from('questions')
-            .select('question_id')
+            .select('question_id, topic_id, image_url')
             .in('category_id', categoryIds)
             .eq('subject_id', subId)
             .eq('question_type', 'multiple_choice')
           if (examConfig.difficultyFilter && examConfig.difficultyFilter.length > 0) {
             mcqQuery = mcqQuery.in('difficulty', examConfig.difficultyFilter)
           }
-          const { data: mcqs } = await mcqQuery.limit(Math.max(subMcqTarget * 5, 200))
+          const { data: mcqs } = await mcqQuery.limit(1000)
           if (mcqs && mcqs.length) {
-            assembledQuestionIds.push(...shuffleArray(mcqs).slice(0, subMcqTarget).map(q => q.question_id))
+            const selectedMcqs = []
+            selectUniformlyFromTopics(mcqs, selectedMcqs, subMcqTarget)
+            assembledQuestionIds.push(...selectedMcqs.map(q => q.question_id))
           }
         }
 
         if (subNumTarget > 0) {
-          const { data: nums } = await supabase
+          let numQuery = supabase
             .from('questions')
-            .select('question_id')
+            .select('question_id, topic_id, image_url')
             .in('category_id', categoryIds)
             .eq('subject_id', subId)
             .eq('question_type', 'numeric')
-            .limit(Math.max(subNumTarget * 5, 50))
+          const { data: nums } = await numQuery.limit(1000)
           if (nums && nums.length) {
-            assembledQuestionIds.push(...shuffleArray(nums).slice(0, subNumTarget).map(q => q.question_id))
+            const selectedNums = []
+            selectUniformlyFromTopics(nums, selectedNums, subNumTarget)
+            assembledQuestionIds.push(...selectedNums.map(q => q.question_id))
           }
         }
       }
