@@ -14,6 +14,7 @@ This file provides the complete, absolute context of the **TestJEE Mock Exam Pla
 * **Frontend**: Vue 3 (Composition API) + Vite + Pinia + Vue Router + Tailwind CSS
 * **Backend/Database**: Supabase (PostgreSQL) + Row-Level Security (RLS) policies
 * **Purpose**: A strict replica of the NTA JEE Main exam layout with extreme anti-cheat/proctoring capabilities, supporting both self-paced practice tests and live classroom-wide mock exams.
+* **Auth Admin App**: A separate Vue 3 app (`Testjee.com_auth_admin/`) used by the platform owner to manage student approvals, test allocations, exam support/resume requests, and the `is_genuine_user` toggle. It connects directly to Supabase with its own key and routes.
 
 ---
 
@@ -34,8 +35,8 @@ Testjee.com_login_main_sthome_test/
 │   │   ├── examStore.js         # Practice exam logic (timers, answers, appeal snapshots, RLS calls)
 │   │   └── examSessionStore.js  # Live session logic (temp student credentials, saveAnswer RLS triggers)
 │   └── components/
-│       ├── Login.vue            # Student credentials login / register
-│       ├── Dashboard.vue        # Student landing page (quotes, performance graphs, results list)
+│       ├── Login.vue            # Student credentials login / register (mobile field is required*)
+│       ├── Dashboard.vue        # Student landing page + compulsory phone-number overlay (Section 7)
 │       ├── ExamLayout.vue       # Proctoring container, timers, fullscreen check, and questions pane
 │       ├── HeaderBar.vue        # Navigation header
 │       ├── QuestionArea.vue     # Core MCQ / Numeric question rendering
@@ -50,6 +51,12 @@ Testjee.com_login_main_sthome_test/
 │           ├── ExamLogin.vue           # Temporary credentials entry for live tests
 │           ├── ExamWaitingRoom.vue     # Live lobby (polling for session 'live' status)
 │           └── StudentResults.vue      # Results screen for live exams (RPC-backed)
+
+Testjee.com_auth_admin/
+└── src/
+    └── pages/
+        ├── DashboardPage.vue    # Student list table with approval, test count, and is_genuine_user toggles
+        └── StudentDetailPage.vue # Full student profile editor with Genuine/Dev toggle in header
 ```
 
 ---
@@ -106,7 +113,7 @@ The anti-cheat mechanisms are strictly managed inside [ExamLayout.vue](file:///c
       if (remainingTime.value <= 0) submitExam(true);
     }, 1000);
     ```
-  * **Grace Timer**: If a student triggers a 10s warning countdown and opens a browser dialog, the countdown continues in real-world time. When they close the dialog, the next tick evaluates the elapsed time and instantly auto-submits if there are $\ge 10$ seconds have passed.
+  * **Grace Timer**: If a student triggers a 10s warning countdown and opens a browser dialog, the countdown continues in real-world time. When they close the dialog, the next tick evaluates the elapsed time and instantly auto-submits if $\ge 10$ seconds have passed.
 
 ---
 
@@ -140,7 +147,7 @@ When a page reload happens during an active exam:
 ## 6. Supabase Tables & Key Database RPCs
 
 ### Key Tables
-* **`students`**: Personal profile, email, verification state, approved checks, and total practice tests remaining.
+* **`students`**: Personal profile, email, verification state, approved checks, total practice tests remaining, `mobile_number` (required for genuine users), and `is_genuine_user` (boolean, default `true` — see Section 7).
 * **`exam_sessions`**: Practice session logs (linked to `students`). Stores start/end times and submission status.
 * **`results`**: Practice answers array and scores.
 * **`exam_support_requests`**: Appealed anti-cheat logs, status (`pending`, `approved`, `completed`), and JSON snapshots of questions and answers.
@@ -162,3 +169,43 @@ When a page reload happens during an active exam:
    * Evaluates responses, computes scores using config marking parameters, registers final ranks, and sets the session status to `submitted`.
 6. **`get_student_live_result(input_student_session_id)`**
    * Securely aggregates student ranks, scores, and accuracy parameters for presentation in results.
+
+---
+
+## 7. Genuine User Flag & Compulsory Phone Number Enforcement
+
+### A. `is_genuine_user` Column (students table)
+* **Type**: `boolean NOT NULL DEFAULT true`
+* **Migration applied**: `ALTER TABLE public.students ADD COLUMN IF NOT EXISTS is_genuine_user boolean NOT NULL DEFAULT true;`
+* **Purpose**: Distinguishes real paying customers from internal dev/test accounts. When `false`, the student is treated as a dev/internal user and phone-number enforcement is completely skipped.
+* **Default**: All existing and new rows default to `true` — no existing student is affected unless explicitly toggled.
+
+### B. Admin Toggle Controls
+Admins can flip this field in two places inside **`Testjee.com_auth_admin`**:
+* **[DashboardPage.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_auth_admin/src/pages/DashboardPage.vue)** — "Genuine User" column in the All Students table. Each row shows a green `✓ Genuine` or gray `⚙ Dev` pill plus a small swap-icon button that calls `toggleGenuineUser()`.
+* **[StudentDetailPage.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_auth_admin/src/pages/StudentDetailPage.vue)** — Badge and `Mark as Dev` / `Mark as Genuine` button in the student header card, alongside the existing approval toggle. Calls `toggleGenuineUser()`.
+
+Both call `supabase.from('students').update({ is_genuine_user: newValue })` directly and update the local reactive state on success.
+
+### C. Compulsory Phone Number Overlay (Dashboard.vue)
+* **Location**: [Dashboard.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/Dashboard.vue) — injected via `<Teleport to="body">` at the very top of the template.
+* **z-index**: `200` — above all modals, sidebars, and exam controls.
+* **Trigger condition** (`needsPhone` computed):
+  ```javascript
+  const VALID_PHONE_REGEX = /^[6-9]\d{9}$/  // Indian numbers only
+  const needsPhone = computed(() => {
+    const profile = studentProfile.value
+    if (!profile) return false                          // still loading
+    if (profile.is_genuine_user === false) return false // dev accounts exempt
+    return !VALID_PHONE_REGEX.test(profile.mobile_number || '')
+  })
+  ```
+* **Non-dismissible**: No close button. The backdrop is not clickable. The only exits are:
+  1. Submit a valid 10-digit Indian mobile number → saved via `authStore.updateStudentProfile()` → `needsPhone` becomes `false` reactively → overlay disappears.
+  2. Click **"Sign out of your account"** → `authStore.logout()` → redirect to `/`.
+* **Catches Google OAuth users**: Since Google sign-up skips the mobile input form, they hit this overlay on first dashboard load.
+
+### D. Compulsory Mobile in Sign-Up Form (Login.vue)
+* The **Mobile** field in the Email/Password sign-up form now shows a red `*` asterisk.
+* Input has `required`, `inputmode="numeric"`, and `maxlength="10"` attributes.
+* JavaScript `validateSignUp()` already enforces the `^[6-9]\d{9}$` regex before submission — the form cannot be submitted without a valid number.
