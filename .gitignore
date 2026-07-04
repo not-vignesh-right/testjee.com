@@ -10,3 +10,8 @@ node_modules/
  .gemini/ 
 +.cursor/
 +.kiro/
+
+# Temporary check and simulation scripts
+**/check_*.js
+**/simulate_fetch.js
+
