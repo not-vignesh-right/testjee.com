@@ -174,6 +174,7 @@
                   <span v-if="sortField === 'number_of_tests'" class="ml-1 text-blue-600">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
                 </th>
                 <th class="text-center py-3 px-4 font-semibold text-gray-600">Status</th>
+                <th class="text-center py-3 px-4 font-semibold text-gray-600">Genuine User</th>
                 <th class="text-center py-3 px-4 font-semibold text-gray-600 cursor-pointer hover:text-blue-600 transition-colors" @click="sortBy('creation_date')">
                   Created
                   <span v-if="sortField === 'creation_date'" class="ml-1 text-blue-600">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
@@ -183,7 +184,7 @@
             </thead>
             <tbody>
               <tr v-if="filteredStudents.length === 0">
-                <td colspan="7" class="text-center py-12 text-gray-400">
+                <td colspan="8" class="text-center py-12 text-gray-400">
                   <svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
                   No students found
                 </td>
@@ -213,6 +214,32 @@
                   >
                     {{ student.is_approved ? 'Approved' : 'Pending' }}
                   </span>
+                </td>
+                <!-- Genuine User toggle cell -->
+                <td class="py-3 px-4 text-center" @click.stop>
+                  <div class="flex items-center justify-center gap-1.5">
+                    <span
+                      :class="student.is_genuine_user !== false
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-gray-100 text-gray-500'"
+                      class="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    >
+                      {{ student.is_genuine_user !== false ? '✓ Genuine' : '⚙ Dev' }}
+                    </span>
+                    <button
+                      @click="toggleGenuineUser(student)"
+                      :disabled="actionLoading"
+                      :class="student.is_genuine_user !== false
+                        ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                        : 'text-emerald-600 hover:bg-emerald-50'"
+                      class="p-1 rounded-lg transition-colors disabled:opacity-40"
+                      :title="student.is_genuine_user !== false ? 'Mark as Dev/Internal' : 'Mark as Genuine'"
+                    >
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                      </svg>
+                    </button>
+                  </div>
                 </td>
                 <td class="py-3 px-4 text-center text-gray-500 text-xs">{{ formatDate(student.creation_date) }}</td>
                 <td class="py-3 px-4 text-center" @click.stop>
@@ -456,6 +483,31 @@ async function decrementTests(student) {
   } catch (err) {
     console.error('Decrement tests error:', err)
     showToast('Failed to update tests', 'error')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function toggleGenuineUser(student) {
+  actionLoading.value = true
+  const newValue = student.is_genuine_user === false ? true : false
+  try {
+    const { error } = await supabase
+      .from('students')
+      .update({ is_genuine_user: newValue, modification_date: new Date().toISOString() })
+      .eq('student_id', student.student_id)
+
+    if (error) throw error
+
+    student.is_genuine_user = newValue
+    showToast(
+      newValue
+        ? `${student.student_name} marked as Genuine User`
+        : `${student.student_name} marked as Dev/Internal`
+    )
+  } catch (err) {
+    console.error('Toggle genuine user error:', err)
+    showToast('Failed to update user type', 'error')
   } finally {
     actionLoading.value = false
   }

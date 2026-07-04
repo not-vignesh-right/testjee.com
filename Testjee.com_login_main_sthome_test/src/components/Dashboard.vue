@@ -1,5 +1,111 @@
 <template>
   <div @click="closeKcetDropdown">
+
+  <!-- ══════════════════════════════════════════════════════════
+       COMPULSORY PHONE NUMBER OVERLAY
+       Shown ONLY if: is_genuine_user !== false AND mobile_number is missing/invalid
+       Not dismissible — user must submit a valid number or sign out.
+       ══════════════════════════════════════════════════════════ -->
+  <Teleport to="body">
+    <div
+      v-if="needsPhone"
+      class="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style="background: rgba(15,23,42,0.85); backdrop-filter: blur(8px);"
+    >
+      <!-- Glow orbs -->
+      <div class="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/20 rounded-full blur-[80px] pointer-events-none"></div>
+      <div class="absolute bottom-1/4 right-1/4 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px] pointer-events-none"></div>
+
+      <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
+        <!-- Top accent bar -->
+        <div class="h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400"></div>
+
+        <div class="p-8">
+          <!-- Icon + heading -->
+          <div class="flex flex-col items-center text-center mb-6">
+            <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200/60 mb-4">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+              </svg>
+            </div>
+            <h2 class="text-2xl font-black text-gray-900 leading-tight">One last step!</h2>
+            <p class="text-gray-500 text-sm mt-2 leading-relaxed max-w-xs">
+              Please add your mobile number to complete your profile. This is required for exam notifications and account recovery.
+            </p>
+          </div>
+
+          <!-- Info chips -->
+          <div class="flex items-center justify-center gap-3 mb-6">
+            <span class="flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              India (+91)
+            </span>
+            <span class="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+              Secure & Private
+            </span>
+          </div>
+
+          <!-- Phone input -->
+          <div class="mb-4">
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Mobile Number</label>
+            <div class="relative">
+              <!-- Country prefix -->
+              <div class="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pr-3 border-r border-gray-200">
+                <span class="text-base leading-none">🇮🇳</span>
+                <span class="text-sm font-bold text-gray-600">+91</span>
+              </div>
+              <input
+                id="phone-overlay-input"
+                v-model="phoneOverlayInput"
+                @keydown.enter="submitPhoneNumber"
+                type="tel"
+                inputmode="numeric"
+                maxlength="10"
+                placeholder="9876543210"
+                :class="phoneOverlayError ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-blue-400 focus:ring-blue-100'"
+                class="w-full pl-24 pr-4 py-3.5 bg-gray-50 border rounded-xl text-base font-semibold text-gray-900 focus:bg-white focus:ring-2 outline-none transition-all placeholder-gray-400"
+              />
+            </div>
+            <p v-if="phoneOverlayError" class="mt-2 text-xs font-medium text-red-600 flex items-center gap-1">
+              <svg class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+              {{ phoneOverlayError }}
+            </p>
+          </div>
+
+          <!-- Submit button -->
+          <button
+            id="phone-overlay-submit"
+            @click="submitPhoneNumber"
+            :disabled="phoneOverlaySaving"
+            class="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200/60 transition-all transform hover:scale-[1.01] active:scale-95 disabled:opacity-60 disabled:scale-100 flex items-center justify-center gap-2"
+          >
+            <svg v-if="phoneOverlaySaving" class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            {{ phoneOverlaySaving ? 'Saving...' : 'Confirm Mobile Number' }}
+          </button>
+
+          <!-- Sign out escape -->
+          <div class="mt-5 pt-5 border-t border-gray-100 text-center">
+            <p class="text-xs text-gray-400 mb-2">Don't want to continue right now?</p>
+            <button
+              id="phone-overlay-signout"
+              @click="handleOverlayLogout"
+              class="text-sm font-semibold text-red-500 hover:text-red-600 transition-colors underline underline-offset-2"
+            >
+              Sign out of your account
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <div class="dashboard-page px-6 py-6 md:px-10 md:py-8">
 
     <!-- Recent Auto-Submit Support Appeal Banner -->
@@ -840,6 +946,51 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const studentProfile = computed(() => authStore.studentProfile)
+
+// ─── Phone Number Overlay ─────────────────────────────────────────────────────
+const VALID_PHONE_REGEX = /^[6-9]\d{9}$/
+
+/**
+ * Show the overlay when:
+ *  1. The student profile is loaded (not null)
+ *  2. The student is a genuine user (is_genuine_user is not explicitly false)
+ *  3. Their mobile_number is missing or not a valid 10-digit Indian number
+ */
+const needsPhone = computed(() => {
+  const profile = studentProfile.value
+  if (!profile) return false                          // profile still loading
+  if (profile.is_genuine_user === false) return false // dev/internal — skip
+  return !VALID_PHONE_REGEX.test(profile.mobile_number || '')
+})
+
+const phoneOverlayInput = ref('')
+const phoneOverlayError = ref('')
+const phoneOverlaySaving = ref(false)
+
+async function submitPhoneNumber() {
+  const cleaned = phoneOverlayInput.value.trim()
+  if (!VALID_PHONE_REGEX.test(cleaned)) {
+    phoneOverlayError.value = 'Please enter a valid 10-digit Indian mobile number (starts with 6–9)'
+    return
+  }
+  phoneOverlayError.value = ''
+  phoneOverlaySaving.value = true
+  try {
+    const result = await authStore.updateStudentProfile({ mobile_number: cleaned })
+    if (!result.success) throw new Error(result.error || 'Failed to save')
+    // Profile is updated reactively via authStore — needsPhone will auto-become false
+  } catch (err) {
+    phoneOverlayError.value = err.message || 'Something went wrong. Please try again.'
+  } finally {
+    phoneOverlaySaving.value = false
+  }
+}
+
+async function handleOverlayLogout() {
+  await authStore.logout()
+  router.push('/')
+}
+// ─────────────────────────────────────────────────────────────────────────────
 const examHistory = ref([])
 const loading = ref(true)
 const showModeModal = ref(false)    // Step 1: Full Mock vs Topic Wise

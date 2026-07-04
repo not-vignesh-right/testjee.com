@@ -169,10 +169,10 @@
                 </div>
               </div>
               <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Mobile</label>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Mobile <span class="text-red-500">*</span></label>
                 <div class="relative">
                   <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
-                  <input v-model="signUpData.mobile" type="tel" class="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all outline-none shadow-sm hover:border-blue-300 placeholder-gray-400 text-sm" placeholder="9876543210" />
+                  <input v-model="signUpData.mobile" type="tel" inputmode="numeric" maxlength="10" required class="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all outline-none shadow-sm hover:border-blue-300 placeholder-gray-400 text-sm" placeholder="9876543210" />
                 </div>
               </div>
             </div>

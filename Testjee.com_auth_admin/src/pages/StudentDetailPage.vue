@@ -36,7 +36,7 @@
                 <p class="text-sm text-gray-500">{{ student.email_id }}</p>
               </div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <span
                 :class="student.is_approved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
                 class="text-sm font-bold px-3 py-1.5 rounded-full"
@@ -52,6 +52,23 @@
                 class="px-4 py-2 text-sm font-semibold rounded-xl border transition-all disabled:opacity-50"
               >
                 {{ student.is_approved ? 'Revoke' : 'Approve Now' }}
+              </button>
+              <!-- Genuine User Toggle -->
+              <span
+                :class="student.is_genuine_user !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'"
+                class="text-sm font-bold px-3 py-1.5 rounded-full"
+              >
+                {{ student.is_genuine_user !== false ? '👤 Genuine User' : '⚙️ Dev/Internal' }}
+              </span>
+              <button
+                @click="toggleGenuineUser"
+                :disabled="saving"
+                :class="student.is_genuine_user !== false
+                  ? 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                  : 'bg-emerald-600 text-white hover:bg-emerald-700'"
+                class="px-4 py-2 text-sm font-semibold rounded-xl border transition-all disabled:opacity-50"
+              >
+                {{ student.is_genuine_user !== false ? 'Mark as Dev' : 'Mark as Genuine' }}
               </button>
             </div>
           </div>
@@ -398,6 +415,26 @@ async function toggleApproval() {
   } catch (err) {
     console.error('Toggle approval error:', err)
     showToast('Failed to update approval', 'error')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function toggleGenuineUser() {
+  saving.value = true
+  try {
+    const newVal = student.value.is_genuine_user === false ? true : false
+    const { error } = await supabase
+      .from('students')
+      .update({ is_genuine_user: newVal, modification_date: new Date().toISOString() })
+      .eq('student_id', student.value.student_id)
+
+    if (error) throw error
+    student.value.is_genuine_user = newVal
+    showToast(newVal ? 'Marked as Genuine User' : 'Marked as Dev/Internal')
+  } catch (err) {
+    console.error('Toggle genuine user error:', err)
+    showToast('Failed to update user type', 'error')
   } finally {
     saving.value = false
   }

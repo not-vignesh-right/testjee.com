@@ -1,0 +1,1050 @@
+🚀 COMPLETE AUTHENTICATION IMPLEMENTATION WORKFLOW FOR ANTIGRAVITY
+
+📋 PHASE 1: UPDATE authStore.js
+File: src/stores/authStore.js
+Add these NEW actions:
+javascript// 1. Sign Up with Password
+async signUpWithPassword(email, password, name, mobile) {
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name: name,
+          mobile: mobile
+        }
+      }
+    })
+    
+    if (error) throw error
+    
+    // Store in localStorage as backup
+    localStorage.setItem('pendingStudentName', name)
+    if (mobile) localStorage.setItem('pendingMobileNumber', mobile)
+    
+    return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+}
+
+// 2. Sign In with Password
+async signInWithPassword(email, password) {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+    
+    if (error) throw error
+    
+    this.user = data.user
+    this.session = data.session
+    this.isAuthenticated = true
+    
+    // Fetch or create student profile
+    await this.fetchOrCreateStudent()
+    
+    return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+}
+
+// 3. Reset Password (send email)
+async resetPassword(email) {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/reset-password`
+    })
+    
+    if (error) throw error
+    
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+}
+
+// 4. Update Password (after reset)
+async updatePassword(newPassword) {
+  try {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    })
+    
+    if (error) throw error
+    
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+}
+Update existing fetchOrCreateStudent():
+javascriptasync fetchOrCreateStudent() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) throw new Error('No user found')
+    
+    // Try to find by supabase_user_id
+    let { data: student, error } = await supabase
+      .from('students')
+      .select('*')
+      .eq('supabase_user_id', user.id)
+      .single()
+    
+    // Fallback: Try to find by email
+    if (error && error.code === 'PGRST116') {
+      const { data: studentByEmail } = await supabase
+        .from('students')
+        .select('*')
+        .eq('email_id', user.email)
+        .single()
+      
+      if (studentByEmail) {
+        // Update existing student with new supabase_user_id
+        const { data: updated } = await supabase
+          .from('students')
+          .update({ 
+            supabase_user_id: user.id,
+            student_name: user.user_metadata.name || studentByEmail.student_name,
+            modification_date: new Date().toISOString()
+          })
+          .eq('student_id', studentByEmail.student_id)
+          .select()
+          .single()
+        
+        student = updated
+      }
+    }
+    
+    // If still not found, create new student
+    if (!student) {
+      const name = user.user_metadata.name || localStorage.getItem('pendingStudentName') || 'Student'
+      const mobile = user.user_metadata.mobile || localStorage.getItem('pendingMobileNumber') || null
+      
+      const { data: newStudent } = await supabase
+        .from('students')
+        .insert({
+          student_name: name,
+          email_id: user.email,
+          mobile_number: mobile,
+          supabase_user_id: user.id,
+          creation_date: new Date().toISOString(),
+          modification_date: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      student = newStudent
+      
+      // Clear localStorage
+      localStorage.removeItem('pendingStudentName')
+      localStorage.removeItem('pendingMobileNumber')
+    }
+    
+    this.studentProfile = student
+    return student
+    
+  } catch (error) {
+    console.error('Error in fetchOrCreateStudent:', error)
+    throw error
+  }
+}
+DELETE/REMOVE these old methods:
+
+Any signInWithOtp method
+Any magic link related code
+
+
+📋 PHASE 2: UPDATE Login.vue
+File: src/components/Login.vue
+Complete component structure:
+vue<template>
+  <div class="login-container">
+    <!-- Toggle between Sign Up and Sign In -->
+    <div class="auth-mode-toggle">
+      <button 
+        @click="isSignUpMode = true" 
+        :class="{ active: isSignUpMode }"
+      >
+        Sign Up
+      </button>
+      <button 
+        @click="isSignUpMode = false" 
+        :class="{ active: !isSignUpMode }"
+      >
+        Sign In
+      </button>
+    </div>
+
+    <!-- SIGN UP MODE -->
+    <div v-if="isSignUpMode" class="auth-form">
+      <h2>Create Your TESTJEE Account</h2>
+      
+      <input 
+        v-model="signUpData.name" 
+        type="text" 
+        placeholder="Full Name *" 
+        required
+      />
+      
+      <input 
+        v-model="signUpData.email" 
+        type="email" 
+        placeholder="Email Address *" 
+        required
+      />
+      
+      <div class="password-input">
+        <input 
+          v-model="signUpData.password" 
+          :type="showPassword ? 'text' : 'password'" 
+          placeholder="Password (min 8 characters) *" 
+          required
+        />
+        <button @click="showPassword = !showPassword" type="button">
+          {{ showPassword ? '👁️' : '👁️‍🗨️' }}
+        </button>
+      </div>
+      
+      <div class="password-input">
+        <input 
+          v-model="signUpData.confirmPassword" 
+          :type="showConfirmPassword ? 'text' : 'password'" 
+          placeholder="Confirm Password *" 
+          required
+        />
+        <button @click="showConfirmPassword = !showConfirmPassword" type="button">
+          {{ showConfirmPassword ? '👁️' : '👁️‍🗨️' }}
+        </button>
+      </div>
+      
+      <input 
+        v-model="signUpData.mobile" 
+        type="tel" 
+        placeholder="Mobile Number (optional)" 
+        pattern="[0-9]{10}"
+      />
+      
+      <button @click="handleSignUp" :disabled="loading" class="submit-btn">
+        {{ loading ? 'Creating Account...' : 'Create Account' }}
+      </button>
+      
+      <p class="toggle-link">
+        Already have an account? 
+        <a @click="isSignUpMode = false">Sign In</a>
+      </p>
+    </div>
+
+    <!-- SIGN IN MODE -->
+    <div v-else class="auth-form">
+      <h2>Sign In to TESTJEE</h2>
+      
+      <input 
+        v-model="signInData.email" 
+        type="email" 
+        placeholder="Email Address" 
+        required
+      />
+      
+      <div class="password-input">
+        <input 
+          v-model="signInData.password" 
+          :type="showPassword ? 'text' : 'password'" 
+          placeholder="Password" 
+          required
+        />
+        <button @click="showPassword = !showPassword" type="button">
+          {{ showPassword ? '👁️' : '👁️‍🗨️' }}
+        </button>
+      </div>
+      
+      <button @click="handleSignIn" :disabled="loading" class="submit-btn">
+        {{ loading ? 'Signing In...' : 'Sign In' }}
+      </button>
+      
+      <p class="forgot-password">
+        <a @click="showForgotPassword = true">Forgot Password?</a>
+      </p>
+      
+      <p class="toggle-link">
+        Don't have an account? 
+        <a @click="isSignUpMode = true">Sign Up</a>
+      </p>
+    </div>
+
+    <!-- FORGOT PASSWORD MODAL -->
+    <div v-if="showForgotPassword" class="modal-overlay" @click="showForgotPassword = false">
+      <div class="modal-content" @click.stop>
+        <h3>Reset Password</h3>
+        <p>Enter your email to receive a password reset link</p>
+        
+        <input 
+          v-model="resetEmail" 
+          type="email" 
+          placeholder="Email Address"
+        />
+        
+        <button @click="handlePasswordReset" :disabled="loading">
+          {{ loading ? 'Sending...' : 'Send Reset Link' }}
+        </button>
+        
+        <button @click="showForgotPassword = false" class="cancel-btn">
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <!-- SUCCESS/ERROR MESSAGES -->
+    <div v-if="message" :class="['message', messageType]">
+      {{ message }}
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
+
+const router = useRouter()
+const auth = useAuthStore()
+
+// State
+const isSignUpMode = ref(false)
+const loading = ref(false)
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
+const showForgotPassword = ref(false)
+const message = ref('')
+const messageType = ref('') // 'success' or 'error'
+const resetEmail = ref('')
+
+const signUpData = ref({
+  name: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  mobile: ''
+})
+
+const signInData = ref({
+  email: '',
+  password: ''
+})
+
+// Validation
+function validateSignUp() {
+  if (!signUpData.value.name.trim()) {
+    showMessage('Please enter your full name', 'error')
+    return false
+  }
+  
+  if (!signUpData.value.email.trim() || !isValidEmail(signUpData.value.email)) {
+    showMessage('Please enter a valid email address', 'error')
+    return false
+  }
+  
+  if (signUpData.value.password.length < 8) {
+    showMessage('Password must be at least 8 characters long', 'error')
+    return false
+  }
+  
+  if (signUpData.value.password !== signUpData.value.confirmPassword) {
+    showMessage('Passwords do not match', 'error')
+    return false
+  }
+  
+  if (signUpData.value.mobile && !/^[6-9]\d{9}$/.test(signUpData.value.mobile)) {
+    showMessage('Please enter a valid 10-digit mobile number', 'error')
+    return false
+  }
+  
+  return true
+}
+
+function validateSignIn() {
+  if (!signInData.value.email.trim() || !isValidEmail(signInData.value.email)) {
+    showMessage('Please enter a valid email address', 'error')
+    return false
+  }
+  
+  if (!signInData.value.password) {
+    showMessage('Please enter your password', 'error')
+    return false
+  }
+  
+  return true
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+function showMessage(msg, type) {
+  message.value = msg
+  messageType.value = type
+  setTimeout(() => {
+    message.value = ''
+  }, 5000)
+}
+
+// Handlers
+async function handleSignUp() {
+  if (!validateSignUp()) return
+  
+  loading.value = true
+  
+  const result = await auth.signUpWithPassword(
+    signUpData.value.email,
+    signUpData.value.password,
+    signUpData.value.name,
+    signUpData.value.mobile
+  )
+  
+  loading.value = false
+  
+  if (result.success) {
+    showMessage(
+      `Verification email sent to ${signUpData.value.email}! Please check your inbox and click the verification link.`,
+      'success'
+    )
+    // Clear form
+    signUpData.value = {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      mobile: ''
+    }
+  } else {
+    if (result.error.includes('already registered')) {
+      showMessage('This email is already registered. Please sign in instead.', 'error')
+    } else {
+      showMessage(result.error, 'error')
+    }
+  }
+}
+
+async function handleSignIn() {
+  if (!validateSignIn()) return
+  
+  loading.value = true
+  
+  const result = await auth.signInWithPassword(
+    signInData.value.email,
+    signInData.value.password
+  )
+  
+  loading.value = false
+  
+  if (result.success) {
+    // Check if email is verified
+    if (!result.data.user.email_confirmed_at) {
+      showMessage('Please verify your email before signing in. Check your inbox for the verification link.', 'error')
+      await auth.logout()
+      return
+    }
+    
+    showMessage('Sign in successful! Redirecting...', 'success')
+    setTimeout(() => {
+      router.push('/sthome')
+    }, 1000)
+  } else {
+    if (result.error.includes('Invalid login credentials')) {
+      showMessage('Invalid email or password. Please try again.', 'error')
+    } else {
+      showMessage(result.error, 'error')
+    }
+  }
+}
+
+async function handlePasswordReset() {
+  if (!resetEmail.value.trim() || !isValidEmail(resetEmail.value)) {
+    showMessage('Please enter a valid email address', 'error')
+    return
+  }
+  
+  loading.value = true
+  
+  const result = await auth.resetPassword(resetEmail.value)
+  
+  loading.value = false
+  
+  if (result.success) {
+    showMessage(`Password reset email sent to ${resetEmail.value}! Check your inbox.`, 'success')
+    showForgotPassword.value = false
+    resetEmail.value = ''
+  } else {
+    showMessage(result.error, 'error')
+  }
+}
+</script>
+
+<style scoped>
+/* Add your styles here - keep your existing styles and add these */
+.auth-mode-toggle {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.auth-mode-toggle button {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.auth-mode-toggle button.active {
+  border-bottom: 2px solid #2563eb;
+  font-weight: bold;
+}
+
+.password-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input input {
+  flex: 1;
+}
+
+.password-input button {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.forgot-password {
+  text-align: right;
+  margin-top: 0.5rem;
+}
+
+.forgot-password a {
+  color: #2563eb;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.toggle-link {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.toggle-link a {
+  color: #2563eb;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+}
+
+.modal-content h3 {
+  margin-bottom: 1rem;
+}
+
+.modal-content input {
+  width: 100%;
+  margin: 1rem 0;
+  padding: 0.5rem;
+}
+
+.cancel-btn {
+  margin-top: 0.5rem;
+  background: #6b7280;
+}
+
+.message {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+.message.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.message.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+</style>
+
+📋 PHASE 3: UPDATE AuthCallback.vue
+File: src/components/AuthCallback.vue
+vue<template>
+  <div class="callback-container">
+    <div v-if="loading" class="loading">
+      <h2>Verifying your email...</h2>
+      <p>Please wait while we set up your account.</p>
+    </div>
+    
+    <div v-else-if="error" class="error">
+      <h2>Verification Failed</h2>
+      <p>{{ error }}</p>
+      <button @click="router.push('/')">Back to Login</button>
+    </div>
+    
+    <div v-else class="success">
+      <h2>Email Verified! ✅</h2>
+      <p>Redirecting to your dashboard...</p>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
+
+const router = useRouter()
+const auth = useAuthStore()
+
+const loading = ref(true)
+const error = ref('')
+
+onMounted(async () => {
+  try {
+    // Get session from URL (after clicking verification link)
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError) throw sessionError
+    
+    if (!session) {
+      throw new Error('Invalid or expired verification link')
+    }
+    
+    // User is now verified, create/update student profile
+    await auth.fetchOrCreateStudent()
+    
+    loading.value = false
+    
+    // Redirect to student home
+    setTimeout(() => {
+      router.push('/sthome')
+    }, 1500)
+    
+  } catch (err) {
+    loading.value = false
+    error.value = err.message
+    console.error('Verification error:', err)
+  }
+})
+</script>
+
+<style scoped>
+.callback-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+}
+
+.loading, .error, .success {
+  padding: 2rem;
+}
+
+.error {
+  color: #991b1b;
+}
+
+.success {
+  color: #065f46;
+}
+
+button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+</style>
+
+📋 PHASE 4: CREATE ResetPassword.vue (NEW FILE)
+File: src/components/ResetPassword.vue
+vue<template>
+  <div class="reset-password-container">
+    <div v-if="!validToken" class="error">
+      <h2>Invalid Reset Link</h2>
+      <p>This password reset link is invalid or has expired.</p>
+      <button @click="router.push('/')">Back to Login</button>
+    </div>
+    
+    <div v-else class="reset-form">
+      <h2>Reset Your Password</h2>
+      
+      <div class="password-input">
+        <input 
+          v-model="newPassword" 
+          :type="showPassword ? 'text' : 'password'" 
+          placeholder="New Password (min 8 characters)" 
+          required
+        />
+        <button @click="showPassword = !showPassword" type="button">
+          {{ showPassword ? '👁️' : '👁️‍🗨️' }}
+        </button>
+      </div>
+      
+      <div class="password-input">
+        <input 
+          v-model="confirmPassword" 
+          :type="showConfirmPassword ? 'text' : 'password'" 
+          placeholder="Confirm New Password" 
+          required
+        />
+        <button @click="showConfirmPassword = !showConfirmPassword" type="button">
+          {{ showConfirmPassword ? '👁️' : '👁️‍🗨️' }}
+        </button>
+      </div>
+      
+      <button @click="handleResetPassword" :disabled="loading" class="submit-btn">
+        {{ loading ? 'Resetting...' : 'Reset Password' }}
+      </button>
+      
+      <div v-if="message" :class="['message', messageType]">
+        {{ message }}
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
+
+const router = useRouter()
+const auth = useAuthStore()
+
+const validToken = ref(true)
+const loading = ref(false)
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
+const newPassword = ref('')
+const confirmPassword = ref('')
+const message = ref('')
+const messageType = ref('')
+
+onMounted(() => {
+  // Check if there's a valid reset token in URL
+  const urlParams = new URLSearchParams(window.location.search)
+  const token = urlParams.get('token')
+  const type = urlParams.get('type')
+  
+  if (!token || type !== 'recovery') {
+    validToken.value = false
+  }
+})
+
+function showMessage(msg, type) {
+  message.value = msg
+  messageType.value = type
+}
+
+async function handleResetPassword() {
+  // Validation
+  if (newPassword.value.length < 8) {
+    showMessage('Password must be at least 8 characters long', 'error')
+    return
+  }
+  
+  if (newPassword.value !== confirmPassword.value) {
+    showMessage('Passwords do not match', 'error')
+    return
+  }
+  
+  loading.value = true
+  
+  const result = await auth.updatePassword(newPassword.value)
+  
+  loading.value = false
+  
+  if (result.success) {
+    showMessage('Password updated successfully! Redirecting to login...', 'success')
+    setTimeout(() => {
+      router.push('/')
+    }, 2000)
+  } else {
+    showMessage(result.error, 'error')
+  }
+}
+</script>
+
+<style scoped>
+.reset-password-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+.reset-form {
+  max-width: 400px;
+  width: 100%;
+}
+
+.reset-form h2 {
+  margin-bottom: 2rem;
+}
+
+.password-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.password-input input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+}
+
+.password-input button {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 0.75rem;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.message {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+.message.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.message.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.error {
+  text-align: center;
+}
+
+.error button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+</style>
+
+📋 PHASE 5: UPDATE router/index.js
+File: src/router/index.js
+Add the new routes:
+javascriptimport ResetPassword from '@/components/ResetPassword.vue'
+
+const routes = [
+  // ... existing routes ...
+  
+  {
+    path: '/auth/callback',
+    name: 'AuthCallback',
+    component: AuthCallback,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/auth/reset-password',
+    name: 'ResetPassword',
+    component: ResetPassword,
+    meta: { requiresAuth: false }
+  },
+  
+  // ... rest of routes ...
+]
+Update the navigation guard:
+javascriptrouter.beforeEach(async (to, from, next) => {
+  const auth = useAuthStore()
+  
+  if (to.meta.requiresAuth) {
+    if (!auth.isAuthenticated) {
+      // Not logged in → Redirect to login
+      next('/')
+    } else {
+      // Logged in → Check if student profile exists
+      if (!auth.studentProfile) {
+        try {
+          await auth.fetchOrCreateStudent()
+        } catch (error) {
+          console.error('Error fetching student profile:', error)
+          next('/')
+          return
+        }
+      }
+      
+      // Check if email is verified
+      if (auth.user && !auth.user.email_confirmed_at) {
+        alert('Please verify your email before accessing this page.')
+        await auth.logout()
+        next('/')
+        return
+      }
+      
+      next()
+    }
+  } else {
+    // Public route
+    next()
+  }
+})
+
+📋 PHASE 6: CLEANUP - Remove Magic Link Code
+In authStore.js:
+
+Delete any signInWithOtp method
+Remove any references to magic link
+
+Search entire codebase for:
+
+signInWithOtp
+magic link
+Any old localStorage keys that are no longer needed
+
+
+📋 PHASE 7: TESTING CHECKLIST
+Test these flows in order:
+✅ Sign Up Flow:
+
+Fill sign up form with valid data
+Click "Create Account"
+Check email inbox for verification email
+Click verification link in email
+Should redirect to /auth/callback → then /sthome
+Check database: new row in students table with correct data
+Check database: auth.users table has user with email_confirmed_at timestamp
+
+✅ Sign In Flow:
+
+Enter registered email + password
+Click "Sign In"
+Should redirect to /sthome immediately
+Student name should display correctly
+Try WRONG password → Should show error
+Try unverified email → Should show "verify email" message
+
+✅ Forgot Password Flow:
+
+Click "Forgot Password" link
+Enter email
+Click "Send Reset Link"
+Check email inbox for reset email
+Click reset link in email
+Should redirect to /auth/reset-password
+Enter new password
+Click "Reset Password"
+Should redirect to login
+Try logging in with NEW password → Should work
+
+✅ Edge Cases:
+
+Try signing up with already registered email → Should show "already registered" error
+Try signing in before verifying email → Should block and show message
+Try accessing /sthome without login → Should redirect to /
+Password must be 8+ chars → Test validation
+Passwords must match → Test validation
+Mobile number validation (10 digits) → Test validation
+
+
+📋 PHASE 8: DEPLOYMENT NOTES
+Before deploying to production:
+
+Update Supabase URLs:
+
+In Supabase dashboard → Authentication → URL Configuration
+Change Site URL to: https://login.testjee.com
+Add redirect URLs:
+
+https://login.testjee.com/auth/callback
+https://login.testjee.com/auth/reset-password
+
+
+
+
+Test email deliverability:
+
+Send test verification and reset emails
+Check spam folder
+Consider using custom SMTP if emails go to spam
+
+
+Environment Variables:
+
+Ensure Supabase URL and Anon Key are in production env vars
+
+
+
+
+🎯 FINAL IMPLEMENTATION ORDER:
+
+authStore.js - Add all new methods
+Login.vue - Complete rewrite with Sign Up/Sign In modes
+AuthCallback.vue - Update for email verification
+ResetPassword.vue - Create new component
+router/index.js - Add routes and update guards
+Cleanup - Remove magic link code
+Test - Follow testing checklist
+Deploy - Update URLs in Supabase
