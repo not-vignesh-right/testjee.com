@@ -1,0 +1,164 @@
+# TestJEE Codebase Context & Reference Guide
+
+> [!IMPORTANT]
+> **CRITICAL FIRST STEP FOR THE INCOMING AGENT:**
+> Before starting any tasks, you must read the detailed Admin architecture document:
+> * [admin_architecture_and_flow.md](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/admin_architecture_and_flow.md)
+> It contains the full specifications, connections, RPCs, and flowcharts for the newly added Live Session administrative controls.
+
+This file provides the complete, absolute context of the **TestJEE Mock Exam Platform** (NTA JEE Main replica) codebase. It captures the architecture, database schema, proctoring systems, state persistence layers, and page-reload recovery workflows. Use this document as the primary reference when starting a new chat in Antigravity.
+
+---
+
+## 1. Tech Stack & Project Overview
+* **Frontend**: Vue 3 (Composition API) + Vite + Pinia + Vue Router + Tailwind CSS
+* **Backend/Database**: Supabase (PostgreSQL) + Row-Level Security (RLS) policies
+* **Purpose**: A strict replica of the NTA JEE Main exam layout with extreme anti-cheat/proctoring capabilities, supporting both self-paced practice tests and live classroom-wide mock exams.
+
+---
+
+## 2. Directory & File Structure
+```
+Testjee.com_login_main_sthome_test/
+├── src/
+│   ├── main.js                  # App bootstrap and store/router registration
+│   ├── App.vue                  # Main layout shell
+│   ├── lib/supabase.js          # Supabase client instantiation
+│   ├── router/index.js          # Authentication guards, route definitions, and live session restoration
+│   ├── data/
+│   │   ├── quotes.js            # Array of motivational quotes
+│   │   └── examConfigs.js       # Core exam configurations (JEE Main marking schema, templates)
+│   ├── stores/
+│   │   ├── authStore.js         # Student authentication, profile registration & approval state
+│   │   ├── adminStore.js        # Administrator authentication and live monitoring control
+│   │   ├── examStore.js         # Practice exam logic (timers, answers, appeal snapshots, RLS calls)
+│   │   └── examSessionStore.js  # Live session logic (temp student credentials, saveAnswer RLS triggers)
+│   └── components/
+│       ├── Login.vue            # Student credentials login / register
+│       ├── Dashboard.vue        # Student landing page (quotes, performance graphs, results list)
+│       ├── ExamLayout.vue       # Proctoring container, timers, fullscreen check, and questions pane
+│       ├── HeaderBar.vue        # Navigation header
+│       ├── QuestionArea.vue     # Core MCQ / Numeric question rendering
+│       ├── QuestionPalette.vue  # Interactive JEE navigation grid
+│       ├── ResultsDetails.vue   # Performance analysis per question
+│       ├── admin/
+│       │   ├── AdminHome.vue           # Admin control panel
+│       │   ├── AdminLiveSessions.vue   # Manage sessions
+│       │   ├── LiveExamMonitor.vue     # Live student action logs, warnings, and submissions
+│       │   └── AdminResumeRequests.vue # Approve/reject student proctoring appeal requests
+│       └── live-exam/
+│           ├── ExamLogin.vue           # Temporary credentials entry for live tests
+│           ├── ExamWaitingRoom.vue     # Live lobby (polling for session 'live' status)
+│           └── StudentResults.vue      # Results screen for live exams (RPC-backed)
+```
+
+---
+
+## 3. The Two Exam Engines
+
+The platform runs two distinct exam pipelines integrated into a single user interface:
+
+### A. Practice / Regular Exams
+* **User base**: Authenticated permanent students (`students` table).
+* **Control store**: [examStore.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/stores/examStore.js).
+* **Persistence**: Synchronizes state dynamically to `localStorage` during active testing. Evaluates and submits final scores to `results` and session states to `exam_sessions`.
+* **Resumption**: Recovered via proctoring appeals (`exam_support_requests`). Admin must approve the ticket, and the client restores exact question arrays, responses, and marked-for-review items.
+
+### B. Live Session Exams
+* **User base**: Classroom students with temporary usernames/codes (`temp_students` table).
+* **Control store**: [examSessionStore.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/stores/examSessionStore.js).
+* **Persistence**: Bypasses `localStorage` for answer states. Every response change or mark-for-review flag is saved **instantly to the database** via the `save_student_answer` RPC to prevent offline data loss or client-side caching hacks.
+* **Resumption**: Does not use appeal tickets. If a student reloads or crashes, they are restored directly back into the live session as long as the status is `'in_progress'`.
+
+### C. Topic-Uniform Question Selection
+* **Uniformity Fix**: Prevents questions from clustering inside a single topic per subject by fetching up to `1000` candidates from Supabase and running a round-robin selector (`selectUniformlyFromTopics`) in [examStore.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/stores/examStore.js) and [ScheduleExam.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/admin/ScheduleExam.vue).
+* **De-duplication**: Filters out duplicate question diagrams and passages using unique `image_url` checks during compilation.
+
+---
+
+## 4. Proctoring & Anti-Cheat System (Fully Hardened)
+
+The anti-cheat mechanisms are strictly managed inside [ExamLayout.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/ExamLayout.vue). If a student triggers any violation:
+
+### A. Fullscreen Enforcement
+* Fullscreen is programmatically requested via `enforceFullScreen()`.
+* If a student exits fullscreen (e.g. presses `Escape`), the `handleFullscreenChange` listener triggers a **10-second warning countdown**.
+* The screen is covered by an overlay modal. The student must click **"Return to Full Screen"** within 10 seconds.
+* Tab switching or window minimizations during this countdown will trigger an **instant auto-submission** with no warning.
+
+### B. Focus / Tab-Switch Enforcement
+* **Visibility Change** (`document.hidden`): Switching tabs, opening another app, or minimizing the browser triggers an **instant auto-submit** (`examStore.submitExam(true)`).
+* **Window Blur** (focus loss): Clicking outside the browser window starts the **10-second warning countdown**.
+
+### C. System Disables
+* Right-click (context menu) is disabled (`contextmenu.preventDefault()`).
+* Developer Tools keys (`F12`, `Ctrl+Shift+I`, `Ctrl+Shift+J`, `Ctrl+Shift+U`) are blocked.
+* Text copying, cutting, pasting, and drag-selections are fully blocked.
+
+### D. Dialog Loophole Fixes (Wall-Clock Synchronization)
+* **The Loophole**: Browser confirm alerts (e.g. the native `Leave site?` dialog triggered by `beforeunload` on refresh) pause the browser's JavaScript execution thread, including standard intervals (`remainingTime.value--`). A student could stay on the reload dialog to get infinite time.
+* **The Solution**: All timers are calculated against **absolute target timestamps** (`Date.now() + duration`).
+  * **Exam Timer**:
+    ```javascript
+    const targetEndTime = Date.now() + remainingTime.value * 1000;
+    globalTimerInterval.value = setInterval(() => {
+      remainingTime.value = Math.max(0, Math.floor((targetEndTime - Date.now()) / 1000));
+      if (remainingTime.value <= 0) submitExam(true);
+    }, 1000);
+    ```
+  * **Grace Timer**: If a student triggers a 10s warning countdown and opens a browser dialog, the countdown continues in real-world time. When they close the dialog, the next tick evaluates the elapsed time and instantly auto-submits if there are $\ge 10$ seconds have passed.
+
+---
+
+## 5. Page-Reload (Ctrl+R) & Resumption Flows
+
+When a page reload happens during an active exam:
+
+### A. Regular Exam Path
+1. `beforeunload` catches reload and runs `emergencySubmit()`, saving all answers and visited statuses to `localStorage` (it does **not** update `is_submitted` in the DB).
+2. On page load, `initializeSession()` reads the live DB session, restores state from `localStorage`, and keeps the exam active.
+3. Because programmatic fullscreen fails without a user gesture, the page displays immediately, fullscreen fails, and the **10-second warning grace countdown immediately covers the screen**.
+4. The student must click **"Return to Full Screen"** (which acts as the user gesture) to hide the warning and continue.
+
+### B. Live Exam Path
+1. On reload, the Pinia store state is wiped.
+2. The route guard in [router/index.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/router/index.js) intercepts the transition to `/exam?mode=live`.
+3. It detects that `studentSessionId` is null, reads `student_username` from `sessionStorage` and `sessionCode` from the URL, and invokes `loginToExam` and `loadQuestions` in the background.
+4. Inside `loginToExam` in [examSessionStore.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/stores/examSessionStore.js), the store fetches the student's original `start_time` from the `student_exam_sessions` database table and recalculates `personalEndTime` accurately:
+   ```javascript
+   personalEndTime = start_time + duration_minutes
+   ```
+5. `bridgeLiveSessionToExamStore` maps questions and restored answers into Pinia.
+6. The router continues navigation, the page displays, programmatic fullscreen fails, and the student is shown the **10-second warning countdown** to return to fullscreen.
+
+### C. Appeal / Resumption Restore
+1. When an admin approves an appeal, `restoreResumedSession()` restores the exact questions, answers, and review flags (`is_marked`) from the database snapshot saved inside the `exam_support_requests` record.
+2. It verifies the request status in the database first to prevent duplicate resume replay exploits.
+
+---
+
+## 6. Supabase Tables & Key Database RPCs
+
+### Key Tables
+* **`students`**: Personal profile, email, verification state, approved checks, and total practice tests remaining.
+* **`exam_sessions`**: Practice session logs (linked to `students`). Stores start/end times and submission status.
+* **`results`**: Practice answers array and scores.
+* **`exam_support_requests`**: Appealed anti-cheat logs, status (`pending`, `approved`, `completed`), and JSON snapshots of questions and answers.
+* **`temp_students`**: Temporary usernames and passwords assigned to live test takers.
+* **`live_exam_sessions`**: Live scheduled tests created by instructors, containing the active status (`scheduled`, `live`, `completed`).
+* **`student_exam_sessions`**: Live testing states. Stores individual progress, score, start/end timestamps, and question shuffling arrays.
+* **`student_answers`**: Detail tables tracking live session answers, time spent per question, and review markers.
+
+### Key RPC Definitions (Security Definer Bypasses)
+1. **`student_exam_login(input_session_code, input_username)`**
+   * Verifies live session code and student username. Returns student details, status, and duration bounds.
+2. **`start_student_exam(input_student_session_id)`**
+   * Transitions a student's session to `in_progress`, populates the shuffled `question_order` array, and sets the active timestamps.
+3. **`get_student_exam_questions(input_student_session_id)`**
+   * Securely returns the text content, options, topics, image resources, and existing answers for the student's assigned questions.
+4. **`save_student_answer(input_student_session_id, input_question_id, input_question_number, input_selected_answer, input_time_spent_seconds, input_is_marked_for_review)`**
+   * Persists a student's response state, time counters, and review flags into `student_answers` on every click.
+5. **`submit_student_exam(input_student_session_id)`**
+   * Evaluates responses, computes scores using config marking parameters, registers final ranks, and sets the session status to `submitted`.
+6. **`get_student_live_result(input_student_session_id)`**
+   * Securely aggregates student ranks, scores, and accuracy parameters for presentation in results.
