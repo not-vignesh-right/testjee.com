@@ -77,9 +77,17 @@
                   {{ session.batch_label }}
                 </span>
 
-                <span class="text-sm font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200">
-                   Code: {{ session.session_code }}
-                </span>
+                <div class="inline-flex items-center gap-1.5 bg-gray-100 text-gray-600 px-2.5 py-1 rounded border border-gray-200 text-sm font-mono select-none">
+                   <span>Code: {{ session.session_code }}</span>
+                   <button 
+                     @click.stop="copySessionLink(session.session_code)" 
+                     class="text-gray-400 hover:text-blue-600 p-0.5 rounded transition-colors focus:outline-none"
+                     title="Copy student exam link"
+                   >
+                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                   </button>
+                   <span v-if="copiedCode === session.session_code" class="text-[10px] text-green-600 font-semibold font-sans">Copied!</span>
+                </div>
               </div>
 
               <h3 class="text-xl font-bold text-gray-900 mb-1 group-hover:text-blue-700 transition-colors" :class="{ 'line-through opacity-50': session.status === 'cancelled' }">
@@ -205,6 +213,22 @@ const loading = ref(true)
 const rawSessions = ref([])
 const activeTab = ref('all')
 const pollInterval = ref(null)
+const copiedCode = ref(null)
+
+const copySessionLink = async (code) => {
+  try {
+    const link = `https://login.testjee.com/live-exam/${code}`
+    await navigator.clipboard.writeText(link)
+    copiedCode.value = code
+    setTimeout(() => {
+      if (copiedCode.value === code) {
+        copiedCode.value = null
+      }
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy session link:', err)
+  }
+}
 
 const filteredSessions = computed(() => {
   if (activeTab.value === 'all') return rawSessions.value

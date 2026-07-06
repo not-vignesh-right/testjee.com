@@ -99,7 +99,18 @@
             </div>
             <div>
                <span class="block text-sm font-bold text-gray-500 mb-1 uppercase tracking-wider">Session Code <span class="text-xs font-normal lowercase">(For students)</span></span>
-               <strong class="text-2xl font-mono text-blue-600 tracking-widest bg-white px-3 py-1 rounded inline-block border border-blue-100 shadow-sm">{{ meta.sessionCode }}</strong>
+               <div class="flex items-center gap-2 mt-1">
+                 <strong class="text-2xl font-mono text-blue-600 tracking-widest bg-white px-3 py-1 rounded inline-block border border-blue-100 shadow-sm">{{ meta.sessionCode }}</strong>
+                 <button
+                   type="button"
+                   @click="copyLink"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                   title="Copy exam link for students"
+                 >
+                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                   <span>{{ copySuccess ? 'Copied Link!' : 'Copy Link' }}</span>
+                 </button>
+               </div>
             </div>
             <div class="md:col-span-2 mt-2">
               <span class="block text-sm font-bold text-gray-500 mb-2 uppercase tracking-wider">Instructions For Students</span>
