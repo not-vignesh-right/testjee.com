@@ -68,6 +68,7 @@ export function bridgeLiveSessionToExamStore(sessionCode, examType = 'JEE_MAIN_F
 
   // Timer: use the personal (per-student) end time computed in examSessionStore.startExam(),
   // not the session-wide scheduled_end_time (BUG-04 — the two diverge once admin uses "Start Early").
+  liveStore.calculateTimeRemaining()
   examStore.remainingTime = liveStore.timeRemainingSeconds
 
   examStore.sessionId = null // live mode never touches exam_sessions/results
