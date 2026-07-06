@@ -115,7 +115,13 @@
                </tr>
              </thead>
              <tbody class="divide-y divide-gray-100">
-                <tr v-for="student in filteredResults" :key="student.username" class="hover:bg-gray-50/80 transition-colors group">
+                <tr 
+                   v-for="student in filteredResults" 
+                   :key="student.username" 
+                   class="transition-colors group"
+                   :class="student.status !== 'not_started' ? 'hover:bg-gray-50/80 cursor-pointer' : 'opacity-75 bg-gray-50/20'"
+                   @click="student.status !== 'not_started' && viewStudentAttempt(student)"
+                >
                    
                    <td class="p-4 text-center">
                      <div class="flex items-center justify-center">
@@ -171,6 +177,193 @@
 
     </div>
   </div>
+
+  <!-- Drawer / Modal for Student's Detailed Attempt Breakdown -->
+  <Teleport to="body">
+    <div v-if="selectedStudent" class="fixed inset-0 z-40 flex justify-end bg-black/60 backdrop-blur-sm" @click="selectedStudent = null">
+      <div class="bg-white w-full max-w-4xl h-full shadow-2xl flex flex-col animate-slide-in" @click.stop>
+        <!-- Drawer Header -->
+        <div class="px-6 py-5 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+          <div>
+            <span class="px-2.5 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-full uppercase tracking-wider">Detailed Student Review</span>
+            <h3 class="text-xl font-bold text-gray-900 mt-1">{{ selectedStudent.student_name || 'Anonymous' }}</h3>
+            <p class="text-xs font-mono text-gray-500 mt-0.5">{{ selectedStudent.username }} • Roll Code: {{ selectedStudent.roll_number || 'No Roll' }}</p>
+          </div>
+          <button @click="selectedStudent = null" class="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Drawer Content -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
+          <div v-if="loadingStudentDetails" class="flex flex-col items-center justify-center py-20">
+            <svg class="animate-spin h-10 w-10 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <p class="text-gray-500 font-medium">Fetching detailed questions & responses...</p>
+          </div>
+          
+          <template v-else-if="selectedStudentDetails.length > 0">
+            <!-- Detailed stats row -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="bg-gray-50 p-4 border border-gray-200 rounded-xl text-center">
+                <div class="text-xs font-bold text-gray-400 uppercase">Score</div>
+                <div class="text-xl font-bold text-gray-900 mt-1">{{ selectedStudent.score ?? '-' }} / {{ maxScore }}</div>
+              </div>
+              <div class="bg-gray-50 p-4 border border-gray-200 rounded-xl text-center">
+                <div class="text-xs font-bold text-gray-400 uppercase">Percentage</div>
+                <div class="text-xl font-bold text-blue-600 mt-1">{{ selectedStudent.percentage ? Number(selectedStudent.percentage).toFixed(1) + '%' : '-' }}</div>
+              </div>
+              <div class="bg-gray-50 p-4 border border-gray-200 rounded-xl text-center">
+                <div class="text-xs font-bold text-gray-400 uppercase">Rank</div>
+                <div class="text-xl font-bold text-purple-600 mt-1">#{{ selectedStudent.rank || '-' }}</div>
+              </div>
+              <div class="bg-gray-50 p-4 border border-gray-200 rounded-xl text-center">
+                <div class="text-xs font-bold text-gray-400 uppercase">Time Taken</div>
+                <div class="text-xl font-bold text-gray-800 mt-1 font-mono">{{ formatDuration(selectedStudent.time_taken_seconds) }}</div>
+              </div>
+            </div>
+
+            <!-- Grouped Grid breakdown -->
+            <div v-for="(questions, subject) in selectedStudentGroupedBySubject" :key="subject" class="space-y-3">
+              <div class="flex items-center gap-2 pb-2 border-b border-gray-100">
+                <div class="w-6 h-6 rounded bg-blue-100 text-blue-800 font-bold text-xs flex items-center justify-center">{{ subject.charAt(0) }}</div>
+                <h4 class="font-bold text-gray-850">{{ subject }}</h4>
+                <span class="text-xs text-gray-400">({{ questions.length }} questions)</span>
+              </div>
+              
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <div
+                  v-for="q in questions"
+                  :key="q.question_id"
+                  @click="selectedQuestion = q"
+                  class="p-3 border rounded-xl hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+                  :class="getCardClass(q)"
+                >
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="w-6 h-6 rounded flex items-center justify-center text-xs font-bold" :class="getQNumberClass(q)">
+                      {{ q.originalIndex + 1 }}
+                    </span>
+                    <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" :class="getStatusBadgeClass(q)">
+                      {{ getQuestionStatusText(q) }}
+                    </span>
+                  </div>
+                  
+                  <div class="flex items-center justify-between text-xs font-semibold mt-1">
+                    <div>
+                      <span class="text-gray-400">Student: </span>
+                      <span :class="getAnswerTextColor(q)">{{ q.selected_answer ? q.selected_answer.toUpperCase() : '—' }}</span>
+                    </div>
+                    <div>
+                      <span class="text-gray-400">Correct: </span>
+                      <span class="text-green-600">{{ q.correct_answer ? q.correct_answer.toUpperCase() : '—' }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+          
+          <div v-else class="text-center py-20 text-gray-400">
+            <p>No details found for this student session.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- Modal for Question Details -->
+  <Teleport to="body">
+    <div v-if="selectedQuestion" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click="selectedQuestion = null">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-fade-in" @click.stop>
+        
+        <!-- Modal Header -->
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-full uppercase tracking-wider">Q{{ selectedQuestion.originalIndex + 1 }}</span>
+            <span class="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">{{ selectedQuestion.subject_name }}</span>
+            <span v-if="selectedQuestion.topic_name" class="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">{{ selectedQuestion.topic_name }}</span>
+            <span class="px-2.5 py-1 bg-gray-100 text-gray-500 text-xs font-semibold rounded-full font-mono">{{ selectedQuestion.question_type === 'multiple_choice' ? 'MCQ' : 'Numeric' }}</span>
+          </div>
+          <button @click="selectedQuestion = null" class="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="p-6 space-y-6">
+          <!-- Status banner -->
+          <div class="rounded-xl p-4 flex items-center justify-between border" :class="getQuestionModalBannerClass(selectedQuestion)">
+            <div>
+              <p class="text-xs font-black uppercase tracking-wider">{{ getQuestionModalStatusText(selectedQuestion) }}</p>
+              <p class="text-sm font-medium text-gray-700 mt-0.5">{{ getQuestionModalStatusSubtitle(selectedQuestion) }}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-[10px] text-gray-400 font-semibold uppercase">Time Spent</p>
+              <p class="text-lg font-black font-mono">{{ formatDuration(selectedQuestion.time_spent_seconds) }}</p>
+            </div>
+          </div>
+
+          <!-- Question Stem -->
+          <div class="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200 bg-gray-100/50">
+              <h3 class="text-xs font-black uppercase text-gray-500 tracking-wider">Question Stem</h3>
+            </div>
+            <div class="p-4">
+              <img v-if="selectedQuestion.image_url" :src="selectedQuestion.image_url" alt="Question" class="max-w-full h-auto object-contain bg-white rounded-lg mx-auto max-h-80" />
+              <p v-else class="text-gray-800 text-base leading-relaxed whitespace-pre-line">{{ selectedQuestion.question_content?.text || selectedQuestion.question_content?.stem || selectedQuestion.external_reference || 'No content.' }}</p>
+            </div>
+          </div>
+
+          <!-- Choices / Numeric Answer -->
+          <div v-if="selectedQuestion.question_type === 'multiple_choice'" class="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200 bg-gray-100/50">
+              <h3 class="text-xs font-black uppercase text-gray-500 tracking-wider">Options</h3>
+            </div>
+            <div class="p-4 space-y-3">
+              <div v-for="opt in getQuestionModalOptions(selectedQuestion)" :key="opt.id" class="flex items-start gap-3 p-3 rounded-lg border bg-white" :class="getModalOptClass(selectedQuestion, opt.id)">
+                <div class="w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold shrink-0" :class="getModalOptBadgeClass(selectedQuestion, opt.id)">
+                  {{ opt.id.toUpperCase() }}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <img v-if="isUrl(opt.text)" :src="opt.text" class="max-w-full h-auto object-contain bg-white max-h-32" />
+                  <p v-else class="text-sm font-medium leading-relaxed text-gray-700">{{ opt.text || '—' }}</p>
+                </div>
+                <!-- Status tags -->
+                <div class="shrink-0 flex items-center gap-1.5 text-xs font-bold">
+                  <span v-if="opt.id === selectedQuestion.correct_answer" class="text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">Correct</span>
+                  <span v-if="opt.id === selectedQuestion.selected_answer && opt.id !== selectedQuestion.correct_answer" class="text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200">Student Answer</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Numeric Field -->
+          <div v-else-if="selectedQuestion.question_type === 'numeric'" class="grid grid-cols-2 gap-4">
+            <div class="rounded-xl p-4 text-center border bg-white" :class="selectedQuestion.is_correct ? 'border-green-300 bg-green-50/30' : 'border-red-300 bg-red-50/30'">
+              <p class="text-[10px] font-black uppercase tracking-wide text-gray-500">Student's Answer</p>
+              <p class="text-2xl font-mono font-bold mt-1" :class="selectedQuestion.is_correct ? 'text-green-700' : 'text-red-700'">{{ selectedQuestion.selected_answer ?? '—' }}</p>
+            </div>
+            <div class="rounded-xl p-4 text-center border border-green-300 bg-green-50/30 bg-white">
+              <p class="text-[10px] font-black uppercase tracking-wide text-green-600">Correct Answer</p>
+              <p class="text-2xl font-mono font-bold text-green-700 mt-1">{{ selectedQuestion.correct_answer ?? '—' }}</p>
+            </div>
+          </div>
+
+          <!-- Solution -->
+          <div class="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200 bg-gray-100/50">
+              <h3 class="text-xs font-black uppercase text-gray-500 tracking-wider">Solution / Explanation</h3>
+            </div>
+            <div class="p-4">
+              <img v-if="selectedQuestion.solution && isUrl(selectedQuestion.solution)" :src="selectedQuestion.solution" alt="Solution" class="max-w-full h-auto object-contain bg-white rounded-lg mx-auto max-h-80" />
+              <p v-else-if="selectedQuestion.solution" class="text-gray-700 text-sm leading-relaxed whitespace-pre-line">{{ selectedQuestion.solution }}</p>
+              <p v-else class="text-gray-400 text-sm text-center py-2">No detailed explanation configured for this question.</p>
+            </div>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -187,7 +380,54 @@ const loading = ref(true)
 const sessionMeta = ref(null)
 const results = ref([])
 
+const selectedStudent = ref(null)
+const selectedStudentDetails = ref([])
+const loadingStudentDetails = ref(false)
+const selectedQuestion = ref(null)
+
 const sessionId = parseInt(route.params.id)
+
+const selectedStudentGroupedBySubject = computed(() => {
+  const groups = {}
+  selectedStudentDetails.value.forEach((q, idx) => {
+    const subject = q.subject_name || 'General'
+    if (!groups[subject]) groups[subject] = []
+    groups[subject].push({
+      ...q,
+      originalIndex: idx
+    })
+  })
+  return groups
+})
+
+const viewStudentAttempt = async (student) => {
+  if (student.status === 'not_started') return
+  selectedStudent.value = student
+  loadingStudentDetails.value = true
+  selectedStudentDetails.value = []
+  try {
+    const { data: sesRow, error: sesErr } = await supabase
+      .from('student_exam_sessions')
+      .select('student_session_id, temp_students!inner(username)')
+      .eq('live_session_id', sessionId)
+      .eq('temp_students.username', student.username)
+      .maybeSingle()
+
+    if (sesErr) throw sesErr
+    if (!sesRow) throw new Error('Student session not found')
+
+    const { data, error } = await supabase.rpc('get_student_live_detailed_results', {
+      input_student_session_id: sesRow.student_session_id,
+      p_admin_token: adminStore.getToken()
+    })
+    if (error) throw error
+    selectedStudentDetails.value = data || []
+  } catch (err) {
+    console.error('Failed to load student attempt details:', err)
+  } finally {
+    loadingStudentDetails.value = false
+  }
+}
 
 onMounted(async () => {
   if (!adminStore.adminProfile?.admin_id) return
@@ -312,6 +552,79 @@ const exportCSV = () => {
   a.download = `${sessionMeta.value?.session_name ?? 'results'}_${Date.now()}.csv`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+// UI & Modal helpers
+const isUrl = (str) => {
+  if (!str) return false
+  return /^https?:\/\//i.test(str.trim())
+}
+const getCardClass = (q) => {
+  if (q.is_correct) return 'bg-green-50/60 border-green-200/70'
+  if (q.selected_answer) return 'bg-red-50/60 border-red-200/70'
+  return 'bg-gray-50/60 border-gray-200/70'
+}
+const getQNumberClass = (q) => {
+  if (q.is_correct) return 'bg-green-500 text-white'
+  if (q.selected_answer) return 'bg-red-500 text-white'
+  return 'bg-gray-300 text-white'
+}
+const getStatusBadgeClass = (q) => {
+  if (q.is_correct) return 'bg-green-100 text-green-700'
+  if (q.selected_answer) return 'bg-red-100 text-red-700'
+  return 'bg-gray-100 text-gray-500'
+}
+const getQuestionStatusText = (q) => {
+  if (q.is_correct) return 'Correct'
+  if (q.selected_answer) return 'Wrong'
+  return 'Skipped'
+}
+const getAnswerTextColor = (q) => {
+  if (!q.selected_answer) return 'text-gray-400'
+  return q.is_correct ? 'text-green-600' : 'text-red-600'
+}
+const getQuestionModalBannerClass = (q) => {
+  if (!q.selected_answer) return 'bg-gray-50 border-gray-200 text-gray-500'
+  if (q.is_correct) return 'bg-green-50 border-green-200 text-green-700'
+  return 'bg-red-50 border-red-200 text-red-700'
+}
+const getQuestionModalStatusText = (q) => {
+  if (!q.selected_answer) return 'Not Attempted'
+  if (q.is_correct) return 'Correct'
+  return 'Incorrect'
+}
+const getQuestionModalStatusSubtitle = (q) => {
+  if (!q.selected_answer) return 'Student skipped this question.'
+  if (q.is_correct) return `Student answered: ${String(q.selected_answer).toUpperCase()}`
+  return `Student answered: ${String(q.selected_answer).toUpperCase()}  ·  Correct: ${String(q.correct_answer || '?').toUpperCase()}`
+}
+const getQuestionModalOptions = (q) => {
+  return ['choice1', 'choice2', 'choice3', 'choice4'].map((col, i) => {
+    const rawVal = q[col]
+    let text = ''
+    if (rawVal) {
+      try {
+        const parsed = typeof rawVal === 'string' ? JSON.parse(rawVal) : rawVal
+        text = parsed?.text || parsed || ''
+      } catch {
+        text = String(rawVal)
+      }
+    }
+    return {
+      id: ['a', 'b', 'c', 'd'][i],
+      text
+    }
+  })
+}
+const getModalOptClass = (q, optId) => {
+  if (optId === q.correct_answer) return 'border-green-400 bg-green-50/50 shadow-sm ring-1 ring-green-400'
+  if (optId === q.selected_answer && !q.is_correct) return 'border-red-400 bg-red-50/50 shadow-sm ring-1 ring-red-400'
+  return 'border-gray-200 hover:bg-gray-50'
+}
+const getModalOptBadgeClass = (q, optId) => {
+  if (optId === q.correct_answer) return 'bg-green-500 text-white'
+  if (optId === q.selected_answer && !q.is_correct) return 'bg-red-500 text-white'
+  return 'bg-gray-200 text-gray-600'
 }
 
 const formatDuration = (totalSeconds) => {
