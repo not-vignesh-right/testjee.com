@@ -177,6 +177,27 @@ export const useExamSessionStore = defineStore('examSession', () => {
 
             questions.value = data || []
 
+            // Fix for Issue: Fetch subject information for each loaded question (because get_student_exam_questions does not return subject)
+            if (questions.value.length > 0) {
+                const questionIds = questions.value.map(q => q.question_id)
+                const { data: dbQuestions, error: dbQErr } = await supabase
+                    .from('questions')
+                    .select('question_id, subject_id, subjects(subject_name)')
+                    .in('question_id', questionIds)
+
+                if (dbQErr) {
+                    console.warn('Could not fetch question subjects from database:', dbQErr)
+                } else if (dbQuestions) {
+                    const subjectMap = {}
+                    dbQuestions.forEach(dq => {
+                        subjectMap[dq.question_id] = dq.subjects?.subject_name || 'General'
+                    })
+                    questions.value.forEach(q => {
+                        q.subject_name = subjectMap[q.question_id] || 'General'
+                    })
+                }
+            }
+
             // Sync local state with loaded database data
             answers.value = {}
             timeSpent.value = {}

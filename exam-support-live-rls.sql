@@ -19,10 +19,16 @@ DROP POLICY IF EXISTS "Allow select for everyone" ON public.student_exam_session
 CREATE POLICY "Allow select for everyone" ON public.student_exam_sessions
 FOR SELECT TO anon, authenticated USING (true);
 
--- 4. Set up live mock exam support requests RLS policies
+-- 4. Enable RLS on questions table and allow SELECT for everyone (necessary for students to retrieve correct subject layouts)
+ALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow select access to questions" ON public.questions;
+CREATE POLICY "Allow select access to questions" ON public.questions
+FOR SELECT TO anon, authenticated USING (true);
+
+-- 5. Set up live mock exam support requests RLS policies
 ALTER TABLE public.exam_support_requests ENABLE ROW LEVEL SECURITY;
 
--- 4.1 SELECT policy: Allow selecting if student_session_id is not null (live exam path)
+-- 5.1 SELECT policy: Allow selecting if student_session_id is not null (live exam path)
 DROP POLICY IF EXISTS "select_live_support_requests" ON public.exam_support_requests;
 CREATE POLICY "select_live_support_requests" 
 ON public.exam_support_requests 
@@ -30,7 +36,7 @@ FOR SELECT
 TO anon, authenticated 
 USING (student_session_id IS NOT NULL);
 
--- 4.2 INSERT policy: Allow inserting if student_session_id is not null
+-- 5.2 INSERT policy: Allow inserting if student_session_id is not null
 DROP POLICY IF EXISTS "insert_live_support_requests" ON public.exam_support_requests;
 CREATE POLICY "insert_live_support_requests" 
 ON public.exam_support_requests 
@@ -38,7 +44,7 @@ FOR INSERT
 TO anon, authenticated 
 WITH CHECK (student_session_id IS NOT NULL);
 
--- 4.3 UPDATE policy: Allow updating if student_session_id is not null (to mark requests as completed)
+-- 5.3 UPDATE policy: Allow updating if student_session_id is not null (to mark requests as completed)
 DROP POLICY IF EXISTS "update_live_support_requests" ON public.exam_support_requests;
 CREATE POLICY "update_live_support_requests" 
 ON public.exam_support_requests 
