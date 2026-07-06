@@ -193,7 +193,21 @@ onMounted(() => {
   
   // Guard logic against already active tests
   if (store.examStatus === 'in_progress') {
-    router.push(`/live-exam/${route.params.sessionCode}/active`)
+    const code = route.params.sessionCode
+    let examType
+    try {
+      const { data: examTypeData } = await supabase
+        .from('live_exam_sessions')
+        .select('exam_type')
+        .eq('session_code', code)
+        .maybeSingle()
+      examType = examTypeData?.exam_type
+    } catch (e) {
+      console.warn('Could not fetch exam_type on active test restore (non-fatal):', e)
+    }
+
+    bridgeLiveSessionToExamStore(code, examType)
+    router.push(`/exam?mode=live&sessionCode=${code}`)
     return
   }
 

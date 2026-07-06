@@ -335,11 +335,8 @@ const redirectBasedOnStatus = () => {
   if (examStore.examStatus === 'submitted' || examStore.examStatus === 'auto_submitted' || examStore.sessionDetails.sessionStatus === 'completed') {
     router.push(`/live-exam/${code}/results`)
   } 
-  else if (examStore.examStatus === 'in_progress') {
-    router.push(`/live-exam/${code}/active`)
-  } 
   else {
-    // not_started / scheduled / lobby
+    // in_progress / not_started / scheduled / lobby
     router.push(`/live-exam/${code}/lobby`)
   }
 }
