@@ -116,6 +116,10 @@ router.beforeEach(async (to, from, next) => {
         console.log(`🔄 Restoring live exam session on reload for username: ${username}, session: ${sessionCode}`)
         const loginRes = await liveStore.loginToExam(sessionCode, username)
         if (loginRes.success) {
+          if (liveStore.examStatus === 'submitted' || liveStore.examStatus === 'auto_submitted') {
+            console.log('🚫 Live exam already submitted, redirecting to results page')
+            return next(`/live-exam/${sessionCode}/results`)
+          }
           const loadRes = await liveStore.loadQuestions()
           if (loadRes.success) {
             // Bug fix: this reload-recovery path predates the bridge's examType parameter
