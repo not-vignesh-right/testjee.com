@@ -181,7 +181,7 @@ const isTimeReached = computed(() => {
   return new Date(store.sessionDetails.scheduledStartTime).getTime() <= currentTime.value
 })
 
-onMounted(() => {
+onMounted(async () => {
   // Run device check here so window is guaranteed available
   checkDevice()
   window.addEventListener('resize', checkDevice)
