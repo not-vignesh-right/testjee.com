@@ -216,18 +216,25 @@ Both call `supabase.from('students').update({ is_genuine_user: newValue })` dire
 
 The following bug fixes were implemented to stabilize the live exam system:
 
-### A. Lobby Waiting Auto-Start
-* **File**: [ExamWaitingRoom.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/live-exam/ExamWaitingRoom.vue)
-* **Changes**: Added a reactive `currentTime` reference that ticks every second via the countdown interval loop. Reconfigured the `canStartExam` computed property to automatically evaluate to `true` when the current time is greater than or equal to `scheduledStartTime`. This enables students to start the exam automatically as soon as the scheduled time is reached, even if the admin hasn't clicked "Start Early".
+### A. Lobby Waiting Room & Dynamic Start Labels
+* **Files**: [ExamWaitingRoom.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/live-exam/ExamWaitingRoom.vue), [AdminLiveSessions.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/admin/AdminLiveSessions.vue)
+* **Changes**: 
+  - Restored `canStartExam` to only allow entering once the session status is `'live'` (preventing DB `exam is not live` errors if student clicks button when the DB status is still `'scheduled'`).
+  - Added an `isTimeReached` computed property in the waiting room. Once the countdown hits `00:00:00` and the scheduled time has passed, the UI displays **"Waiting for Instructor"** with a helpful description explaining that the exam will begin as soon as the instructor starts the session.
+  - Dynamically changes the start button label in the admin dashboard from **"Start Early"** to **"Start Exam"** if the scheduled time has already passed.
 
-### B. Question Rendering Crash Prevention
-* **Files**: [liveExamBridge.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/stores/liveExamBridge.js), [QuestionArea.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/QuestionArea.vue)
-* **Changes**: Live exams return `question_content` as a parsed JSON object. The bridge was modified to verify `typeof q.question_content` and extract text or stem as a string rather than passing the raw object reference. Defensive type checking was also added to `QuestionArea.vue` to ensure `q.text` is a string before evaluating `.includes()`, resolving layout rendering failures.
+### B. Question Rendering & Layout Crash Prevention (KCET Layout Fix)
+* **Files**: [liveExamBridge.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/stores/liveExamBridge.js), [QuestionArea.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/QuestionArea.vue), [exam-support-live-rls.sql](file:///c:/Users/admin/Desktop/testjee/exam-support-live-rls.sql)
+* **Changes**: 
+  - Live exams return `question_content` as a parsed JSON object. The bridge now stringifies the question content object/stem text to ensure `q.text` is always a string. Defensive type checks were also added to `QuestionArea.vue` before checking `.includes()`.
+  - Created a public/anonymous SELECT policy on `live_exam_sessions` (and `student_exam_sessions`). Without this, the student client was blocked by RLS from reading the `exam_type` column of the session on lobby load or reload, causing the bridge to fall back to the default `JEE_MAIN_FULL` structure (which mistakenly loaded Maths and Chemistry sections for a KCET Physics mock test).
 
 ### C. Live Header Student Name
 * **File**: [HeaderBar.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/HeaderBar.vue)
 * **Changes**: Implemented `studentNameDisplay` computed property. If `isLiveMode` is true, the header extracts the student's name from `liveStore.sessionDetails.studentName` (falling back to username) rather than referencing the empty `authStore.studentName` of the unauthenticated auth session.
 
-### D. Support Appeals RLS Policies
+### D. DB Schema & Support Appeals RLS Policies
 * **File**: [exam-support-live-rls.sql](file:///c:/Users/admin/Desktop/testjee/exam-support-live-rls.sql)
-* **Changes**: Configured public/anonymous policies on the `exam_support_requests` table. Since live exam temporary students are not authenticated via standard Supabase Auth, these policies allow selecting, inserting, and updating rows matching `student_session_id IS NOT NULL` under the `anon` and `authenticated` roles.
+* **Changes**: 
+  - Appended a migration to add the missing `end_time` column to the `student_exam_sessions` table if it is not present, resolving syntax/schema errors when admins click **"Approve and Reopen"** for live resumption requests.
+  - Configured SELECT, INSERT, and UPDATE policies on `exam_support_requests` for the anonymous (`anon`) role, gated on `student_session_id IS NOT NULL`.
