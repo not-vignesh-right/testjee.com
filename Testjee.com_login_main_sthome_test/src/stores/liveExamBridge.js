@@ -45,6 +45,30 @@ export function bridgeLiveSessionToExamStore(sessionCode, examType = 'JEE_MAIN_F
     ] : null
   }))
 
+  // Re-sort questions: 
+  // 1. By subject order (Physics, Chemistry, Maths, etc.)
+  // 2. Within each subject: MCQs first, Numerics last.
+  // Stable sort preserves the database's shuffled relative order.
+  const config = EXAM_CONFIGS[examType] || EXAM_CONFIGS.JEE_MAIN_FULL
+  const subjectOrder = config.subjects
+  mappedQuestions.sort((a, b) => {
+    const idxA = subjectOrder.indexOf(a.subject)
+    const idxB = subjectOrder.indexOf(b.subject)
+    if (idxA !== idxB) {
+      return idxA - idxB
+    }
+    const isMcqA = a.question_type === 'multiple_choice'
+    const isMcqB = b.question_type === 'multiple_choice'
+    if (isMcqA && !isMcqB) return -1
+    if (!isMcqA && isMcqB) return 1
+    return 0
+  })
+
+  // Assign correct sequential question numbers (1 to 75 / 180 / 60)
+  mappedQuestions.forEach((q, index) => {
+    q.question_number = index + 1
+  })
+
   examStore.questions = mappedQuestions
   examStore.userAnswers = { ...liveStore.answers }
   examStore.draftAnswers = {}
