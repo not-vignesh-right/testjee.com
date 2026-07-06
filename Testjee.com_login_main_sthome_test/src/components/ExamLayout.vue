@@ -614,6 +614,7 @@ const resumeTest = async () => {
     if (isLiveMode.value) {
       examStore.remainingTime = liveStore.timeRemainingSeconds
     }
+    examStore.isSubmitted = false
     examStore.startTimer()
 
     // Clear overlay state
