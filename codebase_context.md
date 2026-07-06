@@ -244,3 +244,9 @@ The following bug fixes were implemented to stabilize the live exam system:
 * **Changes**:
   - Added a status check in the reload-recovery router guard (`router/index.js`). If `liveStore.examStatus` is already `'submitted'` or `'auto_submitted'` during page refresh, the student is blocked from re-entering `/exam` and immediately redirected to their results page `/live-exam/${sessionCode}/results`.
   - Fixed a UI state lock where the "Exam Time Expired" screen persisted after resumption because the `examStore.isSubmitted` flag was never reset. It is now explicitly set to `false` when `resumeTest` succeeds.
+
+### F. Deprecated Bare-Bones Active UI Bypass
+* **Files**: [ExamLogin.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/live-exam/ExamLogin.vue), [ExamWaitingRoom.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/live-exam/ExamWaitingRoom.vue)
+* **Changes**: 
+  - Centralized in-progress mock exam re-logins. Previously, logging back in while the test was `in_progress` redirected the student to `/live-exam/:sessionCode/active` (`LiveExamInterface.vue`), which is a deprecated, bare-bones UI with layout glitches and blank question palettes.
+  - Re-routed all `in_progress` pathways to `/lobby` instead. In the lobby, the `onMounted` hook fetches the session's configuration parameters, invokes the Pinia bridge, and automatically pushes the student directly to `/exam?mode=live&sessionCode=CODE` (the primary proctored layout), bypassing the bare-bones screen completely.
