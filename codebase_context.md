@@ -238,3 +238,9 @@ The following bug fixes were implemented to stabilize the live exam system:
 * **Changes**: 
   - Appended a migration to add the missing `end_time` column to the `student_exam_sessions` table if it is not present, resolving syntax/schema errors when admins click **"Approve and Reopen"** for live resumption requests.
   - Configured SELECT, INSERT, and UPDATE policies on `exam_support_requests` for the anonymous (`anon`) role, gated on `student_session_id IS NOT NULL`.
+
+### E. Submitted Reload & Resumption Lock
+* **Files**: [router/index.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/router/index.js), [ExamLayout.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/ExamLayout.vue)
+* **Changes**:
+  - Added a status check in the reload-recovery router guard (`router/index.js`). If `liveStore.examStatus` is already `'submitted'` or `'auto_submitted'` during page refresh, the student is blocked from re-entering `/exam` and immediately redirected to their results page `/live-exam/${sessionCode}/results`.
+  - Fixed a UI state lock where the "Exam Time Expired" screen persisted after resumption because the `examStore.isSubmitted` flag was never reset. It is now explicitly set to `false` when `resumeTest` succeeds.
