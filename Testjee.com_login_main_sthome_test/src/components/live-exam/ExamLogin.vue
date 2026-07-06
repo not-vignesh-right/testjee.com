@@ -335,6 +335,10 @@ const handleLogin = async () => {
       return
     }
     
+    // Returning user on same device — refresh both sessionStorage keys so the lobby guard stays happy
+    sessionStorage.setItem('student_username', loginForm.value.username.trim())
+    sessionStorage.setItem('student_roll', (examStore.sessionDetails.rollNumber || '').trim().toUpperCase())
+
     // Proceed to router guard
     redirectBasedOnStatus()
 
@@ -348,8 +352,9 @@ const submitVerification = () => {
   errorMsg.value = ''
   const expectedRoll = examStore.sessionDetails.rollNumber
   if (!expectedRoll || verificationRollNumber.value.trim().toUpperCase() === expectedRoll.trim().toUpperCase()) {
-    // Valid verification! Persist in sessionStorage to claim this tab session.
+    // Valid verification! Persist in sessionStorage to claim this tab/device session.
     sessionStorage.setItem('student_username', loginForm.value.username.trim())
+    sessionStorage.setItem('student_roll', (expectedRoll || '').trim().toUpperCase())
     needsVerification.value = false
     verificationRollNumber.value = ''
     redirectBasedOnStatus()
@@ -370,7 +375,41 @@ const submitDetails = async () => {
     })
     
     if (error) throw error
+
+    // RACE CONDITION GUARD: Two students may have entered the same username and both
+    // reached the details form before either submitted (both saw has_filled_details=false).
+    // Do a fresh DB read immediately after updating to verify OUR data is what's in the DB.
+    // Whoever submitted last "wins" in the DB; the loser is detected and blocked here.
+    const verifyRes = await examStore.loginToExam(
+      loginForm.value.sessionCode.trim().toUpperCase(),
+      loginForm.value.username.trim()
+    )
+
+    if (!verifyRes.success) {
+      errorMsg.value = 'Could not verify your registration. Please try again.'
+      loading.value = false
+      return
+    }
+
+    const dbRoll = (examStore.sessionDetails.rollNumber || '').trim().toUpperCase()
+    const enteredRoll = detailsForm.value.rollNumber.trim().toUpperCase()
+
+    if (dbRoll !== enteredRoll) {
+      // Another student submitted their details for this same username just before us.
+      // Their data is in the DB now. Block this student.
+      errorMsg.value = 'This username was just registered by another student. Please use your correct assigned username!'
+      needsDetails.value = false
+      loginForm.value.username = ''
+      detailsForm.value.fullName = ''
+      detailsForm.value.rollNumber = ''
+      loading.value = false
+      return
+    }
     
+    // Claim this browser session: store both username AND roll so the lobby can validate
+    sessionStorage.setItem('student_username', loginForm.value.username.trim())
+    sessionStorage.setItem('student_roll', enteredRoll)
+
     examStore.sessionDetails.hasFilledDetails = true
     examStore.sessionDetails.studentName = detailsForm.value.fullName.trim()
     examStore.sessionDetails.rollNumber = detailsForm.value.rollNumber.trim()

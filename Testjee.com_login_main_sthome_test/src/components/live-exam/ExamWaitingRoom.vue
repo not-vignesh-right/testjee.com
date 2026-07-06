@@ -26,6 +26,25 @@
       </div>
     </Teleport>
 
+    <!-- Credential Hijack Error Overlay (another student registered this username first) -->
+    <Teleport to="body">
+      <div v-if="credentialError" class="fixed inset-0 bg-white flex flex-col items-center justify-center px-8 text-center" style="z-index:99999">
+        <div class="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <svg class="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          </svg>
+        </div>
+        <h1 class="text-2xl font-black text-gray-900 mb-3">Username Already Taken</h1>
+        <p class="text-gray-500 text-base leading-relaxed max-w-md mb-6">{{ credentialError }}</p>
+        <button
+          @click="router.push(`/live-exam/${route.params.sessionCode}`)"
+          class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+        >
+          ← Back to Login
+        </button>
+      </div>
+    </Teleport>
+
     <!-- Main Card -->
     <div v-if="store.sessionDetails" class="max-w-3xl w-full bg-white rounded-2xl shadow-xl shadow-blue-900/5 overflow-hidden z-10 border border-gray-100">
        
@@ -159,6 +178,7 @@ const store = useExamSessionStore()
 
 const loadingStart = ref(false)
 const startError = ref('')
+const credentialError = ref('') // Set when lobby detects another student has claimed this username
 const pollInterval = ref(null)
 const countdownInterval = ref(null)
 const startCountdownDisplay = ref('00:00:00')
@@ -189,6 +209,31 @@ onMounted(async () => {
   if (!store.studentSessionId) {
     router.push(`/live-exam/${route.params.sessionCode}`)
     return
+  }
+
+  // LOBBY CREDENTIAL GUARD (Second line of defence against simultaneous-login race condition):
+  // Two students could have both seen the "First Time Setup" form simultaneously (before either
+  // submitted). This check catches the case where both passed submitDetails and arrived here.
+  // We re-read the DB right now and compare roll numbers. The student whose roll is in the
+  // DB is the legitimate one; the other is shown an error and redirected back to login.
+  const storedRoll = sessionStorage.getItem('student_roll')
+  const storedUsername = sessionStorage.getItem('student_username')
+  if (storedRoll && storedUsername) {
+    const verifyRes = await store.loginToExam(
+      route.params.sessionCode,
+      storedUsername
+    )
+    if (verifyRes.success) {
+      const dbRoll = (store.sessionDetails.rollNumber || '').trim().toUpperCase()
+      if (dbRoll !== storedRoll.trim().toUpperCase()) {
+        // This browser's registration was overwritten by another student who submitted faster.
+        // Clear sessionStorage and block entry.
+        sessionStorage.removeItem('student_username')
+        sessionStorage.removeItem('student_roll')
+        credentialError.value = 'Your username was registered by another student. Please check your assigned username with your teacher and try again.'
+        return // Do not start polling — just show the error overlay
+      }
+    }
   }
   
   // Guard logic against already active tests
