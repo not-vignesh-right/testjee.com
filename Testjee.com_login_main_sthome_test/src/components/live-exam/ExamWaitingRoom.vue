@@ -53,12 +53,19 @@
              
              <!-- Scheduled / Counting Down -->
              <div v-if="!canStartExam" class="animate-fade-in relative z-10">
-                <span class="block text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">Starting In</span>
+                <span class="block text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">
+                   {{ isTimeReached ? 'Waiting for Instructor' : 'Starting In' }}
+                </span>
                 <div class="text-4xl md:text-5xl font-mono font-black text-gray-900 tabular-nums">
                    {{ startCountdownDisplay }}
                 </div>
                 <div class="mt-4 text-sm text-gray-500 font-medium">
-                   Scheduled Start: <strong class="text-gray-900">{{ formatTimeOnly(store.sessionDetails.scheduledStartTime) }}</strong>
+                   <template v-if="isTimeReached">
+                     The scheduled time has arrived. The exam will start as soon as the instructor opens the session.
+                   </template>
+                   <template v-else>
+                     Scheduled Start: <strong class="text-gray-900">{{ formatTimeOnly(store.sessionDetails.scheduledStartTime) }}</strong>
+                   </template>
                 </div>
              </div>
 
@@ -167,14 +174,11 @@ const checkDevice = () => {
   isMobile.value = w < 1024 || touchDevice
 }
 
-const canStartExam = computed(() => {
-  if (store.sessionDetails?.sessionStatus === 'live' || store.sessionDetails?.canStart) {
-    return true
-  }
-  if (store.sessionDetails?.scheduledStartTime) {
-    return new Date(store.sessionDetails.scheduledStartTime).getTime() <= currentTime.value
-  }
-  return false
+const canStartExam = computed(() => store.sessionDetails?.sessionStatus === 'live' || store.sessionDetails?.canStart)
+
+const isTimeReached = computed(() => {
+  if (!store.sessionDetails?.scheduledStartTime) return false
+  return new Date(store.sessionDetails.scheduledStartTime).getTime() <= currentTime.value
 })
 
 onMounted(() => {
