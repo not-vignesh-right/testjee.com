@@ -209,3 +209,25 @@ Both call `supabase.from('students').update({ is_genuine_user: newValue })` dire
 * The **Mobile** field in the Email/Password sign-up form now shows a red `*` asterisk.
 * Input has `required`, `inputmode="numeric"`, and `maxlength="10"` attributes.
 * JavaScript `validateSignUp()` already enforces the `^[6-9]\d{9}$` regex before submission — the form cannot be submitted without a valid number.
+
+---
+
+## 8. Live Mock Exam Bug Fixes (July 2026)
+
+The following bug fixes were implemented to stabilize the live exam system:
+
+### A. Lobby Waiting Auto-Start
+* **File**: [ExamWaitingRoom.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/live-exam/ExamWaitingRoom.vue)
+* **Changes**: Added a reactive `currentTime` reference that ticks every second via the countdown interval loop. Reconfigured the `canStartExam` computed property to automatically evaluate to `true` when the current time is greater than or equal to `scheduledStartTime`. This enables students to start the exam automatically as soon as the scheduled time is reached, even if the admin hasn't clicked "Start Early".
+
+### B. Question Rendering Crash Prevention
+* **Files**: [liveExamBridge.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/stores/liveExamBridge.js), [QuestionArea.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/QuestionArea.vue)
+* **Changes**: Live exams return `question_content` as a parsed JSON object. The bridge was modified to verify `typeof q.question_content` and extract text or stem as a string rather than passing the raw object reference. Defensive type checking was also added to `QuestionArea.vue` to ensure `q.text` is a string before evaluating `.includes()`, resolving layout rendering failures.
+
+### C. Live Header Student Name
+* **File**: [HeaderBar.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/HeaderBar.vue)
+* **Changes**: Implemented `studentNameDisplay` computed property. If `isLiveMode` is true, the header extracts the student's name from `liveStore.sessionDetails.studentName` (falling back to username) rather than referencing the empty `authStore.studentName` of the unauthenticated auth session.
+
+### D. Support Appeals RLS Policies
+* **File**: [exam-support-live-rls.sql](file:///c:/Users/admin/Desktop/testjee/exam-support-live-rls.sql)
+* **Changes**: Configured public/anonymous policies on the `exam_support_requests` table. Since live exam temporary students are not authenticated via standard Supabase Auth, these policies allow selecting, inserting, and updating rows matching `student_session_id IS NOT NULL` under the `anon` and `authenticated` roles.
