@@ -155,3 +155,50 @@ END;
 $function$;
 
 GRANT EXECUTE ON FUNCTION public.submit_student_exam(integer) TO anon, authenticated;
+
+-- ====================================================================
+-- ATOMIC USERNAME CLAIM FIX
+-- Problem: Two students could enter the same username simultaneously,
+--          both see has_filled_details=false, and both fill the details
+--          form. The second student's submit overwrites the first one's
+--          name/roll in the DB, allowing both into the lobby.
+-- Fix:     Rewrite update_student_details to only write if student_name
+--          is currently NULL or empty. PostgreSQL row-level locking makes
+--          this atomic — only the FIRST submitter wins. The function now
+--          returns (claimed boolean):
+--            true  → this student successfully registered the username
+--            false → someone else already registered it; block this student
+-- ====================================================================
+
+-- Must drop first because we are changing the return type (void → TABLE)
+DROP FUNCTION IF EXISTS public.update_student_details(integer, text, text);
+
+CREATE OR REPLACE FUNCTION public.update_student_details(
+  input_temp_student_id INTEGER,
+  input_student_name TEXT,
+  input_roll_number TEXT
+)
+RETURNS TABLE(claimed boolean)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_rows_updated INTEGER;
+BEGIN
+  UPDATE public.temp_students
+  SET
+    student_name = input_student_name,
+    roll_number  = input_roll_number
+  WHERE
+    temp_student_id = input_temp_student_id
+    -- Only update if nobody has claimed this username yet (atomic first-write-wins)
+    AND (student_name IS NULL OR student_name = '');
+
+  GET DIAGNOSTICS v_rows_updated = ROW_COUNT;
+
+  -- Return true if this student was the first to register, false if already claimed
+  RETURN QUERY SELECT (v_rows_updated > 0);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.update_student_details(integer, text, text) TO anon, authenticated;

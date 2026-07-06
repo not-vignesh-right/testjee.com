@@ -368,7 +368,10 @@ const submitDetails = async () => {
   loading.value = true
   
   try {
-    const { error } = await supabase.rpc('update_student_details', {
+    // The new update_student_details is atomic: it only writes if student_name IS NULL.
+    // It returns { claimed: true } if this student successfully registered the username,
+    // or { claimed: false } if another student already claimed it first.
+    const { data, error } = await supabase.rpc('update_student_details', {
       input_temp_student_id: examStore.tempStudentId,
       input_student_name: detailsForm.value.fullName.trim(),
       input_roll_number: detailsForm.value.rollNumber.trim()
@@ -376,28 +379,13 @@ const submitDetails = async () => {
     
     if (error) throw error
 
-    // RACE CONDITION GUARD: Two students may have entered the same username and both
-    // reached the details form before either submitted (both saw has_filled_details=false).
-    // Do a fresh DB read immediately after updating to verify OUR data is what's in the DB.
-    // Whoever submitted last "wins" in the DB; the loser is detected and blocked here.
-    const verifyRes = await examStore.loginToExam(
-      loginForm.value.sessionCode.trim().toUpperCase(),
-      loginForm.value.username.trim()
-    )
+    // data is an array of rows from RETURNS TABLE — grab the first row
+    const claimed = data?.[0]?.claimed ?? false
 
-    if (!verifyRes.success) {
-      errorMsg.value = 'Could not verify your registration. Please try again.'
-      loading.value = false
-      return
-    }
-
-    const dbRoll = (examStore.sessionDetails.rollNumber || '').trim().toUpperCase()
-    const enteredRoll = detailsForm.value.rollNumber.trim().toUpperCase()
-
-    if (dbRoll !== enteredRoll) {
-      // Another student submitted their details for this same username just before us.
-      // Their data is in the DB now. Block this student.
-      errorMsg.value = 'This username was just registered by another student. Please use your correct assigned username!'
+    if (!claimed) {
+      // Another student submitted their details for this username before us.
+      // The DB atomically rejected our write. Block this student immediately.
+      errorMsg.value = 'This username was already registered by another student. Please enter your correct assigned username!'
       needsDetails.value = false
       loginForm.value.username = ''
       detailsForm.value.fullName = ''
@@ -406,7 +394,8 @@ const submitDetails = async () => {
       return
     }
     
-    // Claim this browser session: store both username AND roll so the lobby can validate
+    // Claim this browser session
+    const enteredRoll = detailsForm.value.rollNumber.trim().toUpperCase()
     sessionStorage.setItem('student_username', loginForm.value.username.trim())
     sessionStorage.setItem('student_roll', enteredRoll)
 
