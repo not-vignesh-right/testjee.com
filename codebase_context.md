@@ -250,3 +250,10 @@ The following bug fixes were implemented to stabilize the live exam system:
 * **Changes**: 
   - Centralized in-progress mock exam re-logins. Previously, logging back in while the test was `in_progress` redirected the student to `/live-exam/:sessionCode/active` (`LiveExamInterface.vue`), which is a deprecated, bare-bones UI with layout glitches and blank question palettes.
   - Re-routed all `in_progress` pathways to `/lobby` instead. In the lobby, the `onMounted` hook fetches the session's configuration parameters, invokes the Pinia bridge, and automatically pushes the student directly to `/exam?mode=live&sessionCode=CODE` (the primary proctored layout), bypassing the bare-bones screen completely.
+
+### G. Question Subject Mapping & Layout Grouping
+* **Files**: [examSessionStore.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/stores/examSessionStore.js), [exam-support-live-rls.sql](file:///c:/Users/admin/Desktop/testjee/exam-support-live-rls.sql)
+* **Changes**:
+  - Resolved an issue where questions from different subjects were mixed up across the layout sections (e.g., Chemistry questions showing inside the Physics tab). The backend RPC `get_student_exam_questions` does not return `subject_name` or `subject_id`, and the client previously guessed the subject by dividing the question number into blocks. Because the questions are shuffled, this block indexing was completely broken.
+  - Reconfigured `loadQuestions` in `examSessionStore.js` to query the public `questions` table directly for the loaded question IDs, resolving the actual `subject_id` and joining `subjects(subject_name)`. Added a SELECT policy on the `questions` table to allow anonymous reads.
+  - By resolving and mapping actual database subject names client-side, all questions are mapped to their correct sections for all exam configurations (JEE, NEET, KCET).
