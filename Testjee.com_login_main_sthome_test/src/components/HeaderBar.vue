@@ -26,7 +26,7 @@
       <div class="text-center hidden lg:block">
         <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2 rounded-lg border border-blue-200">
           <p class="text-xs text-gray-600 font-medium">Student Name</p>
-          <p class="font-semibold text-gray-800 mt-0.5">{{ authStore.studentName }}</p>
+          <p class="font-semibold text-gray-800 mt-0.5">{{ studentNameDisplay }}</p>
         </div>
       </div>
       
@@ -35,7 +35,7 @@
         <!-- Student Name (Mobile) -->
         <div class="lg:hidden text-right mr-2">
           <p class="text-xs text-gray-600">Student</p>
-          <p class="font-semibold text-gray-800 text-sm truncate max-w-[80px]">{{ authStore.studentName }}</p>
+          <p class="font-semibold text-gray-800 text-sm truncate max-w-[80px]">{{ studentNameDisplay }}</p>
         </div>
         
         <!-- Timer -->
@@ -70,11 +70,21 @@
 import logo from '../assets/logo_test_jee_original.png'
 import { useExamStore } from '../stores/examStore'
 import { useAuthStore } from '../stores/authStore'
+import { useExamSessionStore } from '../stores/examSessionStore'
 import { useRouter } from 'vue-router'
+import { computed } from 'vue'
 
 const examStore = useExamStore()
 const authStore = useAuthStore()
+const liveStore = useExamSessionStore()
 const router = useRouter()
+
+const studentNameDisplay = computed(() => {
+  if (examStore.isLiveMode) {
+    return liveStore.sessionDetails?.studentName || sessionStorage.getItem('student_username') || 'Student'
+  }
+  return authStore.studentName || 'Student'
+})
 
 async function handleSubmit() {
   examStore.isManuallySubmitting = true

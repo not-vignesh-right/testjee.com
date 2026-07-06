@@ -155,6 +155,7 @@ const startError = ref('')
 const pollInterval = ref(null)
 const countdownInterval = ref(null)
 const startCountdownDisplay = ref('00:00:00')
+const currentTime = ref(Date.now())
 let realtimeSub = null
 
 // Detect mobile/tablet devices — block from starting exam
@@ -166,7 +167,15 @@ const checkDevice = () => {
   isMobile.value = w < 1024 || touchDevice
 }
 
-const canStartExam = computed(() => store.sessionDetails?.sessionStatus === 'live' || store.sessionDetails?.canStart)
+const canStartExam = computed(() => {
+  if (store.sessionDetails?.sessionStatus === 'live' || store.sessionDetails?.canStart) {
+    return true
+  }
+  if (store.sessionDetails?.scheduledStartTime) {
+    return new Date(store.sessionDetails.scheduledStartTime).getTime() <= currentTime.value
+  }
+  return false
+})
 
 onMounted(() => {
   // Run device check here so window is guaranteed available
@@ -262,6 +271,7 @@ const startStatusPolling = () => {
 
 const startCountdownTimers = () => {
   countdownInterval.value = setInterval(() => {
+    currentTime.value = Date.now()
     if (canStartExam.value) return
     
     const start = new Date(store.sessionDetails?.scheduledStartTime).getTime()

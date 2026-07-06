@@ -158,8 +158,9 @@ const examStore = useExamStore()
 const questionText = computed(() => {
   const q = examStore.currentQuestion
   if (!q?.text) return ''
-  if (q.text === q.image_url || q.text.includes('supabase.co')) return ''
-  return q.text
+  const text = typeof q.text === 'string' ? q.text : ''
+  if (text === q.image_url || text.includes('supabase.co')) return ''
+  return text
 })
 
 const numericDraft = computed({

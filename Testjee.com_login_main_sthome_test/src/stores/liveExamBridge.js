@@ -32,7 +32,7 @@ export function bridgeLiveSessionToExamStore(sessionCode, examType = 'JEE_MAIN_F
 
   const mappedQuestions = liveStore.questions.map(q => ({
     id: q.question_id,
-    text: q.question_content?.text || q.question_content?.stem || q.question_content || '',
+    text: (typeof q.question_content === 'string' ? q.question_content : (q.question_content?.text || q.question_content?.stem || '')) || q.external_reference || '',
     image_url: q.image_url || null,
     subject: q.subject_name || deriveSubjectFromNumber(q.question_number, totalQuestions, examType),
     topic: q.topic_name || '',
