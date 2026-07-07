@@ -310,7 +310,7 @@
 
   <!-- Drawer for Student's Detailed Practice Attempt Breakdown -->
   <Teleport to="body">
-    <div v-if="selectedSession" class="fixed inset-0 z-40 flex justify-end bg-black/60 backdrop-blur-sm" @click="selectedSession = null">
+    <div v-if="selectedSession" class="fixed inset-0 z-[60] flex justify-end bg-black/60 backdrop-blur-sm" @click="selectedSession = null">
       <div class="bg-white w-full max-w-4xl h-full shadow-2xl flex flex-col" @click.stop>
         <!-- Drawer Header -->
         <div class="px-6 py-5 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
