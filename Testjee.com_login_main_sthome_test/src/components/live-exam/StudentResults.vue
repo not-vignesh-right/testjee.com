@@ -393,8 +393,17 @@ const loadDetailedResults = async () => {
 
 onMounted(async () => {
   if (!store.studentSessionId) {
-    router.push(`/live-exam/${route.params.sessionCode}`)
-    return
+    const savedUser = sessionStorage.getItem('student_username')
+    if (savedUser) {
+      const loginRes = await store.loginToExam(route.params.sessionCode, savedUser)
+      if (!loginRes.success) {
+        router.push(`/live-exam/${route.params.sessionCode}`)
+        return
+      }
+    } else {
+      router.push(`/live-exam/${route.params.sessionCode}`)
+      return
+    }
   }
 
   try {
