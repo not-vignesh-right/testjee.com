@@ -316,7 +316,7 @@
         <div class="px-6 py-5 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
           <div>
             <span class="px-2.5 py-0.5 bg-indigo-100 text-indigo-800 text-[10px] font-bold rounded-full uppercase tracking-wider">Practice Exam Review</span>
-            <h3 class="text-xl font-bold text-gray-900 mt-1">{{ session.exam_type }}</h3>
+            <h3 class="text-xl font-bold text-gray-900 mt-1">{{ selectedSession.exam_type }}</h3>
             <p class="text-xs text-gray-500 mt-0.5">Attempted by: {{ student.student_name }} • Date: {{ formatDateTime(selectedSession.start_time) }}</p>
           </div>
           <button @click="selectedSession = null" class="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
@@ -809,18 +809,7 @@ async function viewSessionAttempt(session) {
     // 2. Fetch question details + choices from DB
     const { data: questionsData, error: qErr } = await supabase
       .from('questions')
-      .select(`
-        question_id,
-        question_type,
-        question_content,
-        image_url,
-        solution,
-        external_reference,
-        difficulty,
-        subjects (subject_name),
-        topics (topic_name),
-        choices (choice1, choice2, choice3, choice4, correct_answer)
-      `)
+      .select('question_id,question_type,question_content,image_url,solution,external_reference,difficulty,subjects(subject_name),topics(topic_name),choices(choice1,choice2,choice3,choice4,correct_answer)')
       .in('question_id', questionIds)
 
     if (qErr) throw qErr
