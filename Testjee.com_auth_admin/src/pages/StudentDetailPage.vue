@@ -856,7 +856,7 @@ async function viewSessionAttempt(session) {
         selected_answer: a.answer,
         time_spent_seconds: a.time_taken || 0,
         is_marked_for_review: false,
-        is_correct
+        is_correct: isCorrect
       }
     }).filter(Boolean)
 
