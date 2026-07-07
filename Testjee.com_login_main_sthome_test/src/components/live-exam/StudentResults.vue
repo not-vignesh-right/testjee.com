@@ -349,7 +349,8 @@ const loadDetailedResults = async () => {
   loadingDetails.value = true
   try {
     const { data, error } = await supabase.rpc('get_student_live_detailed_results', {
-      input_student_session_id: store.studentSessionId
+      input_student_session_id: store.studentSessionId,
+      p_admin_token: null
     })
     if (error) throw error
     detailedResults.value = data || []

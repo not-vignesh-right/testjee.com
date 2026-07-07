@@ -97,3 +97,43 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_student_live_detailed_results(integer, text) TO anon, authenticated;
+
+-- ====================================================================
+-- Helper RPC: get_student_session_id_by_username
+-- Target: Resolve student_session_id safely via custom admin session verification.
+-- ====================================================================
+DROP FUNCTION IF EXISTS public.get_student_session_id_by_username(integer, text, text);
+
+CREATE OR REPLACE FUNCTION public.get_student_session_id_by_username(
+  p_live_session_id INTEGER,
+  p_username TEXT,
+  p_admin_token TEXT
+)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_admin_id INTEGER;
+  v_student_session_id INTEGER;
+BEGIN
+  -- Verify the admin token
+  SELECT admin_id INTO v_admin_id FROM verify_admin_session(p_admin_token) LIMIT 1;
+  IF v_admin_id IS NULL THEN
+    RAISE EXCEPTION 'Invalid or expired admin session';
+  END IF;
+
+  -- Get the student session id
+  SELECT ses.student_session_id INTO v_student_session_id
+  FROM student_exam_sessions ses
+  JOIN temp_students ts ON ses.temp_student_id = ts.temp_student_id
+  WHERE ses.live_session_id = p_live_session_id AND ts.username = p_username
+  LIMIT 1;
+
+  RETURN v_student_session_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_student_session_id_by_username(integer, text, text) TO anon, authenticated;
+

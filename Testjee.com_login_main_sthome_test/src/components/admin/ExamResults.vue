@@ -406,18 +406,17 @@ const viewStudentAttempt = async (student) => {
   loadingStudentDetails.value = true
   selectedStudentDetails.value = []
   try {
-    const { data: sesRow, error: sesErr } = await supabase
-      .from('student_exam_sessions')
-      .select('student_session_id, temp_students!inner(username)')
-      .eq('live_session_id', sessionId)
-      .eq('temp_students.username', student.username)
-      .maybeSingle()
+    const { data: studentSessionId, error: sesErr } = await supabase.rpc('get_student_session_id_by_username', {
+      p_live_session_id: sessionId,
+      p_username: student.username,
+      p_admin_token: adminStore.getToken()
+    })
 
     if (sesErr) throw sesErr
-    if (!sesRow) throw new Error('Student session not found')
+    if (!studentSessionId) throw new Error('Student session not found')
 
     const { data, error } = await supabase.rpc('get_student_live_detailed_results', {
-      input_student_session_id: sesRow.student_session_id,
+      input_student_session_id: studentSessionId,
       p_admin_token: adminStore.getToken()
     })
     if (error) throw error
