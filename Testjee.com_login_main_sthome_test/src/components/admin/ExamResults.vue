@@ -240,7 +240,7 @@
                 >
                   <div class="flex items-center justify-between mb-2">
                     <span class="w-6 h-6 rounded flex items-center justify-center text-xs font-bold" :class="getQNumberClass(q)">
-                      {{ q.originalIndex + 1 }}
+                      {{ q.question_number }}
                     </span>
                     <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" :class="getStatusBadgeClass(q)">
                       {{ getQuestionStatusText(q) }}
@@ -278,7 +278,7 @@
         <!-- Modal Header -->
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
           <div class="flex items-center gap-2">
-            <span class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-full uppercase tracking-wider">Q{{ selectedQuestion.originalIndex + 1 }}</span>
+            <span class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-full uppercase tracking-wider">Q{{ selectedQuestion.question_number }}</span>
             <span class="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">{{ selectedQuestion.subject_name }}</span>
             <span v-if="selectedQuestion.topic_name" class="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">{{ selectedQuestion.topic_name }}</span>
             <span class="px-2.5 py-1 bg-gray-100 text-gray-500 text-xs font-semibold rounded-full font-mono">{{ selectedQuestion.question_type === 'multiple_choice' ? 'MCQ' : 'Numeric' }}</span>
@@ -371,6 +371,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../../lib/supabase'
 import { useAdminStore } from '../../stores/adminStore'
+import { EXAM_CONFIGS } from '../../data/examConfigs'
 
 const router = useRouter()
 const route = useRoute()
@@ -389,14 +390,43 @@ const sessionId = parseInt(route.params.id)
 
 const selectedStudentGroupedBySubject = computed(() => {
   const groups = {}
-  selectedStudentDetails.value.forEach((q, idx) => {
+  
+  // 1. Get subject order for the session's exam type
+  const examType = sessionMeta.value?.exam_type || 'JEE_MAIN_FULL'
+  const config = EXAM_CONFIGS[examType] || EXAM_CONFIGS.JEE_MAIN_FULL
+  const subjectOrder = config.subjects
+  
+  // 2. Sort the detailed results following the single, consistent admin order:
+  // - Subject name order
+  // - MCQ first, numeric last
+  // - Question ID ascending (guarantees identical numbering for all students)
+  const sorted = [...selectedStudentDetails.value]
+  sorted.sort((a, b) => {
+    const idxA = subjectOrder.indexOf(a.subject_name)
+    const idxB = subjectOrder.indexOf(b.subject_name)
+    if (idxA !== idxB) return idxA - idxB
+    
+    const isMcqA = a.question_type === 'multiple_choice'
+    const isMcqB = b.question_type === 'multiple_choice'
+    if (isMcqA && !isMcqB) return -1
+    if (!isMcqA && isMcqB) return 1
+    
+    // Sort by static question_id ascending
+    return a.question_id - b.question_id
+  })
+  
+  // 3. Assign sequential question numbers
+  sorted.forEach((q, idx) => {
+    q.question_number = idx + 1
+  })
+  
+  // 4. Group by subject
+  sorted.forEach(q => {
     const subject = q.subject_name || 'General'
     if (!groups[subject]) groups[subject] = []
-    groups[subject].push({
-      ...q,
-      originalIndex: idx
-    })
+    groups[subject].push(q)
   })
+  
   return groups
 })
 

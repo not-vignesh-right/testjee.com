@@ -366,7 +366,7 @@
                 >
                   <div class="flex items-center justify-between mb-2">
                     <span class="w-6 h-6 rounded flex items-center justify-center text-xs font-bold" :class="getQNumberClass(q)">
-                      {{ q.originalIndex + 1 }}
+                      {{ q.question_number }}
                     </span>
                     <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" :class="getStatusBadgeClass(q)">
                       {{ getQuestionStatusText(q) }}
@@ -404,7 +404,7 @@
         <!-- Modal Header -->
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
           <div class="flex items-center gap-2">
-            <span class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-full uppercase tracking-wider">Q{{ selectedQuestion.originalIndex + 1 }}</span>
+            <span class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-full uppercase tracking-wider">Q{{ selectedQuestion.question_number }}</span>
             <span class="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">{{ selectedQuestion.subject_name }}</span>
             <span v-if="selectedQuestion.topic_name" class="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">{{ selectedQuestion.topic_name }}</span>
             <span class="px-2.5 py-1 bg-gray-100 text-gray-500 text-xs font-semibold rounded-full font-mono">{{ selectedQuestion.question_type === 'multiple_choice' ? 'MCQ' : 'Numeric' }}</span>
@@ -516,14 +516,39 @@ const selectedQuestion = ref(null)
 
 const selectedSessionGroupedBySubject = computed(() => {
   const groups = {}
-  selectedSessionDetails.value.forEach((q, idx) => {
+  const subjectOrder = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Botany', 'Zoology']
+  
+  const sorted = [...selectedSessionDetails.value]
+  sorted.sort((a, b) => {
+    let idxA = subjectOrder.indexOf(a.subject_name)
+    let idxB = subjectOrder.indexOf(b.subject_name)
+    if (idxA === -1) idxA = 999
+    if (idxB === -1) idxB = 999
+    if (idxA !== idxB) {
+      if (idxA === 999 && idxB === 999) {
+        return (a.subject_name || '').localeCompare(b.subject_name || '')
+      }
+      return idxA - idxB
+    }
+    
+    const isMcqA = a.question_type === 'multiple_choice'
+    const isMcqB = b.question_type === 'multiple_choice'
+    if (isMcqA && !isMcqB) return -1
+    if (!isMcqA && isMcqB) return 1
+    
+    return a.question_id - b.question_id
+  })
+  
+  sorted.forEach((q, idx) => {
+    q.question_number = idx + 1
+  })
+  
+  sorted.forEach(q => {
     const subject = q.subject_name || 'General'
     if (!groups[subject]) groups[subject] = []
-    groups[subject].push({
-      ...q,
-      originalIndex: idx
-    })
+    groups[subject].push(q)
   })
+  
   return groups
 })
 
