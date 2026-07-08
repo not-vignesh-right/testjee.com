@@ -272,3 +272,44 @@ The following bug fixes were implemented to stabilize the live exam system:
   - **Max Score Fix**: Replaced the incorrect `v_max_score` evaluation (`COUNT(*) * 4` of the student's answered rows in `student_answers` which dynamic-sized the max score based on their attempts, e.g. showing 112 instead of 300) with the true maximum score of the paper: `cardinality(ses.question_order) * v_correct_marks`.
   - **Negative Marking Fix**: Previously, incorrect answers scored `0.0`. It now resolves the session's active `exam_type`. For KCET, it sets Correct = `+1.0`, Incorrect = `0.0`. For JEE and NEET, it applies correct negative markings: Correct = `+4.0`, Incorrect = `-1.0` (unattempted questions stay at `0.0`).
   - Added RLS grant execution to make it callable by both `anon` and `authenticated` roles.
+
+---
+
+## 9. Detailed Exam Results & Admin Click-Through Review (July 2026)
+
+The following detailed results and review capabilities were added to improve student feedback and instructor review flows:
+
+### A. Live Exam Detailed Attempt RPC (`get_student_live_detailed_results`)
+* **RPC Signature**: `get_student_live_detailed_results(input_student_session_id INTEGER, p_admin_token TEXT DEFAULT NULL)`
+* **Shuffled Mapping**: Reconstructs the student's exact shuffled exam order by lateral-joining and unnesting `student_exam_sessions.question_order`.
+* **Security Gates**: 
+  - If a student accesses it, the function verifies that the corresponding `live_exam_sessions` status is `'completed'` (meaning the admin ended the exam). It prevents leakage of correct answers while the exam is active.
+  - If an instructor accesses it, they pass their admin token (`p_admin_token`), verifying their credential via `verify_admin_session`, which grants immediate read access to the detailed responses.
+* **PostgREST Call Signature**: To ensure PostgREST matches the double parameter signature `(integer, text)` in the schema cache, the student results view calls the RPC explicitly passing `{ p_admin_token: null }`.
+
+### B. Student Results Detailed View (`StudentResults.vue`)
+* **Live Session Polling**: The page now checks the live exam status. If the exam is still active, it polls `live_exam_sessions` every 5 seconds.
+* **Integrity Notice**: While the exam is active, it continues showing the *"Detailed Answer Key Hidden"* placeholder.
+* **Instant Reveal**: As soon as the polling detects that the instructor ended the session, the poll ceases, scores/rankings are updated, and the attempt analysis is instantly displayed.
+* **Subject Grouped Grid**: Shows the complete card grid of questions grouped by subject (e.g. Physics, Chemistry, Mathematics). Each card displays the question number, correct/incorrect status, time spent, selected answer, and correct answer.
+* **Inline Modal Overlay**: Teleports a dialog to the document body to display full question stems, images, choice options, selected answer vs correct answer comparisons, and solutions/explanations.
+
+### C. Instructor Live Results Dashboard (`ExamResults.vue`)
+* **Leaderboard Interactivity**: Hovering over student rows (for students who started the test) turns the cursor to a pointer. Clicking a row initiates the view.
+* **Review Drawer**: Opens a slide-over panel displaying the student's details, aggregate statistics, and the exact same subject-grouped question grid.
+* **Instructor Question Modal**: Instructors can click any card in the grid to open the identical Teleported question detail modal to inspect the exact options, question images, responses, and solutions.
+* **Admin Secure Client-Side Join Bypass (`get_student_session_id_by_username` RPC)**: Solved RLS restrictions preventing the admin app's anonymous client from joining `temp_students` table by adding a secure helper RPC.
+* **Admin Unified Question Order & Labeling**: Implemented a single, deterministic sorting convention for admin reviews:
+  1. Sort by subject order (from `EXAM_CONFIGS`).
+  2. Within each subject: MCQs first, Numerics last.
+  3. Within MCQs/Numerics: **sort by `question_id` ascending!** (Since `question_id` is a database key, it is static and identical across all students, satisfying the user's need for a single, consistent arrangement).
+
+### D. Admin Student Practice Detail Review (`StudentDetailPage.vue`)
+* **Clickable Practice Attempt List**: Rows in the **Exam History** table (under the practice sessions list) are now hover-interactive and clickable for any submitted practice session.
+* **Practice Attempt Drawer**: Clicking a submitted session opens an overlay drawer featuring the detailed score, total questions attempted, and a subject-grouped card layout representing each question.
+* **Question Detail Modal**: Clicking a question card opens a modal overlay showing the question stem, images, answer choices, what answer the student selected, the correct answer, time spent on that question, and the explanation/solution text.
+* **Z-Index Layering**: Increased the z-index of results drawers to `z-[60]` in both `StudentDetailPage.vue` and `ExamResults.vue` to prevent overlapping by dashboard navigation top bars.
+
+### E. Refresh State Recovery on Results Screen
+* **Reload Persistence**: Persisted the results dashboard on reload by checking `sessionStorage` for the active `student_username` on mount. If a saved session username is found, it automatically calls `store.loginToExam(...)` to re-initialize and restore their Pinia session.
+
