@@ -350,30 +350,28 @@ The following detailed results and review capabilities were added to improve stu
 
 ---
 
-## 10. Email-Based Practice Signup Approval & Quota System
+## 10. Database-Driven Practice Signup Approval & Quota System
 
-A secure administrative verification and test-limiting system is implemented for self-serve practice accounts:
+A secure database-driven administrative verification and test-limiting system is implemented for self-serve practice accounts:
 
 ### A. Signup Approval Flow
-1. **Student Registration**: When a student fills out the registration form in `Login.vue`, the client runs a duplicate check calling `check_email_exists()`. If unique, it triggers an **EmailJS** template dispatch to the administrator.
-2. **Approval Request**: The dispatch includes student metadata and a base64 encoded payload mapped to an approval link pointing to `https://login.testjee.com/admin-approve`.
-3. **Approval Landing (`AdminApprove.vue`)**: When the admin clicks the link, the page verifies the metadata, programmatically registers the student account in Supabase Auth, adds their row to the `students` table, and sets `is_approved = true`.
+1. **Student Registration**: When a student signs up via the form in `Login.vue`, the client checks if the email is registered using `check_email_exists()`. If unique, the user's Supabase Auth record is registered, and a corresponding profile row is inserted into the `students` table with `is_approved = false`.
+2. **Admin Approvals Queue**: Active pending students are loaded inside the **Auth Admin Console** (`Testjee.com_auth_admin/src/pages/DashboardPage.vue`).
+3. **Approval Execution**: The platform owner manually approves students by toggling their approval state, which directly runs an `UPDATE` on the `students` table setting `is_approved = true`.
 
-### B. Practice Test Quota Management
+### B. Practice Test Quota & Payment Redirection
 1. **Compulsory Test Count**: Every approved student profile contains a `number_of_tests` balance (defaults to 1).
-2. **Quota Decrement**: When a student launches a new practice mock test from `Dashboard.vue`, the system decrements `number_of_tests` by 1.
-3. **Out-of-Tests Gate**: If a student attempts to start a mock test with `number_of_tests == 0`, the client intercepts the flow and renders a **"Request More Tests"** modal popup.
-4. **Quota Restore Appeal**: In the modal, the student selects a quota size (1, 3, 5, or 10 tests), which sends an EmailJS request to the admin containing a restore link:
-   ```
-   https://login.testjee.com/admin-approve?action=restore&email=EMAIL&tests=N&name=NAME&sid=STUDENT_ID
-   ```
-5. **Restore Action**: Clicking the link runs a database update incrementing the student's `number_of_tests` balance.
+2. **Quota Decrement**: Launching a mock test from `Dashboard.vue` decrements `number_of_tests` by 1.
+3. **Out-of-Tests Gate**: If a student attempts to start a mock test with `number_of_tests == 0`, they are blocked from entry.
+4. **Quota Request & Payment**: Students can purchase more tests. Clicking "Request More Tests" sets `is_approved = false` on their profile and redirects them to the **Payment screen** (`PaymentPage.vue`), where they are shown the QR transaction details.
+5. **Admin Re-Approval**: After verifying the payment manually, the admin updates the student's test balance and resets `is_approved = true` in the Auth Admin Console to restore access.
 
 ### C. Email Confirmation Exemption
-* **Design Rule**: In this system, admin approval constitutes absolute verification. To prevent students from getting stuck, the `email_confirmed_at` check is fully disabled in `Login.vue` and the router guard.
+* **Design Rule**: Admin database approval serves as the definitive gate. To prevent students from getting stuck, the `email_confirmed_at` check is bypassed in `Login.vue` and the router guard.
 * **Requirement**: Supabase Auth settings must have **"Confirm email" disabled (OFF)**.
 
 ### D. Timer Stacking Prevention
 * **Global Ref Tracker**: Standard practice exams manage timers using a single `globalTimerInterval` reference inside `examStore.js`.
 * **Clearance**: Both `startTimer()` and `resetExamState()` explicitly clear existing intervals before spawning new ones to prevent timer acceleration loops on consecutive attempts.
+
 
