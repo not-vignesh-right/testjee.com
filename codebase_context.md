@@ -38,14 +38,23 @@ Testjee.com_login_main_sthome_test/
 │       ├── Login.vue            # Student credentials login / register (mobile field is required*)
 │       ├── Dashboard.vue        # Student landing page + compulsory phone-number overlay (Section 7)
 │       ├── ExamLayout.vue       # Proctoring container, timers, fullscreen check, and questions pane
+│       ├── LandingPage.vue      # TestJEE homepage / marketing interface
+│       ├── StudentLayout.vue    # Student layout wrapper (contains Sidebar, HeaderBar, Footer)
 │       ├── HeaderBar.vue        # Navigation header
+│       ├── FooterNav.vue        # Footer navigation mapping
 │       ├── QuestionArea.vue     # Core MCQ / Numeric question rendering
 │       ├── QuestionPalette.vue  # Interactive JEE navigation grid
+│       ├── QuestionDetail.vue   # Modal popover with solutions and explanations
+│       ├── Results.vue          # Student's regular exam score summaries
 │       ├── ResultsDetails.vue   # Performance analysis per question
 │       ├── admin/
 │       │   ├── AdminHome.vue           # Admin control panel
-│       │   ├── AdminLiveSessions.vue   # Manage sessions
+│       │   ├── AdminLayout.vue         # Admin page structure layout wrapper
+│       │   ├── AdminLiveSessions.vue   # Manage, cancel, and start scheduled sessions
+│       │   ├── ScheduleExam.vue        # Form to schedule new mock exams
+│       │   ├── SessionCredentials.vue  # Access code and login roster sheet for students
 │       │   ├── LiveExamMonitor.vue     # Live student action logs, warnings, and submissions
+│       │   ├── ExamResults.vue         # Admin panel student rankings and click-through reviews
 │       │   └── AdminResumeRequests.vue # Approve/reject student proctoring appeal requests
 │       └── live-exam/
 │           ├── ExamLogin.vue           # Temporary credentials entry for live tests
@@ -102,7 +111,12 @@ The anti-cheat mechanisms are strictly managed inside [ExamLayout.vue](file:///c
 * Developer Tools keys (`F12`, `Ctrl+Shift+I`, `Ctrl+Shift+J`, `Ctrl+Shift+U`) are blocked.
 * Text copying, cutting, pasting, and drag-selections are fully blocked.
 
-### D. Dialog Loophole Fixes (Wall-Clock Synchronization)
+### D. Screen Wake Lock API (Anti-Lock / Sleep Prevention)
+* **API Used**: `navigator.wakeLock.request('screen')` (integrated in both `ExamLayout.vue` and `LiveExamInterface.vue` on exam start/mount).
+* **Behavior**: Dynamically requests a screen wake lock when the student enters the active exam interface. This blocks standard operating system actions such as screen savers, screen dimming, auto-sleep, and screen locks due to student inactivity.
+* **Release**: Automatically releases the wake lock (`wakeLock.release()`) when the exam is submitted or when the student leaves/unmounts the component.
+
+### E. Dialog Loophole Fixes (Wall-Clock Synchronization)
 * **The Loophole**: Browser confirm alerts (e.g. the native `Leave site?` dialog triggered by `beforeunload` on refresh) pause the browser's JavaScript execution thread, including standard intervals (`remainingTime.value--`). A student could stay on the reload dialog to get infinite time.
 * **The Solution**: All timers are calculated against **absolute target timestamps** (`Date.now() + duration`).
   * **Exam Timer**:
@@ -138,9 +152,25 @@ When a page reload happens during an active exam:
 5. `bridgeLiveSessionToExamStore` maps questions and restored answers into Pinia.
 6. The router continues navigation, the page displays, programmatic fullscreen fails, and the student is shown the **10-second warning countdown** to return to fullscreen.
 
-### C. Appeal / Resumption Restore
-1. When an admin approves an appeal, `restoreResumedSession()` restores the exact questions, answers, and review flags (`is_marked`) from the database snapshot saved inside the `exam_support_requests` record.
-2. It verifies the request status in the database first to prevent duplicate resume replay exploits.
+### C. Appeal / Resumption Restore Workflow (Regular & Live Exams)
+1. **Request Submission**: When an exam is auto-submitted due to a proctoring violation:
+   - A support request is generated (`submitSupportRequest`) capturing the student's remaining time, reason, and a JSONB snapshot of all active answers.
+   - This request is saved to `exam_support_requests` under status `'pending'`.
+2. **Dashboard Banner & Polling**:
+   - The student dashboard (`Dashboard.vue`) shows a prominent appeal/status alert for **10 minutes** post-auto-submission.
+   - The alert displays the status of the request (`pending`, `approved`, `rejected`) and polls the database for changes.
+   - Once the status changes to `'approved'`, a **"Resume Test Now"** button is unlocked. Clicking it calls `restoreResumedSession(...)` to reload their answers and redirect the student back into the active `/exam`.
+3. **Admin Verification & Action (`AdminResumeRequests.vue` / `DashboardPage.vue`)**:
+   - Admins can inspect the queue of appeals.
+   - Clicking **"Approve and Reopen"**:
+     - Deletes the temporary scorecard row from the `results` table (to prevent duplicate submissions).
+     - Sets the request status to `approved`.
+     - Resets the exam session status (`is_submitted = false` or `status = 'in_progress'`), resets `start_time` to `NOW()`, and adjusts `total_duration_seconds` to the student's remaining time.
+4. **Proxy Parameter Parser**: The admin panel uses a REST proxy API to talk to Supabase. To prevent request failures due to multiline parsing bugs in the proxy, all PostgREST query parameters (like RPC selections) are strictly formatted as single-line strings without whitespace or carriage returns.
+5. **Session Restore Logic**: When `restoreResumedSession()` runs:
+   - It restores the exact questions, answers, and review flags (`is_marked`) from the database snapshot saved inside the `exam_support_requests` record.
+   - It verifies the request status in the database first to prevent duplicate resume replay exploits.
+   - It explicitly resets the `examStore.isSubmitted` flag to `false` to clear any expired time-out overlays.
 
 ---
 
