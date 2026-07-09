@@ -1,5 +1,11 @@
 # TestJEE Architecture Documentation
 
+> [!NOTE]
+> **Active Application Engines & Portals:**
+> This document only covers the static marketing landing page layout. For the core mock testing engines, PostgreSQL RPC definitions, RLS rules, and live session monitors, please refer to:
+> * Global Application Context & Schema: [codebase_context.md](file:///c:/Users/admin/Desktop/testjee/codebase_context.md)
+> * Live Session Administrative Flows: [admin_architecture_and_flow.md](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/admin_architecture_and_flow.md)
+
 ## System Overview
 
 TestJEE is a Single Page Application (SPA) built with Vue 3, designed to provide an authentic exam simulation experience for competitive exams in India. The architecture prioritizes performance, offline capability, and user experience.

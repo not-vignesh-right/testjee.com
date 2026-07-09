@@ -1,5 +1,9 @@
 # Technical Deep Dive: Mock Exam Question Logic
 
+> [!NOTE]
+> For the complete global application architecture, database schemas, reload recovery workflows, and proctoring security structures, refer to the central:
+> * [codebase_context.md](file:///c:/Users/admin/Desktop/testjee/codebase_context.md)
+
 This document specifies the technical implementation of the unique question fetching system, randomization strategy, and state management used in the TestJEE Mock Exam feature.
 
 ## 1. Question Deduplication Logic
