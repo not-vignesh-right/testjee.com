@@ -135,6 +135,10 @@ Everything the admin panel touches: every table, every RPC, every page, and how 
 - Same `get_admin_live_sessions` + `get_session_results` pair. Shows **every** enrolled student including "Did Not Attempt" rows (NEW-01 fix), but the average/highest/pass-rate stat cards are scoped to only students who actually have a `submitted`/`auto_submitted` row (so a session with 2 of 20 submissions doesn't show a misleadingly crashed average).
 - Search box filters the table client-side by name/roll/username. Score-distribution histogram buckets `submittedResults` by score (clamped both ends — negative scores from JEE-style negative marking used to crash this, fixed in the Pre-Deploy Review).
 - Export CSV button — client-side blob download, no server round-trip.
+- **Detailed Student Attempt Review Panel**: Clicking any student row opens a detailed slide-over review panel. It queries and compiles the student's question breakdown via `get_student_live_detailed_results`.
+- **Unified Review Sorting**: Grouped questions in the review drawer are sorted in a single, consistent layout across all students (Subject block $\rightarrow$ MCQ first $\rightarrow$ Numeric last $\rightarrow$ `question_id` ascending), ensuring that question labels/numbers remain identical for the instructor.
+- **Admin Secure Client Join Bypass**: Uses the `get_student_session_id_by_username` RPC to bypass anonymous client-side RLS limitations when joining `temp_students` table.
+- **Interactive Solution Modal**: Instructors can click any card in the student's attempt list to view full question text, diagrams, choice options, selected answer vs correct answer highlighting, and solution explanations.
 
 ### 7. Resume Requests (`AdminResumeRequests.vue`)
 - `get_admin_pending_appeals` RPC (admin-scoped — see Security Hotfix section above) replaces what was originally an unfiltered direct table query.
@@ -876,6 +880,24 @@ JOIN subjects s ON q.subject_id = s.subject_id
 ### RPC-3: `start_student_exam` — Add server-side `personal_end_time` (Phase 5, low priority)
 ```sql
 now() + (les.duration_minutes * interval '1 minute') AS personal_end_time
+```
+
+### RPC-4: `get_student_live_detailed_results` — Detailed question answers (Phase 6+)
+```sql
+-- Secure SECURITY DEFINER function to fetch student question orders and answer details
+SELECT q.question_id, q.question_type, q.question_content, c.choice1, ...
+FROM student_exam_sessions ses
+JOIN LATERAL unnest(ses.question_order) WITH ORDINALITY AS ord(q_id, idx) ON true
+JOIN questions q ON q.question_id = ord.q_id
+```
+
+### RPC-5: `get_student_session_id_by_username` — Security RLS Bypass (Phase 6+)
+```sql
+-- Security Definer to resolve student session IDs by username + live session code
+SELECT ses.student_session_id 
+FROM student_exam_sessions ses
+JOIN temp_students ts ON ses.temp_student_id = ts.temp_student_id
+WHERE ses.live_session_id = p_live_session_id AND ts.username = p_username
 ```
 
 ---
