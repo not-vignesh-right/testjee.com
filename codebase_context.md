@@ -176,6 +176,9 @@ When a page reload happens during an active exam:
 
 ## 6. Supabase Tables & Key Database RPCs
 
+> [!NOTE]
+> The full database schema structure and constraints are defined in [entireSchema.sql](file:///c:/Users/admin/Desktop/testjee/entireSchema.sql).
+
 ### Key Tables
 * **`students`**: Personal profile, email, verification state, approved checks, total practice tests remaining, `mobile_number` (required for genuine users), and `is_genuine_user` (boolean, default `true` — see Section 7).
 * **`exam_sessions`**: Practice session logs (linked to `students`). Stores start/end times and submission status.
