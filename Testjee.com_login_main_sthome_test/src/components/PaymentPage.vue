@@ -271,9 +271,10 @@ async function confirmPayment() {
     
     if (authStore.studentProfile) {
       console.log('[PAYMENT] Finalizing request in DB...', { tests: testCount.value })
-      await authStore.updateStudentProfile({ 
+      await authStore.updateStudentProfile({
         number_of_tests: testCount.value,
-        is_approved: false 
+        is_approved: false,
+        payment_confirmed: true
       })
     }
   } catch (err) {

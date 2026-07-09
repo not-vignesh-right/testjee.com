@@ -1860,9 +1860,11 @@ async function sendRestoreRequest() {
   restoreMessage.value = ''
 
   try {
-    // Set is_approved to false when requesting more tests so admin can re-approve after payment
+    // Set is_approved to false and payment_confirmed to false when requesting more tests,
+    // so this goes back through the payment page and only re-enters the admin queue
+    // once "I have completed the payment" is clicked again.
     if (authStore.studentProfile) {
-      await authStore.updateStudentProfile({ is_approved: false })
+      await authStore.updateStudentProfile({ is_approved: false, payment_confirmed: false })
     }
     
     // Clear message

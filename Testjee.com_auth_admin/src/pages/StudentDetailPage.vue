@@ -38,12 +38,18 @@
             </div>
             <div class="flex items-center gap-2 flex-wrap">
               <span
-                :class="student.is_approved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
+                :class="{
+                  'bg-green-100 text-green-700': student.is_approved,
+                  'bg-red-100 text-red-700': !student.is_approved && student.is_rejected,
+                  'bg-gray-100 text-gray-500': !student.is_approved && !student.is_rejected && !student.payment_confirmed,
+                  'bg-amber-100 text-amber-700': !student.is_approved && !student.is_rejected && student.payment_confirmed
+                }"
                 class="text-sm font-bold px-3 py-1.5 rounded-full"
               >
-                {{ student.is_approved ? '✓ Approved' : '⏳ Pending' }}
+                {{ student.is_approved ? '✓ Approved' : student.is_rejected ? '✕ Rejected' : student.payment_confirmed ? '⏳ Pending' : '💤 Lead (Unpaid)' }}
               </span>
               <button
+                v-if="!student.is_rejected"
                 @click="toggleApproval"
                 :disabled="saving"
                 :class="student.is_approved
@@ -52,6 +58,22 @@
                 class="px-4 py-2 text-sm font-semibold rounded-xl border transition-all disabled:opacity-50"
               >
                 {{ student.is_approved ? 'Revoke' : 'Approve Now' }}
+              </button>
+              <button
+                v-if="!student.is_approved && !student.is_rejected"
+                @click="rejectStudentDetail"
+                :disabled="saving"
+                class="px-4 py-2 text-sm font-semibold rounded-xl border bg-white text-gray-700 border-gray-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-all disabled:opacity-50"
+              >
+                Reject
+              </button>
+              <button
+                v-if="student.is_rejected"
+                @click="reopenStudentDetail"
+                :disabled="saving"
+                class="px-4 py-2 text-sm font-semibold rounded-xl border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 transition-all disabled:opacity-50"
+              >
+                Reopen Application
               </button>
               <!-- Genuine User Toggle -->
               <span
@@ -639,17 +661,68 @@ async function toggleApproval() {
   saving.value = true
   try {
     const newVal = !student.value.is_approved
+    const updates = { is_approved: newVal, modification_date: new Date().toISOString() }
+    if (newVal) {
+      // Approving always overrides any prior rejection and counts as payment confirmed.
+      updates.is_rejected = false
+      updates.payment_confirmed = true
+    }
     const { error } = await supabase
       .from('students')
-      .update({ is_approved: newVal, modification_date: new Date().toISOString() })
+      .update(updates)
       .eq('student_id', student.value.student_id)
 
     if (error) throw error
     student.value.is_approved = newVal
+    if (newVal) {
+      student.value.is_rejected = false
+      student.value.payment_confirmed = true
+    }
     showToast(newVal ? 'Student approved!' : 'Approval revoked')
   } catch (err) {
     console.error('Toggle approval error:', err)
     showToast('Failed to update approval', 'error')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function rejectStudentDetail() {
+  if (!confirm(`Reject ${student.value.student_name}'s application? Their email will stay locked out of new signups until an admin reopens it.`)) return
+
+  saving.value = true
+  try {
+    const { error } = await supabase
+      .from('students')
+      .update({ is_approved: false, is_rejected: true, modification_date: new Date().toISOString() })
+      .eq('student_id', student.value.student_id)
+
+    if (error) throw error
+    student.value.is_approved = false
+    student.value.is_rejected = true
+    showToast('Application rejected')
+  } catch (err) {
+    console.error('Reject error:', err)
+    showToast('Failed to reject student', 'error')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function reopenStudentDetail() {
+  saving.value = true
+  try {
+    const { error } = await supabase
+      .from('students')
+      .update({ is_rejected: false, modification_date: new Date().toISOString() })
+      .eq('student_id', student.value.student_id)
+
+    if (error) throw error
+    student.value.is_rejected = false
+    showToast('Application reopened')
+  } catch (err) {
+    console.error('Reopen error:', err)
+    showToast('Failed to reopen student', 'error')
   } finally {
     saving.value = false
   }

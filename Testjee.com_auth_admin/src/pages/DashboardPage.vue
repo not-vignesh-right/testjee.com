@@ -35,6 +35,69 @@
       </div>
     </section>
 
+    <!-- Leads Section (signed up / Google-authed, phone captured, haven't confirmed payment yet) -->
+    <section v-if="leadStudents.length > 0">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+          Leads — Not Yet Paid
+          <span class="text-sm font-semibold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">{{ leadStudents.length }}</span>
+        </h2>
+        <p class="text-xs text-gray-400">Signed up but haven't confirmed payment. Follow up on WhatsApp, or approve directly if you've already verified payment.</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <LeadCard
+          v-for="student in leadStudents"
+          :key="student.student_id"
+          :student="student"
+          :actionLoading="actionLoading"
+          @approve="approveStudent"
+          @reject="rejectStudent"
+        />
+      </div>
+    </section>
+
+    <!-- Rejected Section -->
+    <section v-if="rejectedStudents.length > 0">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+          Rejected
+          <span class="text-sm font-semibold text-red-600 bg-red-50 px-2.5 py-0.5 rounded-full">{{ rejectedStudents.length }}</span>
+        </h2>
+      </div>
+      <div class="bg-white rounded-2xl border border-gray-200/80 overflow-hidden shadow-sm mb-6">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm text-left">
+            <thead>
+              <tr class="bg-gray-50/80 border-b border-gray-200">
+                <th class="py-3 px-4 font-semibold text-gray-600">Student</th>
+                <th class="py-3 px-4 font-semibold text-gray-600">Email</th>
+                <th class="py-3 px-4 font-semibold text-gray-600">Mobile</th>
+                <th class="py-3 px-4 font-semibold text-gray-600 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="student in rejectedStudents" :key="student.student_id" class="border-b border-gray-100">
+                <td class="py-3 px-4 font-semibold text-gray-900">{{ student.student_name }}</td>
+                <td class="py-3 px-4 text-gray-600">{{ student.email_id }}</td>
+                <td class="py-3 px-4 text-gray-500">{{ student.mobile_number || '—' }}</td>
+                <td class="py-3 px-4 text-center">
+                  <button
+                    @click="reopenStudent(student)"
+                    :disabled="actionLoading"
+                    class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-all"
+                  >
+                    Reopen
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- Exam Resume Requests Section -->
     <section v-if="supportRequests.length > 0">
       <div class="flex items-center justify-between mb-4">
@@ -144,7 +207,9 @@
           >
             <option value="all">All</option>
             <option value="pending">Pending</option>
+            <option value="lead">Lead (Unpaid)</option>
             <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
           </select>
         </div>
       </div>
@@ -207,12 +272,15 @@
                 </td>
                 <td class="py-3 px-4 text-center">
                   <span
-                    :class="student.is_approved
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-amber-100 text-amber-700'"
+                    :class="{
+                      'bg-green-100 text-green-700': student.is_approved,
+                      'bg-red-100 text-red-700': !student.is_approved && student.is_rejected,
+                      'bg-gray-100 text-gray-500': !student.is_approved && !student.is_rejected && !student.payment_confirmed,
+                      'bg-amber-100 text-amber-700': !student.is_approved && !student.is_rejected && student.payment_confirmed
+                    }"
                     class="text-xs font-bold px-2.5 py-1 rounded-full"
                   >
-                    {{ student.is_approved ? 'Approved' : 'Pending' }}
+                    {{ student.is_approved ? 'Approved' : student.is_rejected ? 'Rejected' : student.payment_confirmed ? 'Pending' : 'Lead' }}
                   </span>
                 </td>
                 <!-- Genuine User toggle cell -->
@@ -295,6 +363,7 @@ import { useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
 import StatsBar from '../components/StatsBar.vue'
 import PendingCard from '../components/PendingCard.vue'
+import LeadCard from '../components/LeadCard.vue'
 
 const router = useRouter()
 const showToast = inject('showToast')
@@ -312,7 +381,12 @@ const supportRequests = ref([])
 const supportRequestsLoading = ref(true)
 
 // Computed
-const pendingStudents = computed(() => students.value.filter(s => !s.is_approved))
+// "Pending Approvals" = genuine requests only: paid, not rejected, not yet approved.
+const pendingStudents = computed(() => students.value.filter(s => !s.is_approved && !s.is_rejected && s.payment_confirmed))
+// "Leads" = signed up (or Google-authed) but haven't confirmed payment yet. Not an approval request —
+// kept separate so the admin queue only ever shows people who actually clicked "I have completed the payment".
+const leadStudents = computed(() => students.value.filter(s => !s.is_approved && !s.is_rejected && !s.payment_confirmed))
+const rejectedStudents = computed(() => students.value.filter(s => s.is_rejected && !s.is_approved))
 const approvedStudents = computed(() => students.value.filter(s => s.is_approved))
 const totalTestsAllocated = computed(() => students.value.reduce((sum, s) => sum + (s.number_of_tests || 0), 0))
 
@@ -320,8 +394,10 @@ const filteredStudents = computed(() => {
   let result = [...students.value]
 
   // Filter
-  if (filterStatus.value === 'pending') result = result.filter(s => !s.is_approved)
+  if (filterStatus.value === 'pending') result = result.filter(s => !s.is_approved && !s.is_rejected && s.payment_confirmed)
+  else if (filterStatus.value === 'lead') result = result.filter(s => !s.is_approved && !s.is_rejected && !s.payment_confirmed)
   else if (filterStatus.value === 'approved') result = result.filter(s => s.is_approved)
+  else if (filterStatus.value === 'rejected') result = result.filter(s => s.is_rejected)
 
   // Search
   if (searchQuery.value.trim()) {
@@ -386,14 +462,19 @@ function goToDetail(id) {
 async function approveStudent(student) {
   actionLoading.value = true
   try {
+    // payment_confirmed is force-set true here too so an admin can manually approve a lead
+    // straight away (e.g. payment was verified over WhatsApp/UPI notification instead of the
+    // in-app "I have completed the payment" click).
     const { error } = await supabase
       .from('students')
-      .update({ is_approved: true, modification_date: new Date().toISOString() })
+      .update({ is_approved: true, is_rejected: false, payment_confirmed: true, modification_date: new Date().toISOString() })
       .eq('student_id', student.student_id)
 
     if (error) throw error
 
     student.is_approved = true
+    student.is_rejected = false
+    student.payment_confirmed = true
     showToast(`${student.student_name} has been approved!`)
   } catch (err) {
     console.error('Approve error:', err)
@@ -424,22 +505,50 @@ async function revokeStudent(student) {
 }
 
 async function rejectStudent(student) {
-  if (!confirm(`Are you sure you want to reject and delete ${student.student_name}? This cannot be undone.`)) return
+  if (!confirm(`Reject ${student.student_name}'s application? Their email will stay locked out of new signups — they'll need to contact support to be reconsidered.`)) return
+
+  actionLoading.value = true
+  try {
+    // Reject no longer deletes the row. Deleting used to let the student's email silently
+    // "resurrect" a fresh pending application the next time they logged in or checked status
+    // (fetchOrCreateStudent would just create a new row since none existed). Keeping the row
+    // with is_rejected=true gives them a clear "rejected" message instead, and keeps the email
+    // reserved until an admin explicitly reopens it.
+    const { error } = await supabase
+      .from('students')
+      .update({ is_approved: false, is_rejected: true, modification_date: new Date().toISOString() })
+      .eq('student_id', student.student_id)
+
+    if (error) throw error
+
+    student.is_approved = false
+    student.is_rejected = true
+    showToast(`${student.student_name}'s application has been rejected`)
+  } catch (err) {
+    console.error('Reject error:', err)
+    showToast('Failed to reject student', 'error')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function reopenStudent(student) {
+  if (!confirm(`Reopen ${student.student_name}'s application? They'll go back to a normal pending state.`)) return
 
   actionLoading.value = true
   try {
     const { error } = await supabase
       .from('students')
-      .delete()
+      .update({ is_rejected: false, modification_date: new Date().toISOString() })
       .eq('student_id', student.student_id)
 
     if (error) throw error
 
-    students.value = students.value.filter(s => s.student_id !== student.student_id)
-    showToast(`${student.student_name} has been rejected and removed`)
+    student.is_rejected = false
+    showToast(`${student.student_name}'s application has been reopened`)
   } catch (err) {
-    console.error('Reject error:', err)
-    showToast('Failed to reject student', 'error')
+    console.error('Reopen error:', err)
+    showToast('Failed to reopen student', 'error')
   } finally {
     actionLoading.value = false
   }
