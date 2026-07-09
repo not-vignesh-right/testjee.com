@@ -1,10 +1,12 @@
 # TestJEE Codebase Context & Reference Guide
 
 > [!IMPORTANT]
-> **CRITICAL FIRST STEP FOR THE INCOMING AGENT:**
-> Before starting any tasks, you must read the detailed Admin architecture document:
-> * [admin_architecture_and_flow.md](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/admin_architecture_and_flow.md)
-> It contains the full specifications, connections, RPCs, and flowcharts for the newly added Live Session administrative controls.
+> **CRITICAL FIRST STEP FOR THE INCOMING AGENT (Gateway Entry Point):**
+> This file is the primary entry point to understanding the TestJEE codebase. Before modifying or inspecting components, read these linked architecture guides:
+> * **Global Database Schema**: Refer to the complete SQL schema at [entireSchema.sql](file:///c:/Users/admin/Desktop/testjee/entireSchema.sql).
+> * **Live Session Admin Panel & RPCs**: Refer to [admin_architecture_and_flow.md](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/admin_architecture_and_flow.md).
+> * **Mock Exam Selection & Deduplication Logic**: Refer to [TECHNICAL_DETAILS.md](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/TECHNICAL_DETAILS.md).
+> * **Static Landing Page Architecture**: Refer to [ARCHITECTURE.md](file:///c:/Users/admin/Desktop/testjee/TestJee.com_home/ARCHITECTURE.md).
 
 This file provides the complete, absolute context of the **TestJEE Mock Exam Platform** (NTA JEE Main replica) codebase. It captures the architecture, database schema, proctoring systems, state persistence layers, and page-reload recovery workflows. Use this document as the primary reference when starting a new chat in Antigravity.
 
@@ -345,4 +347,33 @@ The following detailed results and review capabilities were added to improve stu
 
 ### E. Refresh State Recovery on Results Screen
 * **Reload Persistence**: Persisted the results dashboard on reload by checking `sessionStorage` for the active `student_username` on mount. If a saved session username is found, it automatically calls `store.loginToExam(...)` to re-initialize and restore their Pinia session.
+
+---
+
+## 10. Email-Based Practice Signup Approval & Quota System
+
+A secure administrative verification and test-limiting system is implemented for self-serve practice accounts:
+
+### A. Signup Approval Flow
+1. **Student Registration**: When a student fills out the registration form in `Login.vue`, the client runs a duplicate check calling `check_email_exists()`. If unique, it triggers an **EmailJS** template dispatch to the administrator.
+2. **Approval Request**: The dispatch includes student metadata and a base64 encoded payload mapped to an approval link pointing to `https://login.testjee.com/admin-approve`.
+3. **Approval Landing (`AdminApprove.vue`)**: When the admin clicks the link, the page verifies the metadata, programmatically registers the student account in Supabase Auth, adds their row to the `students` table, and sets `is_approved = true`.
+
+### B. Practice Test Quota Management
+1. **Compulsory Test Count**: Every approved student profile contains a `number_of_tests` balance (defaults to 1).
+2. **Quota Decrement**: When a student launches a new practice mock test from `Dashboard.vue`, the system decrements `number_of_tests` by 1.
+3. **Out-of-Tests Gate**: If a student attempts to start a mock test with `number_of_tests == 0`, the client intercepts the flow and renders a **"Request More Tests"** modal popup.
+4. **Quota Restore Appeal**: In the modal, the student selects a quota size (1, 3, 5, or 10 tests), which sends an EmailJS request to the admin containing a restore link:
+   ```
+   https://login.testjee.com/admin-approve?action=restore&email=EMAIL&tests=N&name=NAME&sid=STUDENT_ID
+   ```
+5. **Restore Action**: Clicking the link runs a database update incrementing the student's `number_of_tests` balance.
+
+### C. Email Confirmation Exemption
+* **Design Rule**: In this system, admin approval constitutes absolute verification. To prevent students from getting stuck, the `email_confirmed_at` check is fully disabled in `Login.vue` and the router guard.
+* **Requirement**: Supabase Auth settings must have **"Confirm email" disabled (OFF)**.
+
+### D. Timer Stacking Prevention
+* **Global Ref Tracker**: Standard practice exams manage timers using a single `globalTimerInterval` reference inside `examStore.js`.
+* **Clearance**: Both `startTimer()` and `resetExamState()` explicitly clear existing intervals before spawning new ones to prevent timer acceleration loops on consecutive attempts.
 
