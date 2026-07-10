@@ -44,18 +44,42 @@
           <div v-if="showPlanSelector" class="p-6 bg-gray-50/50 border-b border-gray-100 animate-fade-in">
             <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Choose a package</p>
             <div class="grid grid-cols-4 gap-2">
-              <button 
-                v-for="preset in PRESET_PACKAGES" 
+              <button
+                v-for="preset in PRESET_PACKAGES"
                 :key="preset"
-                @click="updatePlan(preset)"
+                @click="selectPreset(preset)"
                 class="py-2.5 rounded-xl border-2 transition-all flex flex-col items-center justify-center"
-                :class="testCount === preset 
-                  ? 'border-blue-500 bg-blue-50' 
+                :class="testCount === preset && !showCustomInput
+                  ? 'border-blue-500 bg-blue-50'
                   : 'border-white bg-white hover:border-blue-200 shadow-sm'"
               >
                 <span class="text-sm font-black text-gray-900">{{ preset }}</span>
                 <span class="text-[9px] font-bold text-gray-400 uppercase">Tests</span>
               </button>
+              <!-- Custom -->
+              <button
+                @click="selectCustom"
+                class="py-2.5 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center"
+                :class="showCustomInput
+                  ? 'border-blue-400 bg-blue-50'
+                  : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/20'"
+              >
+                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                <span class="text-[9px] font-bold text-gray-400 uppercase mt-0.5">Custom</span>
+              </button>
+            </div>
+
+            <!-- Custom Input -->
+            <div v-if="showCustomInput" class="mt-3 flex items-center gap-2">
+              <span class="text-xs text-gray-500">Number of tests:</span>
+              <input
+                v-model.number="customCount"
+                type="number"
+                min="1"
+                max="100"
+                @change="applyCustomCount"
+                class="w-20 px-2 py-1.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none shadow-sm text-center font-bold text-gray-900 text-sm"
+              />
             </div>
           </div>
 
@@ -191,6 +215,9 @@ const upiDetails = {
 // Plan Management
 const testCount = ref(parseInt(route.query.tests) || 5)
 const showPlanSelector = ref(false)
+// If they arrive with a non-preset count (e.g. chose "custom" on the sign-up page), show the custom input by default.
+const showCustomInput = ref(!PRESET_PACKAGES.includes(testCount.value))
+const customCount = ref(testCount.value)
 
 const pricing = computed(() => getPriceDetails(testCount.value))
 
@@ -205,6 +232,22 @@ onMounted(async () => {
     console.error('[PAYMENT] Error loading student profile on mount:', err)
   }
 })
+
+function selectPreset(preset) {
+  showCustomInput.value = false
+  updatePlan(preset)
+}
+
+function selectCustom() {
+  showCustomInput.value = true
+  customCount.value = testCount.value
+}
+
+function applyCustomCount() {
+  const n = Math.max(1, Math.min(100, parseInt(customCount.value) || 1))
+  customCount.value = n
+  updatePlan(n)
+}
 
 async function updatePlan(count) {
   testCount.value = count

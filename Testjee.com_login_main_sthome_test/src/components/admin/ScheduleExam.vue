@@ -14,26 +14,177 @@
         {{ errorMsg }}
       </div>
 
-      <!-- Exam Type: visual tile grid instead of a <select> -->
+      <!-- Exam Type: colorful cards matching the student dashboard's JEE/NEET/KCET cards -->
       <div>
         <label class="block text-sm font-semibold text-ink-700 mb-2.5">Exam type <span class="text-gta-danger">*</span></label>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <!-- JEE -->
           <button
-            v-for="opt in examTypeOptions"
-            :key="opt.key"
             type="button"
-            @click="selectExamType(opt.key)"
-            class="relative text-left px-4 py-3.5 rounded-xl border transition-all duration-200 ease-out-quart"
-            :class="formData.exam_type === opt.key
-              ? 'border-gta-primary bg-blue-50 ring-1 ring-gta-primary'
-              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
+            @click="selectFamily('JEE')"
+            class="relative text-left p-4 rounded-2xl overflow-hidden transition-all duration-200"
+            :class="examFamily === 'JEE' ? 'ring-2 ring-offset-2 ring-blue-500' : 'opacity-90 hover:opacity-100'"
           >
-            <span class="block text-sm font-semibold" :class="formData.exam_type === opt.key ? 'text-gta-secondary' : 'text-ink-900'">{{ opt.shortLabel }}</span>
-            <span class="block text-xs text-ink-500 mt-0.5">{{ opt.durationLabel }}</span>
-            <svg v-if="formData.exam_type === opt.key" class="absolute top-2.5 right-2.5 w-4 h-4 text-gta-secondary" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <div class="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-500"></div>
+            <div class="relative z-10">
+              <span class="inline-block px-2 py-0.5 bg-white/20 text-white text-[10px] font-bold rounded-full uppercase tracking-wide mb-2">NTA Pattern</span>
+              <h3 class="text-lg font-bold text-white">JEE Main</h3>
+              <p class="text-blue-100 text-xs mt-0.5">75 Qs &middot; 3h &middot; PCM</p>
+            </div>
+            <svg v-if="examFamily === 'JEE'" class="absolute top-3 right-3 w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
           </button>
+
+          <!-- NEET -->
+          <button
+            type="button"
+            @click="selectFamily('NEET')"
+            class="relative text-left p-4 rounded-2xl overflow-hidden transition-all duration-200"
+            :class="examFamily === 'NEET' ? 'ring-2 ring-offset-2 ring-emerald-500' : 'opacity-90 hover:opacity-100'"
+          >
+            <div class="absolute inset-0 bg-gradient-to-br from-emerald-600 via-green-500 to-teal-500"></div>
+            <div class="relative z-10">
+              <span class="inline-block px-2 py-0.5 bg-white/20 text-white text-[10px] font-bold rounded-full uppercase tracking-wide mb-2">Medical Pattern</span>
+              <h3 class="text-lg font-bold text-white">NEET UG</h3>
+              <p class="text-green-100 text-xs mt-0.5">180 Qs &middot; 3h20m &middot; PCB</p>
+            </div>
+            <svg v-if="examFamily === 'NEET'" class="absolute top-3 right-3 w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          </button>
+
+          <!-- KCET (with subject sub-picker) -->
+          <div
+            class="relative text-left p-4 rounded-2xl overflow-hidden transition-all duration-200"
+            :class="examFamily === 'KCET' ? 'ring-2 ring-offset-2 ring-amber-500' : 'opacity-90 hover:opacity-100'"
+          >
+            <div class="absolute inset-0 bg-gradient-to-br from-amber-500 via-yellow-500 to-orange-400"></div>
+            <button type="button" @click="selectFamily('KCET')" class="relative z-10 block w-full text-left">
+              <span class="inline-block px-2 py-0.5 bg-white/20 text-white text-[10px] font-bold rounded-full uppercase tracking-wide mb-2">Karnataka State</span>
+              <h3 class="text-lg font-bold text-white">KCET</h3>
+              <p class="text-yellow-100 text-xs mt-0.5">60 Qs &middot; 80m &middot; No -ve</p>
+            </button>
+            <svg v-if="examFamily === 'KCET'" class="absolute top-3 right-3 w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+
+            <!-- KCET subject sub-picker -->
+            <div v-if="examFamily === 'KCET'" class="relative z-10 grid grid-cols-2 gap-1.5 mt-3">
+              <button
+                v-for="opt in kcetOptions"
+                :key="opt.value"
+                type="button"
+                @click="selectKcetSubject(opt.value)"
+                class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+                :class="formData.exam_type === opt.value
+                  ? 'bg-white text-amber-700'
+                  : 'bg-white/15 text-white hover:bg-white/25'"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </div>
         </div>
         <p class="text-xs text-ink-500 mt-2">Determines the subjects, question mix, and marking scheme for this session.</p>
+      </div>
+
+      <!-- Test mode: Full Mock vs Topic Wise -->
+      <div>
+        <label class="block text-sm font-semibold text-ink-700 mb-2.5">Test mode</label>
+        <div class="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            @click="setMode('full')"
+            class="flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left"
+            :class="examMode === 'full' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-white'"
+          >
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
+              <svg class="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-ink-900">Full Mock Test</p>
+              <p class="text-xs text-ink-500">Standard randomized paper</p>
+            </div>
+          </button>
+          <button
+            type="button"
+            @click="setMode('topic')"
+            class="flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left"
+            :class="examMode === 'topic' ? 'border-purple-400 bg-purple-50' : 'border-slate-200 hover:border-slate-300 bg-white'"
+          >
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
+              <svg class="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-ink-900">Topic Wise</p>
+              <p class="text-xs text-ink-500">Choose specific topics</p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Topic picker (only in Topic Wise mode) -->
+      <div v-if="examMode === 'topic'" class="bg-canvas rounded-2xl p-5">
+        <div v-if="topicsLoading" class="flex items-center justify-center py-8 text-ink-500 text-sm gap-2">
+          <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Loading topics...
+        </div>
+        <template v-else>
+          <!-- Subject tabs -->
+          <div class="flex gap-1 p-1 bg-white rounded-xl mb-4">
+            <button
+              v-for="subj in topicSubjects"
+              :key="subj"
+              type="button"
+              @click="activeTopicSubject = subj"
+              class="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all"
+              :class="activeTopicSubject === subj ? 'bg-blue-50 text-blue-700' : 'text-ink-500 hover:text-ink-700'"
+            >
+              {{ subj }}
+            </button>
+          </div>
+
+          <template v-if="activeTopicSubject && topicsBySubject[activeTopicSubject]">
+            <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+              <label class="flex items-center gap-2.5 cursor-pointer" @click="toggleSelectAll(activeTopicSubject)">
+                <div
+                  class="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all"
+                  :class="isAllSelectedForSubject(activeTopicSubject) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300'"
+                >
+                  <svg v-if="isAllSelectedForSubject(activeTopicSubject)" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                </div>
+                <span class="text-sm font-semibold text-ink-700">Select All {{ activeTopicSubject }}</span>
+              </label>
+              <span class="text-xs font-medium text-ink-500">
+                {{ selectedTopics[activeTopicSubject]?.size || 0 }} / {{ topicsBySubject[activeTopicSubject]?.length || 0 }} selected
+              </span>
+            </div>
+
+            <div class="max-h-72 overflow-y-auto pr-1">
+              <div v-for="classGroup in ['11', '12']" :key="classGroup" class="mb-4">
+                <p class="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Class {{ classGroup }}</p>
+                <div class="space-y-1">
+                  <label
+                    v-for="topic in getTopicsForSubjectAndClass(activeTopicSubject, classGroup)"
+                    :key="topic.topic_id"
+                    class="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all"
+                    :class="isTopicSelected(activeTopicSubject, topic.topic_id) ? 'bg-indigo-50' : 'hover:bg-white'"
+                    @click="toggleTopic(activeTopicSubject, topic.topic_id)"
+                  >
+                    <div
+                      class="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all"
+                      :class="isTopicSelected(activeTopicSubject, topic.topic_id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300'"
+                    >
+                      <svg v-if="isTopicSelected(activeTopicSubject, topic.topic_id)" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                    </div>
+                    <span class="text-sm text-ink-700" :class="isTopicSelected(activeTopicSubject, topic.topic_id) ? 'font-semibold text-indigo-800' : ''">
+                      {{ topic.topic_name }}
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </template>
+        </template>
+        <p class="text-xs text-ink-500 mt-3">{{ totalTopicsSelected }} topic{{ totalTopicsSelected !== 1 ? 's' : '' }} selected across all subjects. Question availability (including cross-category borrowing) is checked when you create the session.</p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -153,6 +304,7 @@ import { useRouter } from 'vue-router'
 import { supabase } from '../../lib/supabase'
 import { useAdminStore } from '../../stores/adminStore'
 import { EXAM_CONFIGS, getExamConfig } from '../../data/examConfigs'
+import { compileExamQuestions, fetchTopicsForSubjects } from '../../utils/topicExamEngine'
 
 const router = useRouter()
 const adminStore = useAdminStore()
@@ -160,20 +312,37 @@ const adminStore = useAdminStore()
 const loading = ref(false)
 const errorMsg = ref('')
 
-// BUG-09 fix: previously the category dropdown only tagged which question bank
-// (JEE-pool vs NEET-pool) to pull from, while the assembly loop below still always built
-// a hardcoded Physics/Chemistry/Mathematics paper regardless of what was picked — so
-// choosing NEET actually produced a broken/empty JEE-shaped exam. This replaces it with a
-// real Exam Type selector driven by the same EXAM_CONFIGS used by the student dashboard,
-// which is the actual source of truth for subjects/question counts/marking per exam type.
-const examTypeOptions = Object.entries(EXAM_CONFIGS).map(([key, cfg]) => ({
-  key,
-  title: cfg.title,
-  shortLabel: cfg.shortLabel,
-  durationLabel: `${Math.round(cfg.durationSeconds / 60)} min`
-}))
-
 const currentExamTitle = computed(() => getExamConfig(formData.value.exam_type).title)
+
+// BUG-09 fix (kept): a real Exam Type selector driven by the same EXAM_CONFIGS used by the
+// student dashboard, which is the actual source of truth for subjects/question counts/marking.
+// NEW: presented as colorful JEE/NEET/KCET family cards (matching the student dashboard)
+// instead of a flat tile grid, with KCET's subject sub-picker inline.
+const examFamily = computed(() => {
+  if (formData.value.exam_type?.startsWith('JEE')) return 'JEE'
+  if (formData.value.exam_type?.startsWith('NEET')) return 'NEET'
+  if (formData.value.exam_type?.startsWith('KCET')) return 'KCET'
+  return 'JEE'
+})
+
+const kcetOptions = [
+  { value: 'KCET_PHYSICS', label: 'Physics' },
+  { value: 'KCET_CHEMISTRY', label: 'Chemistry' },
+  { value: 'KCET_MATHEMATICS', label: 'Mathematics' },
+  { value: 'KCET_BIOLOGY', label: 'Biology' },
+]
+const kcetSubject = ref('KCET_PHYSICS') // remembers last-picked KCET subject
+
+function selectFamily(family) {
+  if (family === 'JEE') selectExamType('JEE_MAIN_FULL')
+  else if (family === 'NEET') selectExamType('NEET_UG_FULL')
+  else if (family === 'KCET') selectExamType(kcetSubject.value)
+}
+
+function selectKcetSubject(value) {
+  kcetSubject.value = value
+  selectExamType(value)
+}
 
 // Enforce min datetime to now + 5 minutes — gives admins a natural buffer to share
 // credentials and students to join the lobby before the scheduled time actually hits.
@@ -206,7 +375,80 @@ const selectExamType = (key) => {
   formData.value.exam_type = key
   formData.value.duration_minutes = Math.round(getExamConfig(key).durationSeconds / 60)
   customDuration.value = false
+  // Topics differ per exam type — clear the picker and re-fetch if it's currently open.
+  topicsBySubject.value = {}
+  selectedTopics.value = {}
+  if (examMode.value === 'topic') loadTopicsForCurrentExam()
 }
+
+// ─── Topic Wise state (Full Mock vs Topic Wise) ───────────────────────────────
+const examMode = ref('full') // 'full' | 'topic'
+const topicsBySubject = ref({})    // { SubjectName: [{ topic_id, topic_name, class }] }
+const selectedTopics = ref({})     // { SubjectName: Set<topic_id> }
+const activeTopicSubject = ref('')
+const topicsLoading = ref(false)
+
+const topicSubjects = computed(() => getExamConfig(formData.value.exam_type)?.subjects ?? [])
+
+const totalTopicsSelected = computed(() => {
+  let count = 0
+  for (const subj of topicSubjects.value) count += selectedTopics.value[subj]?.size ?? 0
+  return count
+})
+
+function setMode(mode) {
+  examMode.value = mode
+  errorMsg.value = ''
+  if (mode === 'topic' && Object.keys(topicsBySubject.value).length === 0) {
+    loadTopicsForCurrentExam()
+  }
+}
+
+async function loadTopicsForCurrentExam() {
+  topicsLoading.value = true
+  try {
+    const cfg = getExamConfig(formData.value.exam_type)
+    topicsBySubject.value = await fetchTopicsForSubjects(supabase, cfg)
+    const initSel = {}
+    for (const subj of cfg.subjects) initSel[subj] = new Set()
+    selectedTopics.value = initSel
+    activeTopicSubject.value = cfg.subjects[0] || ''
+  } catch (err) {
+    console.error('Failed to load topics:', err)
+    errorMsg.value = 'Failed to load topics. Please try again.'
+  } finally {
+    topicsLoading.value = false
+  }
+}
+
+function isTopicSelected(subj, topicId) {
+  return selectedTopics.value[subj]?.has(topicId) ?? false
+}
+
+function isAllSelectedForSubject(subj) {
+  const topics = topicsBySubject.value[subj]
+  if (!topics || topics.length === 0) return false
+  return (selectedTopics.value[subj]?.size ?? 0) === topics.length
+}
+
+function toggleTopic(subj, topicId) {
+  if (!selectedTopics.value[subj]) selectedTopics.value[subj] = new Set()
+  if (selectedTopics.value[subj].has(topicId)) selectedTopics.value[subj].delete(topicId)
+  else selectedTopics.value[subj].add(topicId)
+  selectedTopics.value = { ...selectedTopics.value }
+}
+
+function toggleSelectAll(subj) {
+  const topics = topicsBySubject.value[subj] ?? []
+  if (isAllSelectedForSubject(subj)) selectedTopics.value[subj] = new Set()
+  else selectedTopics.value[subj] = new Set(topics.map(t => t.topic_id))
+  selectedTopics.value = { ...selectedTopics.value }
+}
+
+function getTopicsForSubjectAndClass(subj, classNum) {
+  return (topicsBySubject.value[subj] ?? []).filter(t => t.class === classNum)
+}
+// ─── End Topic Wise state ──────────────────────────────────────────────────
 
 // 4.6: Prefill from "Duplicate" on AdminLiveSessions.vue. Merged field-by-field (not a
 // blind Object.assign) so a missing/invalid field falls back to this form's own defaults
@@ -244,17 +486,6 @@ const isSubmitDisabled = computed(() => {
   return formData.value.num_students > availableStudentLimit.value || formData.value.num_students < 1
 })
 
-// BUG-10 fix: `.sort(() => 0.5 - Math.random())` is a well-known biased shuffle —
-// some orderings are far more likely than others. Fisher-Yates is uniform.
-function shuffleArray(arr) {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
-
 const handleCreateSession = async () => {
   errorMsg.value = ''
   
@@ -268,148 +499,31 @@ const handleCreateSession = async () => {
   try {
     const inputDate = new Date(formData.value.start_time)
     const examConfig = getExamConfig(formData.value.exam_type)
-    const categoryIds = Array.isArray(examConfig.categoryId) ? examConfig.categoryId : [examConfig.categoryId]
 
-    // 1. Resolve subject_ids for every canonical subject via its synonyms (e.g. NEET's
-    // "Botany" canonical name also matches rows literally named "Biology" in some pools)
-    const allSynonymNames = Array.from(new Set(Object.values(examConfig.subjectNameSynonyms).flat()))
-    const { data: subjectsData, error: subjectsError } = await supabase
-        .from('subjects')
-        .select('subject_id, subject_name')
-        .in('subject_name', allSynonymNames)
-
-    if (subjectsError) throw subjectsError
-
-    const lookupIdsFor = (canonicalName) => {
-      const candidates = examConfig.subjectNameSynonyms[canonicalName] || [canonicalName]
-      return (subjectsData || []).filter(s => candidates.includes(s.subject_name)).map(s => s.subject_id)
-    }
-
-    const mcqTarget = examConfig.questionsPerSubject.mcq
-    const numTarget = examConfig.hasNumeric ? examConfig.questionsPerSubject.numeric : 0
-    const assembledQuestionIds = []
-
-    // Track unique images across the entire exam paper to avoid duplicates
-    const currentExamImageUrls = new Set()
-
-    const selectUniformlyFromTopics = (candidates, targetArray, limit) => {
-      if (!candidates || candidates.length === 0) return
-
-      // 1. Group candidates by topic_id (fallback to 'no_topic')
-      const topicGroups = {}
-      candidates.forEach(q => {
-        const topicId = q.topic_id !== null && q.topic_id !== undefined ? String(q.topic_id) : 'no_topic'
-        if (!topicGroups[topicId]) topicGroups[topicId] = []
-        topicGroups[topicId].push(q)
-      })
-
-      // 2. Shuffle questions inside each topic group
-      Object.keys(topicGroups).forEach(topicId => {
-        topicGroups[topicId] = shuffleArray(topicGroups[topicId])
-      })
-
-      const imageDuplicateBackups = []
-
-      // 3. Round-robin selection
-      while (targetArray.length < limit) {
-        let activeTopicIds = Object.keys(topicGroups).filter(topicId => topicGroups[topicId].length > 0)
-        if (activeTopicIds.length === 0) break
-
-        activeTopicIds = shuffleArray(activeTopicIds)
-
-        for (const topicId of activeTopicIds) {
-          if (targetArray.length >= limit) break
-
-          // Find first question with unique image in this topic group
-          let foundIdx = -1
-          for (let idx = 0; idx < topicGroups[topicId].length; idx++) {
-            const q = topicGroups[topicId][idx]
-            const imgUrl = q.image_url
-            if (imgUrl && imgUrl.trim() !== '') {
-              if (currentExamImageUrls.has(imgUrl.trim())) {
-                continue
-              }
-            }
-            foundIdx = idx
-            break
-          }
-
-          if (foundIdx !== -1) {
-            const q = topicGroups[topicId].splice(foundIdx, 1)[0]
-            const imgUrl = q.image_url
-            if (imgUrl && imgUrl.trim() !== '') {
-              currentExamImageUrls.add(imgUrl.trim())
-            }
-            targetArray.push(q)
-          } else {
-            // All have duplicate images, move first to backup
-            const backupQ = topicGroups[topicId].shift()
-            if (backupQ) {
-              imageDuplicateBackups.push(backupQ)
-            }
-          }
-        }
+    // Build the topic filter (Topic Wise mode only) the same shape examStore.js uses for
+    // student practice exams: { SubjectName: [topicId, ...] }
+    let topicFilterMap = null
+    if (examMode.value === 'topic') {
+      topicFilterMap = {}
+      let totalSelections = 0
+      for (const subj of examConfig.subjects) {
+        const ids = [...(selectedTopics.value[subj] ?? [])]
+        topicFilterMap[subj] = ids
+        totalSelections += ids.length
       }
-
-      // Fallback to duplicate images if target array is still not filled
-      if (targetArray.length < limit && imageDuplicateBackups.length > 0) {
-        const shuffledBackups = shuffleArray(imageDuplicateBackups)
-        while (targetArray.length < limit && shuffledBackups.length > 0) {
-          targetArray.push(shuffledBackups.shift())
-        }
+      if (totalSelections === 0) {
+        throw new Error('Please select at least one topic to continue, or switch to Full Mock Test.')
       }
     }
 
-    for (const subjectName of examConfig.subjects) {
-      const subjectIds = lookupIdsFor(subjectName)
-      if (subjectIds.length === 0) {
-        console.warn(`No subject_id found for "${subjectName}" (exam type ${formData.value.exam_type})`)
-        continue
-      }
+    // Compile the paper via the shared engine (also used by examStore.js for student practice
+    // exams) — includes the same cross-category borrowing (KCET <-> JEE/NEET, JEE <-> NEET) and
+    // reports a per-subject shortfall instead of silently shipping a thinner paper.
+    const { questionIds: assembledQuestionIds, shortfalls } = await compileExamQuestions(supabase, examConfig, topicFilterMap)
 
-      // Split the per-subject target evenly across every mapped subject_id (e.g. a
-      // "Biology" canonical subject that maps to both Botany and Zoology rows)
-      const subCount = subjectIds.length
-      for (let i = 0; i < subCount; i++) {
-        const subId = subjectIds[i]
-        const subMcqTarget = Math.floor(mcqTarget / subCount) + (i < (mcqTarget % subCount) ? 1 : 0)
-        const subNumTarget = Math.floor(numTarget / subCount) + (i < (numTarget % subCount) ? 1 : 0)
-
-        if (subMcqTarget > 0) {
-          let mcqQuery = supabase
-            .from('questions')
-            .select('question_id, topic_id, image_url')
-            .in('category_id', categoryIds)
-            .eq('subject_id', subId)
-            .eq('question_type', 'multiple_choice')
-          if (examConfig.difficultyFilter && examConfig.difficultyFilter.length > 0) {
-            mcqQuery = mcqQuery.in('difficulty', examConfig.difficultyFilter)
-          }
-          const { data: mcqs } = await mcqQuery.limit(1000)
-          if (mcqs && mcqs.length) {
-            const selectedMcqs = []
-            selectUniformlyFromTopics(mcqs, selectedMcqs, subMcqTarget)
-            assembledQuestionIds.push(...selectedMcqs.map(q => q.question_id))
-          }
-        }
-
-        if (subNumTarget > 0) {
-          let numQuery = supabase
-            .from('questions')
-            .select('question_id, topic_id, image_url')
-            .in('category_id', categoryIds)
-            .eq('subject_id', subId)
-            .eq('question_type', 'numeric')
-          const { data: nums } = await numQuery.limit(1000)
-          if (nums && nums.length) {
-            const selectedNums = []
-            selectUniformlyFromTopics(nums, selectedNums, subNumTarget)
-            assembledQuestionIds.push(...selectedNums.map(q => q.question_id))
-          }
-        }
-      }
+    if (shortfalls.length > 0) {
+      throw new Error(`Not enough questions available: ${shortfalls.join(' | ')}`)
     }
-
     if (assembledQuestionIds.length === 0) {
       throw new Error("No questions found for this Exam Type. Add questions first.")
     }

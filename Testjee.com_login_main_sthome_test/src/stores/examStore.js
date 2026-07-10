@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from './authStore'
 import { useExamSessionStore } from './examSessionStore'
 import { EXAM_CONFIGS, getExamConfig } from '../data/examConfigs'
+import { shuffleArray, selectUniformlyFromTopics as selectUniformlyFromTopicsShared } from '../utils/topicExamEngine'
 
 export const useExamStore = defineStore('exam', () => {
   // State
@@ -412,14 +413,6 @@ export const useExamStore = defineStore('exam', () => {
         return found.map(s => s.subject_id)
       }
 
-      const shuffleArray = (array) => {
-        for (let i = array.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [array[i], array[j]] = [array[j], array[i]]
-        }
-        return array
-      }
-
       // Helper to apply category filter. categoryId can be a number or array of numbers.
       const applyCategoryFilter = (query, categoryIdConfig) => {
         if (!categoryIdConfig) return query
@@ -436,74 +429,10 @@ export const useExamStore = defineStore('exam', () => {
       const assembledQuestions = []
       const currentExamImageUrls = new Set()
 
-      // Helper to select questions uniformly and randomly from topics with unique image URLs
-      const selectUniformlyFromTopics = (candidates, targetArray, limit) => {
-        if (!candidates || candidates.length === 0) return
-
-        // 1. Group candidates by topic_id (fallback to 'no_topic')
-        const topicGroups = {}
-        candidates.forEach(q => {
-          const topicId = q.topic_id !== null && q.topic_id !== undefined ? String(q.topic_id) : 'no_topic'
-          if (!topicGroups[topicId]) topicGroups[topicId] = []
-          topicGroups[topicId].push(q)
-        })
-
-        // 2. Shuffle questions inside each topic group
-        Object.keys(topicGroups).forEach(topicId => {
-          topicGroups[topicId] = shuffleArray(topicGroups[topicId])
-        })
-
-        const imageDuplicateBackups = []
-
-        // 3. Round-robin selection
-        while (targetArray.length < limit) {
-          let activeTopicIds = Object.keys(topicGroups).filter(topicId => topicGroups[topicId].length > 0)
-          if (activeTopicIds.length === 0) break
-
-          activeTopicIds = shuffleArray(activeTopicIds)
-
-          for (const topicId of activeTopicIds) {
-            if (targetArray.length >= limit) break
-
-            // Find first question with unique image in this topic group
-            let foundIdx = -1
-            for (let idx = 0; idx < topicGroups[topicId].length; idx++) {
-              const q = topicGroups[topicId][idx]
-              const imgUrl = q.image_url
-              if (imgUrl && imgUrl.trim() !== '') {
-                if (currentExamImageUrls.has(imgUrl.trim())) {
-                  continue
-                }
-              }
-              foundIdx = idx
-              break
-            }
-
-            if (foundIdx !== -1) {
-              const q = topicGroups[topicId].splice(foundIdx, 1)[0]
-              const imgUrl = q.image_url
-              if (imgUrl && imgUrl.trim() !== '') {
-                currentExamImageUrls.add(imgUrl.trim())
-              }
-              targetArray.push(q)
-            } else {
-              // All have duplicate images, move first to backup
-              const backupQ = topicGroups[topicId].shift()
-              if (backupQ) {
-                imageDuplicateBackups.push(backupQ)
-              }
-            }
-          }
-        }
-
-        // Fallback to duplicate images if target array is still not filled
-        if (targetArray.length < limit && imageDuplicateBackups.length > 0) {
-          const shuffledBackups = shuffleArray(imageDuplicateBackups)
-          while (targetArray.length < limit && shuffledBackups.length > 0) {
-            targetArray.push(shuffledBackups.shift())
-          }
-        }
-      }
+      // Select questions uniformly and randomly from topics with unique image URLs.
+      // Delegates to the shared engine (also used by ScheduleExam.vue) — see topicExamEngine.js.
+      const selectUniformlyFromTopics = (candidates, targetArray, limit) =>
+        selectUniformlyFromTopicsShared(candidates, targetArray, limit, currentExamImageUrls)
 
       for (const subjectName of cfg.subjects) {
         const subjectIds = lookupIdsFor(subjectName)
