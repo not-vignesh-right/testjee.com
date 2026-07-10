@@ -31,6 +31,8 @@ Testjee.com_login_main_sthome_test/
 │   ├── data/
 │   │   ├── quotes.js            # Array of motivational quotes
 │   │   └── examConfigs.js       # Core exam configurations (JEE Main marking schema, templates)
+│   ├── utils/
+│   │   └── topicExamEngine.js   # Shared question-selection engine (Section 12) — used by examStore.js + admin ScheduleExam.vue
 │   ├── stores/
 │   │   ├── authStore.js         # Student authentication, profile registration & approval state
 │   │   ├── adminStore.js        # Administrator authentication and live monitoring control
@@ -39,6 +41,9 @@ Testjee.com_login_main_sthome_test/
 │   └── components/
 │       ├── Login.vue            # Student credentials login / register (mobile field is required*)
 │       ├── Dashboard.vue        # Student landing page + compulsory phone-number overlay (Section 7)
+│       ├── AuthCallback.vue     # Google OAuth redirect target; enforces mandatory phone number (Section 11.C)
+│       ├── PaymentPage.vue      # Payment/plan selection incl. custom test count; sets payment_confirmed (Section 11.B)
+│       ├── WaitingApproval.vue  # Pending/Rejected/Approved status screen (Section 11.A)
 │       ├── ExamLayout.vue       # Proctoring container, timers, fullscreen check, and questions pane
 │       ├── LandingPage.vue      # TestJEE homepage / marketing interface
 │       ├── StudentLayout.vue    # Student layout wrapper (contains Sidebar, HeaderBar, Footer)
@@ -65,9 +70,12 @@ Testjee.com_login_main_sthome_test/
 
 Testjee.com_auth_admin/
 └── src/
-    └── pages/
-        ├── DashboardPage.vue    # Student list table with approval, test count, and is_genuine_user toggles
-        └── StudentDetailPage.vue # Full student profile editor with Genuine/Dev toggle in header
+    ├── pages/
+    │   ├── DashboardPage.vue    # Pending/Leads/Rejected/All Students, approval + is_genuine_user toggles (Section 11.D)
+    │   └── StudentDetailPage.vue # Full student profile editor incl. Reject/Reopen controls (Section 11.D)
+    └── components/
+        ├── PendingCard.vue      # Pending-approval student card + WhatsApp button (Section 11.D)
+        └── LeadCard.vue         # Unpaid-lead student card + WhatsApp button (Section 11.D, new)
 ```
 
 ---
@@ -373,5 +381,43 @@ A secure database-driven administrative verification and test-limiting system is
 ### D. Timer Stacking Prevention
 * **Global Ref Tracker**: Standard practice exams manage timers using a single `globalTimerInterval` reference inside `examStore.js`.
 * **Clearance**: Both `startTimer()` and `resetExamState()` explicitly clear existing intervals before spawning new ones to prevent timer acceleration loops on consecutive attempts.
+
+---
+
+## 11. Signup Approval Lifecycle Hardening (July 2026)
+
+Section 10's approval model (`is_approved` boolean only) had three concrete gaps, fixed by adding two new `students` columns via [signup-lifecycle-migration.sql](file:///c:/Users/admin/Desktop/testjee/signup-lifecycle-migration.sql):
+
+### A. `is_rejected` — Reject no longer deletes the row
+* **Old behavior**: Admin's **Reject** button hard-`DELETE`d the `students` row. Since `auth.users` was untouched, a rejected student could still log in — `fetchOrCreateStudent()`'s "not found → create new" fallback then silently re-created a fresh pending row, making rejection effectively a no-op with no trace and no message shown to the student.
+* **New behavior**: Reject sets `is_rejected = true, is_approved = false` and **keeps the row**. [WaitingApproval.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/WaitingApproval.vue) shows a distinct "Application Rejected" screen (with a WhatsApp contact link) instead of looping back into "waiting." The email stays permanently reserved (blocks re-signup via `check_email_exists`) until an admin clicks **Reopen** (`Testjee.com_auth_admin`'s `DashboardPage.vue`/`StudentDetailPage.vue`), which just clears `is_rejected`.
+* **Revoke** (unrelated, unchanged) still just sets `is_approved = false` — it's the soft "back to pending" action, distinct from the sticky Reject state.
+
+### B. `payment_confirmed` — Lead vs. genuine approval request
+* **Old behavior**: The `students` row (and thus visibility in the admin's "Pending Approvals" queue) was created at signup/first-Google-login — before the student ever saw the payment page, let alone paid.
+* **New behavior**: Signup/Google-auth still creates the row immediately (`payment_confirmed` defaults `false`) — it's now a **Lead**, shown in a separate "Leads — Not Yet Paid" section in the admin dashboard with a WhatsApp follow-up button, kept out of Pending Approvals. Only [PaymentPage.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/PaymentPage.vue)'s `confirmPayment()` (the "I have completed the payment" click) sets `payment_confirmed = true`, promoting it into Pending Approvals. `Dashboard.vue`/`Results.vue`'s "Request More Tests" flow resets `payment_confirmed = false` when re-entering the payment page for a repeat purchase.
+* Admin's **Approve** action also force-sets `payment_confirmed = true` (and clears `is_rejected`), so an admin can promote a Lead straight to Approved if payment was verified manually (e.g. over WhatsApp) without the student ever clicking the in-app button.
+
+### C. Mandatory Phone Number — Google sign-in bypass closed
+* **The bug**: `validateSignUp()` in `Login.vue` required a valid phone for the manual email/password form, but `handleGoogleSignIn()` had no equivalent check — a Google-authenticated student could reach the admin's approval queue with `mobile_number = null`, making WhatsApp follow-up impossible.
+* **The fix**: [AuthCallback.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/AuthCallback.vue) (the Google OAuth redirect target) now checks `mobile_number` against the same `^[6-9]\d{9}$` regex after `fetchOrCreateStudent()`. If missing/invalid, it blocks with an inline "One last thing" phone-entry step before routing onward to payment — same requirement, just enforced at the point where Google sign-in actually creates the account instead of only in the manual form's client-side validation. `Dashboard.vue`'s existing non-dismissible phone overlay (Section 7) remains as a safety net for any pre-existing accounts that slipped through before this fix.
+
+### D. Admin dashboard additions (`Testjee.com_auth_admin`)
+* **Leads** and **Rejected** sections added to `DashboardPage.vue` (new `LeadCard.vue` component), alongside the existing Pending Approvals/All Students. Filter dropdown gained `lead`/`rejected` options.
+* **WhatsApp buttons** added to `PendingCard.vue`, `LeadCard.vue`, and a per-row column in the All Students table (shown whenever `mobile_number` is present).
+* **"Attempted" column** added to All Students — cross-references `exam_sessions.is_submitted = true` per `student_id` to show whether a student has ever completed a practice exam.
+* **Exam Support Logs & Appeals** section moved below All Students and collapsed by default behind a Show more/Hide toggle (previously always-expanded and usually empty, pushing more relevant sections down).
+
+### E. No email notifications exist
+* Grepped the full repo — no email-sending integration (EmailJS/SendGrid/Resend/etc.) exists anywhere. Approve/Reject only write to the DB; the only real emails sent are Supabase Auth's own built-in ones (verification, password reset), unrelated to the approval flow. `WaitingApproval.vue`'s previous "you'll receive an email when approved" copy (false) was removed and replaced with "we'll update this page automatically." `AdminApprove.vue` is a dead/legacy component built for an email-link-triggered approval flow that nothing in the codebase actually sends — unused.
+
+---
+
+## 12. Shared Question Selection Engine & Topic-Wise Live Scheduling (July 2026)
+
+* **New file**: [topicExamEngine.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/utils/topicExamEngine.js) — extracts the question-selection algorithm (subject-name resolution via `subjectNameSynonyms`, `selectUniformlyFromTopics` round-robin + image-dedup, and cross-category "borrowing") that was previously duplicated between `examStore.js` (student practice) and `ScheduleExam.vue` (admin live scheduling) — the admin copy was a weaker reimplementation with no cross-category fallback. See [TECHNICAL_DETAILS.md Section 5](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/TECHNICAL_DETAILS.md) for the full algorithm.
+* **`examStore.js`** now imports the shared `selectUniformlyFromTopics`/`shuffleArray` instead of a local copy (pure dedup, no behavior change).
+* **`ScheduleExam.vue`** (admin live exam scheduling) gained full parity with the student dashboard's topic-wise flow: colorful JEE/NEET/KCET cards (replacing the flat tile grid), a Full Mock Test vs Topic Wise mode toggle, and a Class 11/12 topic picker per subject. Session creation now calls the shared `compileExamQuestions()`, which — unlike the old admin-only assembly — includes the cross-category borrow fallback and blocks with a clear per-subject error (`shortfalls`) if the question pool can't be filled even after borrowing, instead of silently shipping a shorter paper. See [admin_architecture_and_flow.md Phase 7](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/admin_architecture_and_flow.md).
+* **Payment page custom test count**: [PaymentPage.vue](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/components/PaymentPage.vue)'s "Change Plan" selector gained a Custom option (number input, 1-100), matching the sign-up page's existing custom package picker — previously only the 6 preset tiers were selectable there.
 
 

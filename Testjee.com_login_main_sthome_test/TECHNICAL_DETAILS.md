@@ -60,5 +60,52 @@ The `src/router/index.js` guard was updated to selectively block access to the `
 - **Indexed Filtering**: `question_id` is a primary key, making the `not in` filter extremely fast even with hundreds of excluded IDs.
 - **Batch Selection**: Subject IDs are resolved via a `subjectNameSynonyms` mapping to handle data inconsistencies (e.g., 'Math' vs 'Mathematics') before querying.
 
+## 5. Shared Question-Selection Engine (`src/utils/topicExamEngine.js`)
+
+Added when topic-wise selection was ported into the admin live-exam scheduler
+(`ScheduleExam.vue`), which previously reimplemented this logic separately and
+worse (single query per subject, no fallback). Both `examStore.js` (student
+practice exams) and `ScheduleExam.vue` (admin live exams) now import from this
+one module. Exports:
+
+- **`shuffleArray`** / **`selectUniformlyFromTopics`** — the Fisher-Yates +
+  round-robin-across-topics + image-dedup algorithm described in Section 2,
+  extracted verbatim so both call sites stay byte-identical instead of drifting.
+- **`fetchSubjectIdLookup(supabase, subjectNameSynonyms)`** — resolves every
+  synonym name in one query, returns a `lookupIdsFor(canonicalName)` helper.
+- **`fetchTopicsForSubjects(supabase, examConfig)`** — returns
+  `{ [SubjectName]: [{ topic_id, topic_name, class }] }`, sorted by class then
+  name, for populating the topic-wise picker UI (used by both `Dashboard.vue`'s
+  topic modal logic and `ScheduleExam.vue`'s inline topic picker).
+- **`compileSubjectQuestions(supabase, opts)`** — fetches + picks questions for
+  one `subject_id` + `question_type`, with a **two-tier fallback**:
+  1. **Tier 1**: within the exam's own `categoryId` (respecting `topicIds`/`difficultyFilter`).
+  2. **Tier 2 — cross-category borrowing**: if Tier 1 falls short, re-queries with
+     the category filter dropped entirely (still respecting topic/difficulty
+     filters). This is how KCET papers exist at all despite there being no KCET
+     `category_id` row in the DB — KCET configs just point `categoryId` at
+     JEE's (1) and/or NEET's (2) pools, and Tier 2 additionally allows pulling
+     from *any* category if that specific pool is thin. Also how JEE/NEET
+     borrow each other's Physics/Chemistry questions when a topic is thin on
+     one side but not the other.
+- **`compileExamQuestions(supabase, examConfig, topicFilterMap)`** — the
+  top-level entry point. Loops every subject in the config, splits the
+  per-subject target evenly across every resolved `subject_id` (e.g. KCET
+  Biology's 60 questions split ~30/30 across Botany + Zoology), and returns
+  `{ questionIds, shortfalls }`. `topicFilterMap` is `null` for a full mock
+  test, or `{ [SubjectName]: [topicId, ...] }` for topic-wise. `shortfalls` is
+  a human-readable array populated per subject that still couldn't be filled
+  even after borrowing — callers (`ScheduleExam.vue`) block and surface this
+  instead of silently shipping a shorter paper, matching the validation
+  strictness `Dashboard.vue`'s topic-wise flow already enforced for students.
+
+**Not yet unified:** `examStore.js`'s own per-student fallback ladder (exclude
+correctly-answered → cross-category borrow → allow repeats → cross-category +
+repeats, keyed off a given student's history) is more elaborate than
+`compileExamQuestions`'s two-tier version, since admin-scheduled live exams
+have no single "student" to scope exclusions to. `examStore.js` still owns
+that extra logic itself, calling only the shared low-level helpers
+(`selectUniformlyFromTopics`/`shuffleArray`) rather than `compileExamQuestions`.
+
 ---
-*Technical Documentation - Feb 24, 2026*
+*Technical Documentation - Feb 24, 2026, updated Jul 10, 2026 (Section 5: shared topicExamEngine.js)*

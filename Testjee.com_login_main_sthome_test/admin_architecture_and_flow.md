@@ -5,6 +5,22 @@
 
 ---
 
+# ✅ PHASE 7: Topic-Wise Live Exam Scheduling & Shared Question Engine (Complete)
+
+**Goal:** Give admins the same "Full Mock Test vs Topic Wise" choice students already have on the practice dashboard, and stop `ScheduleExam.vue` from being a separate, weaker reimplementation of the question-selection logic.
+
+**What shipped:**
+- **`src/utils/topicExamEngine.js` (new)** — the single implementation of subject-name→subject_id resolution (via `subjectNameSynonyms`), topic fetching for the picker UI, uniform-across-topics/image-deduplicated selection (`selectUniformlyFromTopics`, `shuffleArray`), and the cross-category "borrowing" fallback (KCET↔JEE/NEET pools, JEE↔NEET Physics/Chemistry — see `TECHNICAL_DETAILS.md` for the full algorithm). Previously this was duplicated between `examStore.js` (student practice exams) and `ScheduleExam.vue`, with the admin copy missing the cross-category borrow tier entirely.
+- **`examStore.js`** now imports `selectUniformlyFromTopics`/`shuffleArray` from the shared module instead of a local copy — no behavior change, pure dedup.
+- **`ScheduleExam.vue`** rewritten:
+  - Exam Type picker is now colorful JEE (blue) / NEET (green) / KCET (amber, with an inline Physics/Chemistry/Mathematics/Biology sub-picker) cards, matching the student dashboard's exam cards, instead of a flat tile grid.
+  - New **Test mode** toggle: Full Mock Test vs Topic Wise. Topic Wise reveals a picker (subject tabs, Class 11/12 grouping, per-topic checkboxes, Select All) sourced from `fetchTopicsForSubjects()` in the shared engine — same UX as `Dashboard.vue`'s topic-wise modal.
+  - `handleCreateSession()` now calls `compileExamQuestions(supabase, examConfig, topicFilterMap)` from the shared engine instead of its own single-query-per-subject assembly loop. This is a real behavior improvement, not just a port: the old admin assembly had **no fallback at all** — a thin question pool silently produced a shorter paper with no warning. The shared engine adds the same two-tier fallback the student flow relies on (own category+topic first, then cross-category borrow if short) and returns `shortfalls: string[]` — if any subject still can't be filled after borrowing, `handleCreateSession()` throws and blocks session creation with a clear per-subject error instead of shipping a thinner paper silently.
+
+**Files touched:** `src/utils/topicExamEngine.js` (new), `src/components/admin/ScheduleExam.vue`, `src/stores/examStore.js`.
+
+---
+
 # ✅ PHASE 6: The "Impeccable" UI/UX Overhaul (Complete)
 
 The admin panel currently functions perfectly, but visually relies on the "Tailwind Default" aesthetic (white cards on gray backgrounds, standard dropdowns, repetitive spacing). Phase 6 will elevate this from a basic internal tool to a **premium, production-grade SaaS product**.
@@ -115,11 +131,12 @@ Everything the admin panel touches: every table, every RPC, every page, and how 
   - **any status** → Duplicate (prefills `ScheduleExam.vue` via `sessionStorage['prefillExamSession']`)
 
 ### 3. Schedule New Exam (`ScheduleExam.vue`)
-1. Admin picks an **Exam Type** (JEE Main / NEET UG / KCET ×4) from `EXAM_CONFIGS` (`src/data/examConfigs.js`) — this drives subjects, per-subject MCQ/numeric counts, difficulty filter, and `categoryId` (which underlying question pool(s) to draw from). This replaced the original hardcoded-JEE-only assembly (BUG-09).
-2. `handleCreateSession()` resolves subject_ids via synonym lookup against `subjects`, pulls candidate `questions` rows per subject (respecting `categoryId` and `difficultyFilter`), Fisher-Yates shuffles (BUG-10 fix), and slices to the exam type's target counts.
-3. Assembled question ID list → `create_live_exam_session_custom` RPC (admin_id, name, start time, duration, num_students, instructions, question_ids) → creates the `live_exam_sessions` row + generates `temp_students` credentials + increments the admin's quota counters (inferred, not directly observed).
-4. Best-effort follow-up calls: `set_live_session_exam_type` (persists the chosen exam type) and, if provided, `set_live_session_batch_label`. Both wrapped in try/catch so exam creation still succeeds even if either RPC/migration is missing.
-5. Redirects to `SessionCredentials.vue`, passing the just-created credentials via `sessionStorage['newSessionCredentials']` (cleared immediately on read — NEW-05 fix — so stale creds never leak into a later session).
+1. Admin picks an **Exam Type** via colorful JEE/NEET/KCET cards (KCET has an inline subject sub-picker) driven by `EXAM_CONFIGS` (`src/data/examConfigs.js`) — this drives subjects, per-subject MCQ/numeric counts, difficulty filter, and `categoryId` (which underlying question pool(s) to draw from). This replaced the original hardcoded-JEE-only assembly (BUG-09), and Phase 7 replaced the flat tile grid with the student-dashboard-style cards.
+2. Admin picks a **Test mode**: Full Mock Test, or Topic Wise (Phase 7) — which opens a per-subject topic picker (Class 11/12 grouped) sourced from `fetchTopicsForSubjects()` in `src/utils/topicExamEngine.js`.
+3. `handleCreateSession()` builds a `topicFilterMap` (Topic Wise only) and calls `compileExamQuestions(supabase, examConfig, topicFilterMap)` — the shared engine (Phase 7) that resolves subject_ids via synonym lookup, applies the topic/difficulty/category filters, Fisher-Yates shuffles (BUG-10 fix, now in the shared module), and — unlike the pre-Phase-7 version — falls back to cross-category borrowing and reports per-subject `shortfalls` if the pool still can't be filled, blocking creation with a clear error instead of silently shipping a thinner paper.
+4. Assembled question ID list → `create_live_exam_session_custom` RPC (admin_id, name, start time, duration, num_students, instructions, question_ids) → creates the `live_exam_sessions` row + generates `temp_students` credentials + increments the admin's quota counters (inferred, not directly observed).
+5. Best-effort follow-up calls: `set_live_session_exam_type` (persists the chosen exam type) and, if provided, `set_live_session_batch_label`. Both wrapped in try/catch so exam creation still succeeds even if either RPC/migration is missing.
+6. Redirects to `SessionCredentials.vue`, passing the just-created credentials via `sessionStorage['newSessionCredentials']` (cleared immediately on read — NEW-05 fix — so stale creds never leak into a later session).
 
 ### 4. Session Credentials (`SessionCredentials.vue`)
 - Fast path: reads `sessionStorage['newSessionCredentials']` (only present right after creation).
