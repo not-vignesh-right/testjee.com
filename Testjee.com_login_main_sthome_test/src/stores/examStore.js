@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from './authStore'
 import { useExamSessionStore } from './examSessionStore'
 import { EXAM_CONFIGS, getExamConfig } from '../data/examConfigs'
-import { shuffleArray, selectUniformlyFromTopics as selectUniformlyFromTopicsShared } from '../utils/topicExamEngine'
+import { shuffleArray, selectUniformlyFromTopics as selectUniformlyFromTopicsShared, fetchRandomQuestionBatch } from '../utils/topicExamEngine'
 
 export const useExamStore = defineStore('exam', () => {
   // State
@@ -413,15 +413,6 @@ export const useExamStore = defineStore('exam', () => {
         return found.map(s => s.subject_id)
       }
 
-      // Helper to apply category filter. categoryId can be a number or array of numbers.
-      const applyCategoryFilter = (query, categoryIdConfig) => {
-        if (!categoryIdConfig) return query
-        if (Array.isArray(categoryIdConfig)) {
-          return query.in('category_id', categoryIdConfig)
-        }
-        return query.eq('category_id', categoryIdConfig)
-      }
-
       const mcqTarget = cfg.questionsPerSubject.mcq
       const numTarget = cfg.questionsPerSubject.numeric
       const difficultyFilter = cfg.difficultyFilter // null or array like ['easy', 'medium']
@@ -457,72 +448,48 @@ export const useExamStore = defineStore('exam', () => {
 
           if (subMcqTarget <= 0 && subNumTarget <= 0) continue
 
-          // --- Helper: build a base MCQ query for this specific subjectId ---
-          const buildMcqQueryForId = (excludeIds, useCategory = true) => {
-            let q = supabase
-              .from('questions')
-              .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name), choices(multi_choice, choice1, choice2, choice3, choice4, correct_answer)')
-              .eq('subject_id', subId)
-              .eq('question_type', 'multiple_choice')
-
-            if (useCategory) {
-              q = applyCategoryFilter(q, cfg.categoryId)
-            }
-
-            if (difficultyFilter && difficultyFilter.length > 0) {
-              q = q.in('difficulty', difficultyFilter)
-            }
-
-            if (subjectTopicIds && subjectTopicIds.length > 0) {
-              q = q.in('topic_id', subjectTopicIds)
-            }
-
-            if (excludeIds && excludeIds.length > 0) {
-              q = q.not('question_id', 'in', `(${excludeIds.join(',')})`)
-            }
-            return q
-          }
+          // --- Helper: fetch a truly random candidate batch for this specific subjectId ---
+          // Uses get_random_questions RPC (ORDER BY random() server-side) instead of a plain
+          // .limit(n) query — see topicExamEngine.js's fetchRandomQuestionBatch doc comment
+          // for why a plain limit silently starves late-uploaded topics once a subject's
+          // question count exceeds the fetch limit.
+          const fetchMcqBatch = (excludeIds, useCategory = true) => fetchRandomQuestionBatch(supabase, {
+            subjectId: subId, questionType: 'multiple_choice', categoryId: cfg.categoryId, useCategory,
+            topicIds: subjectTopicIds, difficultyFilter, excludeIds
+          })
 
           let subMcqs = []
 
           // MCQ Phase 1: Target category + unattempted/correctly-scoped exclusions
-          const { data: mcqRows, error: mcqError } = await buildMcqQueryForId(excludedQuestionIds).limit(1000)
-          if (!mcqError && mcqRows) {
-            selectUniformlyFromTopics(mcqRows, subMcqs, subMcqTarget)
-          }
+          const mcqRows = await fetchMcqBatch(excludedQuestionIds)
+          selectUniformlyFromTopics(mcqRows, subMcqs, subMcqTarget)
 
           // MCQ Fallback 1: Target category + cross-category exclusion
           if (subMcqs.length < subMcqTarget && allCorrectlyAnsweredIds.length > excludedQuestionIds.length) {
             const currentPickedIds = subMcqs.map(q => q.question_id)
             const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
-            const { data: fillMcqs } = await buildMcqQueryForId(skipIds).limit(1000)
-            if (fillMcqs) {
-              selectUniformlyFromTopics(fillMcqs, subMcqs, subMcqTarget)
-            }
+            const fillMcqs = await fetchMcqBatch(skipIds)
+            selectUniformlyFromTopics(fillMcqs, subMcqs, subMcqTarget)
           }
 
           // MCQ Fallback 2: Borrow from OTHER categories (Interdependence) + cross-category exclusion
           if (subMcqs.length < subMcqTarget) {
             const currentPickedIds = subMcqs.map(q => q.question_id)
             const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
-            const { data: fillMcqs } = await buildMcqQueryForId(skipIds, false).limit(1000)
-            if (fillMcqs) {
-              selectUniformlyFromTopics(fillMcqs, subMcqs, subMcqTarget)
-            }
+            const fillMcqs = await fetchMcqBatch(skipIds, false)
+            selectUniformlyFromTopics(fillMcqs, subMcqs, subMcqTarget)
           }
 
           // MCQ Fallback 3: Target category + allow repeats (pool exhausted)
           if (subMcqs.length < subMcqTarget) {
             const currentPickedIds = subMcqs.map(q => q.question_id)
-            const { data: fillMcqs } = await buildMcqQueryForId(currentPickedIds).limit(1000)
-            if (fillMcqs) {
-              selectUniformlyFromTopics(fillMcqs, subMcqs, subMcqTarget)
-              if (subMcqs.length < subMcqTarget) {
-                for (const row of shuffleArray(fillMcqs)) {
-                  if (subMcqs.length >= subMcqTarget) break
-                  if (!subMcqs.some(q => q.question_id === row.question_id)) {
-                    subMcqs.push(row)
-                  }
+            const fillMcqs = await fetchMcqBatch(currentPickedIds)
+            selectUniformlyFromTopics(fillMcqs, subMcqs, subMcqTarget)
+            if (subMcqs.length < subMcqTarget) {
+              for (const row of shuffleArray(fillMcqs)) {
+                if (subMcqs.length >= subMcqTarget) break
+                if (!subMcqs.some(q => q.question_id === row.question_id)) {
+                  subMcqs.push(row)
                 }
               }
             }
@@ -531,15 +498,13 @@ export const useExamStore = defineStore('exam', () => {
           // MCQ Fallback 4: Borrow from OTHER categories + allow repeats
           if (subMcqs.length < subMcqTarget) {
             const currentPickedIds = subMcqs.map(q => q.question_id)
-            const { data: fillMcqs } = await buildMcqQueryForId(currentPickedIds, false).limit(1000)
-            if (fillMcqs) {
-              selectUniformlyFromTopics(fillMcqs, subMcqs, subMcqTarget)
-              if (subMcqs.length < subMcqTarget) {
-                for (const row of shuffleArray(fillMcqs)) {
-                  if (subMcqs.length >= subMcqTarget) break
-                  if (!subMcqs.some(q => q.question_id === row.question_id)) {
-                    subMcqs.push(row)
-                  }
+            const fillMcqs = await fetchMcqBatch(currentPickedIds, false)
+            selectUniformlyFromTopics(fillMcqs, subMcqs, subMcqTarget)
+            if (subMcqs.length < subMcqTarget) {
+              for (const row of shuffleArray(fillMcqs)) {
+                if (subMcqs.length >= subMcqTarget) break
+                if (!subMcqs.some(q => q.question_id === row.question_id)) {
+                  subMcqs.push(row)
                 }
               }
             }
@@ -549,67 +514,43 @@ export const useExamStore = defineStore('exam', () => {
 
           // --- Fetch Numericals (only if config has numeric) ---
           if (cfg.hasNumeric && subNumTarget > 0) {
-            const buildNumQueryForId = (excludeIds, useCategory = true) => {
-              let q = supabase
-                .from('questions')
-                .select('question_id, subject_id, topic_id, question_type, question_content, image_url, external_reference, topics(topic_name)')
-                .eq('subject_id', subId)
-                .eq('question_type', 'numeric')
-
-              if (useCategory) {
-                q = applyCategoryFilter(q, cfg.categoryId)
-              }
-
-              if (subjectTopicIds && subjectTopicIds.length > 0) {
-                q = q.in('topic_id', subjectTopicIds)
-              }
-
-              if (excludeIds && excludeIds.length > 0) {
-                q = q.not('question_id', 'in', `(${excludeIds.join(',')})`)
-              }
-              return q
-            }
+            const fetchNumBatch = (excludeIds, useCategory = true) => fetchRandomQuestionBatch(supabase, {
+              subjectId: subId, questionType: 'numeric', categoryId: cfg.categoryId, useCategory,
+              topicIds: subjectTopicIds, excludeIds
+            })
 
             let subNums = []
 
             // Num Phase 1: Target category + exclusions
-            const { data: numRows, error: numError } = await buildNumQueryForId(excludedQuestionIds).limit(1000)
-            if (!numError && numRows) {
-              selectUniformlyFromTopics(numRows, subNums, subNumTarget)
-            }
+            const numRows = await fetchNumBatch(excludedQuestionIds)
+            selectUniformlyFromTopics(numRows, subNums, subNumTarget)
 
             // Num Fallback 1: Target category + cross-category exclusion
             if (subNums.length < subNumTarget && allCorrectlyAnsweredIds.length > excludedQuestionIds.length) {
               const currentPickedIds = subNums.map(q => q.question_id)
               const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
-              const { data: fillNums } = await buildNumQueryForId(skipIds).limit(1000)
-              if (fillNums) {
-                selectUniformlyFromTopics(fillNums, subNums, subNumTarget)
-              }
+              const fillNums = await fetchNumBatch(skipIds)
+              selectUniformlyFromTopics(fillNums, subNums, subNumTarget)
             }
 
             // Num Fallback 2: Borrow from OTHER categories + cross-category exclusion
             if (subNums.length < subNumTarget) {
               const currentPickedIds = subNums.map(q => q.question_id)
               const skipIds = [...new Set([...allCorrectlyAnsweredIds, ...currentPickedIds])]
-              const { data: fillNums } = await buildNumQueryForId(skipIds, false).limit(1000)
-              if (fillNums) {
-                selectUniformlyFromTopics(fillNums, subNums, subNumTarget)
-              }
+              const fillNums = await fetchNumBatch(skipIds, false)
+              selectUniformlyFromTopics(fillNums, subNums, subNumTarget)
             }
 
             // Num Fallback 3: Target category + allow repeats
             if (subNums.length < subNumTarget) {
               const currentPickedIds = subNums.map(q => q.question_id)
-              const { data: fillNums } = await buildNumQueryForId(currentPickedIds).limit(1000)
-              if (fillNums) {
-                selectUniformlyFromTopics(fillNums, subNums, subNumTarget)
-                if (subNums.length < subNumTarget) {
-                  for (const row of shuffleArray(fillNums)) {
-                    if (subNums.length >= subNumTarget) break
-                    if (!subNums.some(q => q.question_id === row.question_id)) {
-                      subNums.push(row)
-                    }
+              const fillNums = await fetchNumBatch(currentPickedIds)
+              selectUniformlyFromTopics(fillNums, subNums, subNumTarget)
+              if (subNums.length < subNumTarget) {
+                for (const row of shuffleArray(fillNums)) {
+                  if (subNums.length >= subNumTarget) break
+                  if (!subNums.some(q => q.question_id === row.question_id)) {
+                    subNums.push(row)
                   }
                 }
               }
@@ -618,15 +559,13 @@ export const useExamStore = defineStore('exam', () => {
             // Num Fallback 4: Borrow from OTHER categories + allow repeats
             if (subNums.length < subNumTarget) {
               const currentPickedIds = subNums.map(q => q.question_id)
-              const { data: fillNums } = await buildNumQueryForId(currentPickedIds, false).limit(1000)
-              if (fillNums) {
-                selectUniformlyFromTopics(fillNums, subNums, subNumTarget)
-                if (subNums.length < subNumTarget) {
-                  for (const row of shuffleArray(fillNums)) {
-                    if (subNums.length >= subNumTarget) break
-                    if (!subNums.some(q => q.question_id === row.question_id)) {
-                      subNums.push(row)
-                    }
+              const fillNums = await fetchNumBatch(currentPickedIds, false)
+              selectUniformlyFromTopics(fillNums, subNums, subNumTarget)
+              if (subNums.length < subNumTarget) {
+                for (const row of shuffleArray(fillNums)) {
+                  if (subNums.length >= subNumTarget) break
+                  if (!subNums.some(q => q.question_id === row.question_id)) {
+                    subNums.push(row)
                   }
                 }
               }

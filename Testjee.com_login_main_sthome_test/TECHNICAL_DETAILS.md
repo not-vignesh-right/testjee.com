@@ -30,19 +30,25 @@ Ensure that a student does not see the same question twice in sequential Mock Ex
 ## 2. Advanced Randomization sampling
 
 ### Pool-Based Sampling
-To prevent "cluster repetition" (where a student sees the same set of questions in the same order), we implemented **Oversampled Sampling**:
-1.  **Fetch Pool**: Instead of fetching exactly 20 questions, the query fetches a limit of **60** unique questions per subject.
-2.  **In-Memory Shuffle**: We use a `shuffleArray` helper implementing the **Fisher-Yates Shuffle Algorithm**:
+To prevent "cluster repetition" (where a student sees the same set of questions in the same order), we implement **Oversampled Sampling**:
+1.  **Fetch Pool**: Instead of fetching exactly 20 questions, the candidate query fetches a much larger pool per subject (see the "True Random Candidate Fetch" note below — this pool is now fetched via a randomized RPC, not a plain `.limit(n)`).
+2.  **In-Memory Shuffle**: We use a `shuffleArray` helper implementing the **Fisher-Yates Shuffle Algorithm** (now in `src/utils/topicExamEngine.js`, shared with the admin scheduler — see Section 5):
     ```javascript
-    const shuffleArray = (array) => {
-      for (let i = array.length - 1; i > 0; i--) {
+    export function shuffleArray(arr) {
+      const a = [...arr]
+      for (let i = a.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]]
+        [a[i], a[j]] = [a[j], a[i]]
       }
-      return array
+      return a
     }
     ```
-3.  **Slice**: The first 20 items from the shuffled 60-item pool are selected. This results in $3 \times 10^{24}$ possible variations for a 60-item set, making duplicate exams statistically impossible.
+3.  **Round-robin-by-topic selection** (`selectUniformlyFromTopics`): rather than a flat slice of the shuffled pool, candidates are grouped by `topic_id` first, each group shuffled internally, then picked round-robin one-per-topic-per-pass until the target count is reached — this is what actually guarantees topic *variety*, not just randomness. A flat shuffle-and-slice alone would still let a topic with disproportionately more rows in the pool dominate the selection.
+
+### ⚠️ True Random Candidate Fetch (July 2026 fix)
+The pool-based sampling above only works if the **candidate pool itself** is a representative, unbiased sample of the question bank. It wasn't: every candidate query used a plain `.limit(n)` with **no `ORDER BY`**. Postgres/PostgREST return unordered queries in roughly insertion order, not randomly — at question-bank sizes above the fetch limit (this platform runs 10,000+ questions, 3,000+ per subject), a plain `.limit(1000)` could be systematically dominated by whichever topics were uploaded first, silently starving later-uploaded topics of any representation in the candidate pool at all — no amount of round-robin logic downstream can select from a topic that was never fetched.
+
+**Fix**: `get_random_questions` (see `random-question-selection-rpc.sql`), a `SECURITY DEFINER` RPC that does the randomization at the database level (`ORDER BY random() LIMIT n`), called via `fetchRandomQuestionBatch()` in `src/utils/topicExamEngine.js`. Both `examStore.js` (student practice, all 8 fallback-tier fetches) and the admin scheduler's `compileSubjectQuestions` now fetch candidates this way instead of a raw `.from('questions').select(...).limit(n)`.
 
 ## 3. Session & State Management
 
@@ -71,6 +77,10 @@ one module. Exports:
 - **`shuffleArray`** / **`selectUniformlyFromTopics`** — the Fisher-Yates +
   round-robin-across-topics + image-dedup algorithm described in Section 2,
   extracted verbatim so both call sites stay byte-identical instead of drifting.
+- **`fetchRandomQuestionBatch(supabase, opts)`** — calls the `get_random_questions`
+  RPC (Section 2's "True Random Candidate Fetch") instead of a plain `.limit(n)`
+  query, and reshapes the flat RPC row into the nested `{ topics: { topic_name },
+  choices: { choice1..4 } }` shape the rest of the pipeline expects.
 - **`fetchSubjectIdLookup(supabase, subjectNameSynonyms)`** — resolves every
   synonym name in one query, returns a `lookupIdsFor(canonicalName)` helper.
 - **`fetchTopicsForSubjects(supabase, examConfig)`** — returns

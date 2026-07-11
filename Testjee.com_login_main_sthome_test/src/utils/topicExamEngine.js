@@ -92,6 +92,50 @@ export function applyCategoryFilter(query, categoryId) {
 }
 
 /**
+ * Fetches a truly random batch of candidate questions via the `get_random_questions` RPC
+ * (see random-question-selection-rpc.sql), instead of a plain `.limit(n)` query.
+ *
+ * Why this matters: without an explicit ORDER BY, Postgres/PostgREST return unordered
+ * queries in roughly insertion order, not randomly. At question-bank sizes above the fetch
+ * limit, a plain `.limit(n)` candidate pool can be systematically dominated by whichever
+ * topics were uploaded first, silently starving later-uploaded topics of any representation
+ * in the round-robin selection below — regardless of how "uniform across topics" that
+ * selection logic is, it can only work with whatever candidates actually got fetched.
+ * `ORDER BY random()` at the database level fixes this at the source.
+ *
+ * Rows are reshaped to match the nested `{ topics: { topic_name }, choices: { choice1..4 } }`
+ * shape the old direct `.select('...topics(topic_name), choices(...)')` queries produced, so
+ * `selectUniformlyFromTopics` and any downstream question-object transform need no changes.
+ */
+export async function fetchRandomQuestionBatch(supabase, { subjectId, questionType, categoryId, useCategory = true, topicIds, difficultyFilter, excludeIds, limit = 500 }) {
+  const { data, error } = await supabase.rpc('get_random_questions', {
+    p_subject_id: subjectId,
+    p_question_type: questionType,
+    p_category_ids: useCategory ? (Array.isArray(categoryId) ? categoryId : [categoryId]) : null,
+    p_topic_ids: topicIds?.length ? topicIds : null,
+    p_difficulty: difficultyFilter?.length ? difficultyFilter : null,
+    p_exclude_ids: excludeIds?.length ? excludeIds : null,
+    p_limit: limit
+  })
+
+  if (error) {
+    console.error('get_random_questions RPC error:', error)
+    return []
+  }
+
+  return (data || []).map(row => ({
+    question_id: row.question_id,
+    topic_id: row.topic_id,
+    image_url: row.image_url,
+    question_type: row.question_type,
+    question_content: row.question_content,
+    external_reference: row.external_reference,
+    topics: { topic_name: row.topic_name },
+    choices: { choice1: row.choice1, choice2: row.choice2, choice3: row.choice3, choice4: row.choice4 }
+  }))
+}
+
+/**
  * Resolves every canonical subject name in `subjectNameSynonyms` to its DB subject_id(s)
  * in one query, and returns a `lookupIdsFor(canonicalName)` helper.
  */
@@ -162,16 +206,11 @@ export async function compileSubjectQuestions(supabase, { categoryId, subjectId,
   const pickedIds = new Set()
 
   async function runTier(useCategory) {
-    let q = supabase
-      .from('questions')
-      .select('question_id, topic_id, image_url')
-      .eq('subject_id', subjectId)
-      .eq('question_type', questionType)
-    if (useCategory) q = applyCategoryFilter(q, categoryId)
-    if (difficultyFilter?.length) q = q.in('difficulty', difficultyFilter)
-    if (topicIds?.length) q = q.in('topic_id', topicIds)
-    const { data } = await q.limit(1000)
-    return (data || []).filter(row => !pickedIds.has(row.question_id))
+    const data = await fetchRandomQuestionBatch(supabase, {
+      subjectId, questionType, categoryId, useCategory, topicIds, difficultyFilter,
+      excludeIds: [...pickedIds]
+    })
+    return data.filter(row => !pickedIds.has(row.question_id))
   }
 
   let candidates = await runTier(true)
