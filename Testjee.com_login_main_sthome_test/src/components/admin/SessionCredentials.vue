@@ -315,13 +315,16 @@ const fetchFromDatabase = async () => {
       return
     }
 
-    // BUG-06 fix: student credentials live in temp_students (keyed by admin_test_id),
-    // not the non-existent `live_exam_students` table.
-    const { data: studentsData, error: studentsError } = await supabase
-      .from('temp_students')
-      .select('username, student_name, roll_number')
-      .eq('admin_test_id', sessionData.admin_test_id)
-      .order('created_date', { ascending: true })
+    // Student credentials live in temp_students (keyed by admin_test_id) — fetched via a
+    // token-verified RPC (get_session_credentials) instead of a direct client-side
+    // `.from('temp_students')` read. That table has no RLS policies in this project by
+    // design (see harden-admin-rpc-security.sql), so a raw client SELECT silently returns
+    // zero rows with no error the moment RLS is enabled for any reason — which is exactly
+    // the "0 Student Slots after refresh" bug this replaces.
+    const { data: studentsData, error: studentsError } = await supabase.rpc('get_session_credentials', {
+      p_token: adminStore.getToken(),
+      input_live_session_id: sessionId
+    })
 
     if (studentsError) {
       errorMsg.value = 'Failed to load student credentials from the database.'
