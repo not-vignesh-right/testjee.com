@@ -1,9 +1,9 @@
 <template>
-  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
     <!-- Loading -->
     <div v-if="loading" class="flex justify-center items-center h-64">
-      <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin h-7 w-7 text-gta-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
       </svg>
@@ -11,167 +11,178 @@
 
     <!-- Error -->
     <div v-else-if="errorMsg" class="flex flex-col items-center justify-center py-20 text-center">
-      <div class="bg-red-50 p-4 rounded-xl border border-red-200 text-red-700 max-w-md">
-        <svg class="w-8 h-8 mx-auto mb-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-        <p class="font-semibold">{{ errorMsg }}</p>
-        <button @click="router.push('/admin/sessions')" class="mt-4 text-sm text-blue-600 hover:underline font-medium">
-          ← Back to Sessions
-        </button>
-      </div>
+      <svg class="w-8 h-8 mb-3 text-gta-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <p class="font-semibold text-ink-900">{{ errorMsg }}</p>
+      <button @click="router.push('/admin/sessions')" class="mt-4 text-sm text-gta-secondary hover:underline font-medium">
+        ← Back to Sessions
+      </button>
     </div>
 
     <!-- Credentials content -->
     <template v-else-if="meta.sessionCode">
-      
-      <!-- Page header -->
-      <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 class="text-2xl font-bold text-gray-900">Session Credentials</h1>
-          <p class="text-sm text-gray-500 mt-0.5">Distribute these User IDs to students before the exam.</p>
-        </div>
-        <div class="flex flex-wrap gap-2 w-full sm:w-auto">
-          <button
-            @click="copyLink"
-            class="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors flex-1 sm:flex-none justify-center"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-            {{ copySuccess ? 'Copied!' : 'Copy Link' }}
-          </button>
-          <button
-            @click="shareWhatsApp"
-            class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors flex-1 sm:flex-none justify-center"
-          >
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 004.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm5.83 14.11c-.24.68-1.4 1.3-1.93 1.36-.52.06-1 .27-3.36-.7-2.85-1.18-4.68-4.05-4.82-4.24-.14-.19-1.15-1.53-1.15-2.92 0-1.39.73-2.07.99-2.35.26-.28.57-.35.76-.35h.55c.18 0 .42-.07.65.5.24.57.81 1.98.88 2.13.07.14.11.31.02.5-.09.19-.14.31-.28.47-.14.16-.29.36-.42.48-.14.14-.28.29-.12.57.16.28.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.22 1.37.28.14.44.12.6-.07.16-.19.68-.79.87-1.06.18-.28.36-.23.6-.14.24.09 1.55.73 1.81.86.26.14.44.2.5.31.06.12.06.65-.18 1.33z"/></svg>
-            Share on WhatsApp
-          </button>
-          <button
-            @click="printCredentials"
-            class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors flex-1 sm:flex-none justify-center"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-            Print / Save PDF
-          </button>
-        </div>
-      </div>
 
-      <!-- Admin Controls: kept visually distinct from the Copy/WhatsApp/Print row above,
-           since those are distribution actions and these are session lifecycle actions.
-           Only shown while the session hasn't started yet. -->
-      <div v-if="meta.status === 'scheduled'" class="mb-6 bg-gray-50 border border-gray-200 rounded-xl px-5 py-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <!-- Page header: title, live status line, distribution actions — one row, no boxing -->
+      <div class="mb-8">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
           <div>
-            <p class="text-sm font-bold text-gray-700">Admin Controls</p>
-            <p class="text-xs text-gray-500 mt-0.5">
-              Scheduled start: <strong class="text-gray-700">{{ formatDateTime(meta.scheduledStartTime) }}</strong> — manage this session directly from here, no need to go back to the sessions list.
-            </p>
+            <h1 class="text-2xl font-semibold text-ink-900 tracking-tight">{{ meta.sessionName }}</h1>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2 text-sm text-ink-500">
+              <span
+                class="inline-flex items-center gap-1.5 font-semibold text-xs uppercase tracking-wide px-2 py-0.5 rounded-md"
+                :class="statusBadgeClass"
+              >
+                <span v-if="meta.status === 'live'" class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+                {{ meta.status }}
+              </span>
+              <span v-if="meta.scheduledStartTime">Starts <strong class="font-semibold text-ink-700">{{ formatDateTime(meta.scheduledStartTime) }}</strong></span>
+              <span v-if="presentCount !== null" class="inline-flex items-center gap-1.5 text-gta-success font-medium">
+                <span class="w-1.5 h-1.5 rounded-full bg-gta-success animate-pulse"></span>
+                {{ presentCount }} in lobby now
+              </span>
+            </div>
           </div>
-          <div class="flex flex-wrap gap-2">
+
+          <!-- Distribution actions: equal visual weight, none of these is THE primary action -->
+          <div class="flex flex-wrap gap-2 shrink-0">
             <button
-              @click="nudgeStart(5)"
-              :disabled="actionLoading"
-              title="Push the start time back by 5 minutes"
-              class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+              @click="copyLink"
+              class="inline-flex items-center gap-2 bg-surface border border-slate-200 text-ink-700 hover:bg-canvas px-3.5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ease-out-quart"
             >
-              +5 min
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+              {{ copySuccess ? 'Copied!' : 'Copy Link' }}
             </button>
             <button
-              @click="openReschedule"
-              :disabled="actionLoading"
-              class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+              @click="shareWhatsApp"
+              class="inline-flex items-center gap-2 bg-surface border border-slate-200 text-ink-700 hover:bg-canvas px-3.5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ease-out-quart"
             >
-              Reschedule
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 004.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm5.83 14.11c-.24.68-1.4 1.3-1.93 1.36-.52.06-1 .27-3.36-.7-2.85-1.18-4.68-4.05-4.82-4.24-.14-.19-1.15-1.53-1.15-2.92 0-1.39.73-2.07.99-2.35.26-.28.57-.35.76-.35h.55c.18 0 .42-.07.65.5.24.57.81 1.98.88 2.13.07.14.11.31.02.5-.09.19-.14.31-.28.47-.14.16-.29.36-.42.48-.14.14-.28.29-.12.57.16.28.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.22 1.37.28.14.44.12.6-.07.16-.19.68-.79.87-1.06.18-.28.36-.23.6-.14.24.09 1.55.73 1.81.86.26.14.44.2.5.31.06.12.06.65-.18 1.33z"/></svg>
+              WhatsApp
             </button>
             <button
-              @click="cancelSession"
-              :disabled="actionLoading"
-              class="px-4 py-2 bg-white border border-red-300 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+              @click="printCredentials"
+              class="inline-flex items-center gap-2 bg-surface border border-slate-200 text-ink-700 hover:bg-canvas px-3.5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ease-out-quart"
             >
-              Cancel Session
-            </button>
-            <button
-              @click="forceStartExam"
-              :disabled="actionLoading"
-              class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50"
-            >
-              Force Start Exam
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+              Print
             </button>
           </div>
         </div>
 
-        <!-- Reschedule inline form -->
-        <div v-if="showReschedule" class="mt-4 pt-4 border-t border-gray-200 flex flex-col sm:flex-row sm:items-end gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1">New start date &amp; time</label>
-            <input
-              v-model="rescheduleForm.startTime"
-              type="datetime-local"
-              class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
-            />
+        <!-- Session controls: a quiet rule + inline row, not a boxed panel — Force Start Exam
+             is the one confident primary action here; everything else is secondary/ghost. -->
+        <div v-if="meta.status === 'scheduled'" class="mt-6 pt-5 border-t border-slate-200">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p class="text-xs font-semibold text-ink-500 uppercase tracking-wide">Session controls</p>
+            <div class="flex flex-wrap gap-2">
+              <button
+                @click="nudgeStart(5)"
+                :disabled="actionLoading"
+                title="Push the start time back by 5 minutes"
+                class="px-3.5 py-2 bg-surface border border-slate-200 text-ink-700 text-sm font-medium rounded-lg hover:bg-canvas transition-colors duration-200 ease-out-quart disabled:opacity-50"
+              >
+                +5 min
+              </button>
+              <button
+                @click="openReschedule"
+                :disabled="actionLoading"
+                class="px-3.5 py-2 bg-surface border border-slate-200 text-ink-700 text-sm font-medium rounded-lg hover:bg-canvas transition-colors duration-200 ease-out-quart disabled:opacity-50"
+                :class="{ 'bg-canvas': showReschedule }"
+              >
+                Reschedule
+              </button>
+              <button
+                @click="cancelSession"
+                :disabled="actionLoading"
+                class="px-3.5 py-2 bg-surface border border-red-200 text-gta-danger text-sm font-medium rounded-lg hover:bg-red-50 transition-colors duration-200 ease-out-quart disabled:opacity-50"
+              >
+                Cancel Session
+              </button>
+              <button
+                @click="forceStartExam"
+                :disabled="actionLoading"
+                class="px-4 py-2 bg-gta-primary text-white text-sm font-semibold rounded-lg hover:bg-gta-secondary shadow-sm transition-colors duration-200 ease-out-quart disabled:opacity-50"
+              >
+                Force Start Exam
+              </button>
+            </div>
           </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1">Duration (minutes)</label>
-            <input
-              v-model.number="rescheduleForm.durationMinutes"
-              type="number"
-              min="30" max="300"
-              class="w-28 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
-            />
-          </div>
-          <button
-            @click="submitReschedule"
-            :disabled="actionLoading || !rescheduleForm.startTime"
-            class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50"
-          >
-            Confirm Reschedule
-          </button>
-        </div>
-      </div>
-      <div v-if="actionError" class="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm font-medium">
-        {{ actionError }}
-      </div>
-      <div v-if="actionSuccess" class="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm font-medium">
-        {{ actionSuccess }}
-      </div>
 
-      <!-- Printable Area Start -->
-      <div id="credentials-printable-area" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden divide-y divide-gray-200">
-
-        <!-- Top Overview Box -->
-        <div class="p-8 bg-[#F4F7FB] border-b-2 border-blue-500 print:bg-white print:border-black print:pb-4">
-          <h2 class="text-2xl font-bold text-gray-900 mb-6 uppercase tracking-wide print:text-black">LIVE EXAM CREDENTIALS</h2>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Reschedule inline reveal -->
+          <div v-if="showReschedule" class="mt-4 p-4 bg-canvas rounded-xl flex flex-col sm:flex-row sm:items-end gap-3">
             <div>
-               <span class="block text-sm font-bold text-gray-500 mb-1 uppercase tracking-wider">Session Name</span>
-               <strong class="text-lg text-gray-900">{{ meta.sessionName }}</strong>
+              <label class="block text-xs font-semibold text-ink-500 mb-1">New start date &amp; time</label>
+              <input
+                v-model="rescheduleForm.startTime"
+                type="datetime-local"
+                class="px-3 py-2 bg-surface border border-slate-200 rounded-lg text-sm text-ink-900 focus:ring-2 focus:ring-blue-100 focus:border-gta-primary outline-none transition-colors duration-200"
+              />
             </div>
             <div>
-               <span class="block text-sm font-bold text-gray-500 mb-1 uppercase tracking-wider">Session Code <span class="text-xs font-normal lowercase">(For students)</span></span>
+              <label class="block text-xs font-semibold text-ink-500 mb-1">Duration (minutes)</label>
+              <input
+                v-model.number="rescheduleForm.durationMinutes"
+                type="number"
+                min="30" max="300"
+                class="w-28 px-3 py-2 bg-surface border border-slate-200 rounded-lg text-sm text-ink-900 focus:ring-2 focus:ring-blue-100 focus:border-gta-primary outline-none transition-colors duration-200"
+              />
+            </div>
+            <button
+              @click="submitReschedule"
+              :disabled="actionLoading || !rescheduleForm.startTime"
+              class="px-4 py-2 bg-gta-primary text-white text-sm font-semibold rounded-lg hover:bg-gta-secondary shadow-sm transition-colors duration-200 ease-out-quart disabled:opacity-50"
+            >
+              Confirm Reschedule
+            </button>
+          </div>
+        </div>
+
+        <!-- Inline feedback -->
+        <div v-if="actionError" class="mt-4 px-4 py-2.5 bg-red-50 rounded-lg text-gta-danger text-sm font-medium">
+          {{ actionError }}
+        </div>
+        <div v-if="actionSuccess" class="mt-4 px-4 py-2.5 bg-emerald-50 rounded-lg text-gta-success text-sm font-medium">
+          {{ actionSuccess }}
+        </div>
+      </div>
+
+      <!-- Printable Area Start: the one place a genuinely elevated "surface" earns its keep —
+           this is the actual handout, on-screen and on paper. -->
+      <div id="credentials-printable-area" class="bg-surface rounded-2xl border border-slate-200 overflow-hidden">
+
+        <!-- Session identity: name, code, instructions -->
+        <div class="p-8 border-b border-slate-200 print:pb-4">
+          <h2 class="text-sm font-semibold text-ink-500 uppercase tracking-wide mb-6 print:text-black">Live Exam Credentials</h2>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+               <span class="block text-xs font-semibold text-ink-500 mb-1 uppercase tracking-wide">Session Name</span>
+               <strong class="text-lg text-ink-900 font-semibold">{{ meta.sessionName }}</strong>
+            </div>
+            <div>
+               <span class="block text-xs font-semibold text-ink-500 mb-1 uppercase tracking-wide">Session Code <span class="font-normal normal-case text-ink-400">(for students)</span></span>
                <div class="flex items-center gap-2 mt-1">
-                 <strong class="text-2xl font-mono text-blue-600 tracking-widest bg-white px-3 py-1 rounded inline-block border border-blue-100 shadow-sm">{{ meta.sessionCode }}</strong>
+                 <strong class="text-xl font-mono font-semibold text-gta-secondary tracking-widest bg-canvas px-3 py-1 rounded-lg inline-block">{{ meta.sessionCode }}</strong>
                  <button
                    type="button"
                    @click="copyLink"
-                   class="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 bg-canvas hover:bg-slate-100 text-ink-700 rounded-lg text-xs font-semibold transition-colors duration-200 ease-out-quart cursor-pointer"
                    title="Copy exam link for students"
                  >
                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                   <span>{{ copySuccess ? 'Copied Link!' : 'Copy Link' }}</span>
+                   <span>{{ copySuccess ? 'Copied!' : 'Copy Link' }}</span>
                  </button>
                </div>
             </div>
             <div class="md:col-span-2 mt-2">
-              <span class="block text-sm font-bold text-gray-500 mb-2 uppercase tracking-wider">Instructions For Students</span>
-              <div class="bg-white p-4 rounded-lg border border-gray-200 text-gray-700 text-sm">
-                <ol class="list-decimal pl-5 space-y-1">
-                  <li>Visit <strong class="text-blue-600">login.testjee.com/live-exam/{{ meta.sessionCode }}</strong></li>
-                  <li>Enter the session code and your unique User ID assigned below.</li>
-                  <li>Write your real Full Name and Roll Code accurately if prompted.</li>
-                  <li>Wait in the lobby for the instructor to begin the exam dynamically.</li>
-                </ol>
-              </div>
+              <span class="block text-xs font-semibold text-ink-500 mb-2 uppercase tracking-wide">Instructions For Students</span>
+              <ol class="list-decimal pl-5 space-y-1 text-ink-700 text-sm">
+                <li>Visit <strong class="text-gta-secondary">login.testjee.com/live-exam/{{ meta.sessionCode }}</strong></li>
+                <li>Enter the session code and your unique User ID assigned below.</li>
+                <li>Write your real Full Name and Roll Code accurately if prompted.</li>
+                <li>Wait in the lobby for the instructor to begin the exam dynamically.</li>
+              </ol>
             </div>
           </div>
         </div>
@@ -179,26 +190,23 @@
         <!-- Credentials Grid -->
         <div class="p-6">
           <div class="flex items-center justify-between mb-4">
-            <span class="text-sm font-semibold text-gray-700">{{ meta.credentials.length }} Student Slots</span>
-            <span class="text-xs text-gray-400">User IDs are case-sensitive</span>
+            <span class="text-sm font-semibold text-ink-700">{{ meta.credentials.length }} Student Slots</span>
+            <span class="text-xs text-ink-400">User IDs are case-sensitive</span>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            
-            <!-- Loop generation of cards -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <div
               v-for="(cred, index) in meta.credentials"
               :key="index"
-              class="flex items-center gap-4 p-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 hover:bg-white hover:border-blue-400 hover:shadow-sm transition-all print:border-solid print:border-gray-400"
+              class="flex items-center gap-3 p-3 rounded-xl bg-canvas hover:bg-slate-100 transition-colors duration-200 ease-out-quart print:border print:border-slate-300 print:bg-white"
             >
-              <div class="bg-blue-100 text-blue-800 font-bold w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-sm">
+              <div class="bg-white text-ink-700 font-semibold w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-sm border border-slate-200">
                 {{ index + 1 }}
               </div>
               <div class="overflow-hidden min-w-0">
-                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-0.5">User ID</div>
-                 <div class="font-mono font-bold text-gray-900 text-base truncate">{{ cred.username }}</div>
+                 <div class="text-[11px] text-ink-400 uppercase tracking-wide mb-0.5">User ID</div>
+                 <div class="font-mono font-semibold text-ink-900 text-sm truncate">{{ cred.username }}</div>
               </div>
             </div>
-            
           </div>
         </div>
 
@@ -211,10 +219,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../../lib/supabase'
 import { useAdminStore } from '../../stores/adminStore'
+import { watchLobbyPresence } from '../../utils/lobbyPresence'
 
 const router = useRouter()
 const route = useRoute()
@@ -238,6 +247,13 @@ const rescheduleForm = ref({ startTime: '', durationMinutes: null })
 
 const sessionId = parseInt(route.params.id)
 
+const statusBadgeClass = computed(() => ({
+  'bg-amber-100 text-amber-700': meta.value.status === 'scheduled',
+  'bg-red-100 text-gta-danger': meta.value.status === 'live',
+  'bg-emerald-100 text-gta-success': meta.value.status === 'completed',
+  'bg-slate-100 text-ink-500': meta.value.status === 'cancelled'
+}))
+
 // Converts an ISO/timestamptz string to the local "YYYY-MM-DDTHH:mm" format <input
 // type="datetime-local"> expects, so the field prefills with the current scheduled time.
 function toDatetimeLocalValue(isoString) {
@@ -246,6 +262,22 @@ function toDatetimeLocalValue(isoString) {
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
+
+// Live "students actually in the lobby right now" — see lobbyPresence.js. null until we know
+// the session code; the header line only renders once this becomes a number.
+const presentCount = ref(null)
+let presenceChannel = null
+function startPresenceWatch() {
+  if (!meta.value.sessionCode || presenceChannel) return
+  if (meta.value.status !== 'scheduled' && meta.value.status !== 'live') return
+  presenceChannel = watchLobbyPresence(meta.value.sessionCode, (count) => {
+    presentCount.value = count
+  })
+}
+
+onUnmounted(() => {
+  if (presenceChannel) supabase.removeChannel(presenceChannel)
+})
 
 onMounted(async () => {
   // 1. Try sessionStorage first (fast path — just after creation)
@@ -261,6 +293,7 @@ onMounted(async () => {
         // accidentally pick up these stale credentials from sessionStorage.
         sessionStorage.removeItem('newSessionCredentials')
         await fetchStatus()
+        startPresenceWatch()
         return
       }
     } catch {
@@ -270,6 +303,7 @@ onMounted(async () => {
 
   // 2. Fallback: fetch from Supabase using the session ID
   await fetchFromDatabase()
+  startPresenceWatch()
 })
 
 // Fetched separately (and always, regardless of which path populated `meta`) so the Admin
@@ -513,7 +547,7 @@ const shareWhatsApp = () => {
     box-shadow: none !important;
     border: none !important;
   }
-  .bg-gray-50 {
+  .bg-canvas {
     background-color: transparent !important;
   }
 }

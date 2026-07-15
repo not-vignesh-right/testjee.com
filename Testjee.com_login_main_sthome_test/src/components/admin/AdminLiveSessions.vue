@@ -130,6 +130,12 @@
                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400 block"></span> In Prog: {{ session.students_in_progress }}</span>
                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-300 block"></span> Wait: {{ session.students_not_started }}</span>
                  </div>
+                 <!-- Live presence — distinct from "Wait": how many are ACTUALLY connected to
+                      the lobby right now (Realtime presence), vs just not-yet-started in the DB -->
+                 <div v-if="session.status === 'scheduled' || session.status === 'live'" class="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100 text-xs font-semibold text-emerald-600">
+                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                   {{ lobbyPresenceCounts[session.session_code] ?? 0 }} in lobby right now
+                 </div>
                </div>
 
                <!-- Primary Interaction Buttons -->
@@ -214,6 +220,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../../lib/supabase'
 import { useAdminStore } from '../../stores/adminStore'
+import { watchLobbyPresence } from '../../utils/lobbyPresence'
 
 const router = useRouter()
 const adminStore = useAdminStore()
@@ -223,6 +230,25 @@ const activeTab = ref('all')
 const pollInterval = ref(null)
 const copiedCode = ref(null)
 const nudgingId = ref(null)
+
+// Live "students actually in the lobby right now" per session (Realtime presence — see
+// lobbyPresence.js), distinct from the DB's "not started" count. Plain (non-reactive) Map
+// for channel handles since only the counts themselves need to be reactive.
+const lobbyPresenceCounts = ref({})
+const presenceChannels = new Map()
+
+function ensurePresenceWatch(sessionCode) {
+  if (presenceChannels.has(sessionCode)) return
+  const channel = watchLobbyPresence(sessionCode, (count) => {
+    lobbyPresenceCounts.value = { ...lobbyPresenceCounts.value, [sessionCode]: count }
+  })
+  presenceChannels.set(sessionCode, channel)
+}
+
+function teardownAllPresenceWatches() {
+  for (const channel of presenceChannels.values()) supabase.removeChannel(channel)
+  presenceChannels.clear()
+}
 
 const copySessionLink = async (code) => {
   try {
@@ -252,6 +278,13 @@ const fetchSessions = async () => {
     })
     if (error) throw error
     rawSessions.value = data || []
+
+    // Watch presence for every scheduled/live session (idempotent — skips ones already watched)
+    for (const session of rawSessions.value) {
+      if (session.status === 'scheduled' || session.status === 'live') {
+        ensurePresenceWatch(session.session_code)
+      }
+    }
   } catch (err) {
     console.error('Failed fetching live sessions:', err)
   } finally {
@@ -284,6 +317,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (pollInterval.value) clearInterval(pollInterval.value)
+  teardownAllPresenceWatches()
 })
 
 const startExam = async (sessionId) => {

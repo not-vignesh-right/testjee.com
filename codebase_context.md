@@ -455,3 +455,23 @@ Closes the gap noted in Section 13 — admins can now edit an already-scheduled 
 * **Root cause**: the DB-fallback path (used on refresh, once the one-time `sessionStorage` cache is gone) queried `temp_students` directly from the client (`.from('temp_students').select(...)`). This table was **deliberately never given RLS policies** in this project (see the Security Hardening section's "Deliberately NOT done" note) — meaning its client-side readability has always silently depended on RLS being off for that table. Supabase does not error when RLS blocks a `SELECT`; it just returns zero rows, which is exactly this symptom.
 * **Fix**: [get-session-credentials-rpc.sql](file:///c:/Users/admin/Desktop/testjee/get-session-credentials-rpc.sql) adds `get_session_credentials(p_token, live_session_id)` — a token-verified, ownership-checked `SECURITY DEFINER` RPC (same pattern as `student_exam_login`, `get_admin_pending_appeals`, etc.), which `SessionCredentials.vue`'s `fetchFromDatabase()` now calls instead of the raw table read. This both fixes the bug regardless of the table's actual current RLS state, and closes a latent privacy gap the old code had (no ownership check at all — any admin's browser could query any other admin's `admin_test_id` for its student roster).
 
+---
+
+## 15. Live "Students in Lobby" Presence + Session Credentials Page Redesign (July 2026)
+
+### A. Live lobby presence (distinct from the "not started" DB status)
+* **The gap**: `student_exam_sessions.status = 'not_started'` (the "Wait" bucket on the sessions list) is set for every enrolled student from the moment the admin schedules the session — it only changes when they click "Start Exam." So it can't tell "never opened the link" apart from "sitting in the lobby right now, waiting." There is no presence/connection concept anywhere in the schema.
+* **The fix**: [lobbyPresence.js](file:///c:/Users/admin/Desktop/testjee/Testjee.com_login_main_sthome_test/src/utils/lobbyPresence.js) — a small shared module using Supabase Realtime **Presence** (not `postgres_changes`; no DB writes, no replication dependency, purely socket-based and auto-cleared the instant a tab closes) on the lobby's existing `lobby-{sessionCode}` Realtime channel:
+  - `trackLobbyPresence(channel, identity)` — student side. `ExamWaitingRoom.vue` calls this once its existing channel subscription reports `SUBSCRIBED`.
+  - `watchLobbyPresence(sessionCode, onCountChange)` — admin side. Subscribes to the same channel purely to observe (never calls `.track()` itself, so the admin never counts as a "present student"), returns the channel for cleanup. Used by both `AdminLiveSessions.vue` (one watch per visible scheduled/live session card, a `Map` keyed by session code for cleanup) and `SessionCredentials.vue` (single watch for the one session it's showing).
+* Displayed as a small pulsing "N in lobby now" indicator — sessions list (per card) and the Credentials page header.
+
+### B. Session Credentials page redesign
+* **The problem**: `SessionCredentials.vue` was never included in the Phase 6 "Impeccable" design pass that gave the rest of the admin panel its `canvas`/`surface`/`ink`/`gta-*` token system — it still used raw Tailwind grays/blues, and had accumulated a lot of stacked, differently-styled zones (distribution actions, a bordered gray "Admin Controls" box with an inline reschedule form, error/success banners, then a separately-styled printable card) that read as cluttered next to the rest of the panel.
+* **The fix**: rebuilt using the existing tokens and this project's own product-register principles (calm under load, whitespace/typography over borders, no nested cards, one confident primary action per screen — see `Testjee.com_login_main_sthome_test/PRODUCT.md`):
+  - Header consolidated into one block: session name, status badge, scheduled time, live presence — no more separate boxed status area.
+  - Copy Link / WhatsApp / Print given equal visual weight (all quiet outline buttons) since none of them is *the* primary action; **Force Start Exam** is the only solid/filled button on the page, as the one genuine commit action.
+  - The "Admin Controls" bordered box replaced with a plain top-rule + inline action row; the reschedule form reveals inline in a soft `canvas`-tinted panel instead of a second bordered box.
+  - Credential grid cards lost their dashed-border hover-color-flip gimmick in favor of plain, consistent `canvas`-tinted rows.
+  - Print stylesheet, Copy Link/WhatsApp share, and all reschedule/nudge/cancel/force-start logic preserved exactly — this was a visual pass only, no behavior changes beyond the new presence indicator.
+

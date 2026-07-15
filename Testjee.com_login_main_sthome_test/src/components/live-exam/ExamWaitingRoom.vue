@@ -182,6 +182,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useExamSessionStore } from '../../stores/examSessionStore'
 import { bridgeLiveSessionToExamStore } from '../../stores/liveExamBridge'
 import { supabase } from '../../lib/supabase'
+import { trackLobbyPresence } from '../../utils/lobbyPresence'
 
 const router = useRouter()
 const route = useRoute()
@@ -294,7 +295,13 @@ onMounted(async () => {
       table: 'live_exam_sessions',
       filter: `session_code=eq.${route.params.sessionCode}`
     }, () => checkStatusSafely())
-    .subscribe()
+    .subscribe((status) => {
+      // Announce presence once actually connected — lets the admin see "in lobby right now"
+      // counts, separate from the DB's not_started status. See lobbyPresence.js.
+      if (status === 'SUBSCRIBED') {
+        trackLobbyPresence(realtimeSub, { username: sessionStorage.getItem('student_username') || 'unknown' })
+      }
+    })
 })
 
 onUnmounted(() => {
