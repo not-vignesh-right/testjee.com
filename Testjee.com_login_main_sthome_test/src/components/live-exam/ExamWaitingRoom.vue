@@ -326,6 +326,17 @@ const checkStatusSafely = async () => {
       if (data && data.length > 0) {
         const info = data[0]
         isLive = info.session_status === 'live' || info.can_start
+
+        // Pick up admin reschedules/nudges live: this RPC always returns the CURRENT
+        // scheduled_start_time/duration, so refresh the store every time we check (poll or
+        // Realtime-triggered) rather than only reacting to the isLive flag. Without this, an
+        // admin's reschedule would update the DB row (firing the Realtime subscription below)
+        // but the countdown here would keep counting down to the old, stale time.
+        if (store.sessionDetails) {
+          if (info.scheduled_start_time) store.sessionDetails.scheduledStartTime = info.scheduled_start_time
+          if (info.scheduled_end_time) store.sessionDetails.scheduledEndTime = info.scheduled_end_time
+          if (info.duration_minutes) store.sessionDetails.durationMinutes = info.duration_minutes
+        }
       }
     } else {
       // Fallback: Read directly from table (might be blocked by RLS depending on setup)

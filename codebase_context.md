@@ -437,3 +437,15 @@ Admins (colleges) can now have their own logo + name shown throughout the live-e
 
 **Note**: no "reschedule an already-scheduled live session" feature exists today — `AdminLiveSessions.vue` only offers Cancel (kills it) or Duplicate (prefills a brand-new session form with a different time); there's no in-place edit of an existing scheduled session's date/time.
 
+---
+
+## 14. Reschedule / Nudge a Scheduled Live Session, Live Countdown Sync (July 2026)
+
+Closes the gap noted in Section 13 — admins can now edit an already-scheduled session's start time in place, and the change propagates to students already sitting in the lobby without a page refresh.
+
+* **DB**: [reschedule-live-exam-session-rpc.sql](file:///c:/Users/admin/Desktop/testjee/reschedule-live-exam-session-rpc.sql) adds two token-verified, ownership-checked RPCs, both only usable while `status = 'scheduled'`:
+  - `reschedule_live_exam_session(p_token, live_session_id, new_start_time, duration_minutes?)` — full reschedule to an exact new date/time, optionally also changing duration.
+  - `nudge_live_exam_session_start(p_token, live_session_id, minutes)` — relative shift (the "+5 min" button), computed via a server-side `INTERVAL` add so it's immune to client/server clock skew.
+* **Admin UI**: `SessionCredentials.vue`'s existing Admin Controls bar gained **+5 min** and **Reschedule** (inline datetime + duration form) buttons alongside the existing Cancel/Force Start Exam. `AdminLiveSessions.vue`'s per-session card gained a **+5 min** quick button too (the full reschedule form only lives on the Credentials page, to avoid a duplicated inline form per list row).
+* **Live propagation to the student lobby — the actual interesting part**: both RPCs `UPDATE` the `live_exam_sessions` row, which the lobby's existing Realtime subscription (`ExamWaitingRoom.vue`, channel `lobby-{sessionCode}`, already listening for `UPDATE` on that table) already fires on with zero DB-side changes needed. The fix was client-side: `checkStatusSafely()` previously only read `session_status`/`can_start` off the `student_exam_login` RPC response and ignored everything else, so even though the Realtime event correctly triggered a refetch, the countdown kept counting down to the **stale** cached `scheduledStartTime` in the Pinia store. Now every call to `checkStatusSafely()` (both the Realtime-triggered one and the 5s poll fallback) also refreshes `store.sessionDetails.scheduledStartTime`/`scheduledEndTime`/`durationMinutes` from the RPC's response — so a reschedule or nudge updates the lobby countdown live, no refresh needed.
+

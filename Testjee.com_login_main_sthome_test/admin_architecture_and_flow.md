@@ -5,6 +5,18 @@
 
 ---
 
+# ✅ PHASE 9: Reschedule / Nudge a Scheduled Session + Live Lobby Countdown Sync (Complete)
+
+**Goal:** Let an admin change an already-scheduled session's start time in place (previously impossible — only Cancel or Duplicate-as-new existed, see Phase 8's closing note), and make sure students already waiting in the lobby see the new time live.
+
+**What shipped (`reschedule-live-exam-session-rpc.sql`):**
+- `reschedule_live_exam_session(p_token, live_session_id, new_start_time, duration_minutes?)` and `nudge_live_exam_session_start(p_token, live_session_id, minutes)` — both token-verified (`verify_admin_session`), ownership-checked, and reject anything not currently `status = 'scheduled'`. The nudge RPC does the time math as a server-side `INTERVAL` add specifically to avoid any client/server clock-skew bugs a naive "read time, add 5 min in JS, write it back" approach would have.
+- `SessionCredentials.vue`: **+5 min** and **Reschedule** (inline form: datetime-local + duration) added to the existing Admin Controls bar.
+- `AdminLiveSessions.vue`: **+5 min** quick button added per scheduled session card in the list.
+- **The real fix — live propagation without refresh**: `ExamWaitingRoom.vue`'s Realtime subscription on `live_exam_sessions` already fired correctly on these RPCs' `UPDATE`s, but `checkStatusSafely()` only ever read the `is_live`/`can_start` fields off the response and threw away `scheduled_start_time`/`duration_minutes` — so the countdown kept ticking down to a stale cached value even though the "something changed" signal arrived. Fixed by having `checkStatusSafely()` refresh `store.sessionDetails.scheduledStartTime`/`scheduledEndTime`/`durationMinutes` from the `student_exam_login` RPC response on every call (both the Realtime-triggered one and the 5s poll fallback), not just when `is_live` flips. Students sitting in the lobby now see a reschedule/nudge reflected in their countdown within one Realtime tick (or at most 5s via the poll fallback), no page refresh required.
+
+---
+
 # ✅ PHASE 8: Institution-Specific Branding (Complete)
 
 **Goal:** Show each admin's (college's) own logo + name in the admin dashboard and on the student-facing live-exam login/lobby screens, without building any admin-facing upload UI — logos are set manually by us in Supabase.

@@ -137,12 +137,20 @@
                  
                  <!-- Scheduled State Actions -->
                  <template v-if="session.status === 'scheduled'">
-                   <button 
+                   <button
                      @click="startExam(session.live_session_id)"
                      class="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition-all flex items-center justify-center gap-2"
                    >
                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                      {{ new Date(session.scheduled_start_time).getTime() <= Date.now() ? 'Start Exam' : 'Start Early' }}
+                   </button>
+                   <button
+                     @click="nudgeStart(session)"
+                     :disabled="nudgingId === session.live_session_id"
+                     title="Push the start time back by 5 minutes"
+                     class="px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-all flex items-center justify-center disabled:opacity-50"
+                   >
+                     +5 min
                    </button>
                    <button
                      @click="router.push(`/admin/sessions/${session.live_session_id}/credentials`)"
@@ -214,6 +222,7 @@ const rawSessions = ref([])
 const activeTab = ref('all')
 const pollInterval = ref(null)
 const copiedCode = ref(null)
+const nudgingId = ref(null)
 
 const copySessionLink = async (code) => {
   try {
@@ -296,6 +305,28 @@ const startExam = async (sessionId) => {
     alert(err.message || 'Failed to start exam')
   } finally {
     loading.value = false
+  }
+}
+
+// Quick "+5 min" — see reschedule-live-exam-session-rpc.sql. Full "pick an exact new time"
+// reschedule form lives on the Credentials page (View Setup); this is just the fast path for
+// the common "running a few minutes behind" case, directly from the list.
+const nudgeStart = async (session) => {
+  nudgingId.value = session.live_session_id
+  try {
+    const { data, error } = await supabase.rpc('nudge_live_exam_session_start', {
+      p_token: adminStore.getToken(),
+      input_live_session_id: session.live_session_id,
+      input_minutes: 5
+    })
+    if (error) throw error
+    const row = data?.[0]
+    if (row) session.scheduled_start_time = row.scheduled_start_time
+  } catch (err) {
+    console.error('Failed to nudge session start:', err)
+    alert(err.message || 'Failed to adjust start time')
+  } finally {
+    nudgingId.value = null
   }
 }
 

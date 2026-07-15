@@ -59,30 +59,80 @@
       <!-- Admin Controls: kept visually distinct from the Copy/WhatsApp/Print row above,
            since those are distribution actions and these are session lifecycle actions.
            Only shown while the session hasn't started yet. -->
-      <div v-if="meta.status === 'scheduled'" class="mb-6 bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <p class="text-sm font-bold text-gray-700">Admin Controls</p>
-          <p class="text-xs text-gray-500 mt-0.5">Manage this session directly from here — no need to go back to the sessions list.</p>
+      <div v-if="meta.status === 'scheduled'" class="mb-6 bg-gray-50 border border-gray-200 rounded-xl px-5 py-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p class="text-sm font-bold text-gray-700">Admin Controls</p>
+            <p class="text-xs text-gray-500 mt-0.5">
+              Scheduled start: <strong class="text-gray-700">{{ formatDateTime(meta.scheduledStartTime) }}</strong> — manage this session directly from here, no need to go back to the sessions list.
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              @click="nudgeStart(5)"
+              :disabled="actionLoading"
+              title="Push the start time back by 5 minutes"
+              class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+            >
+              +5 min
+            </button>
+            <button
+              @click="openReschedule"
+              :disabled="actionLoading"
+              class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+            >
+              Reschedule
+            </button>
+            <button
+              @click="cancelSession"
+              :disabled="actionLoading"
+              class="px-4 py-2 bg-white border border-red-300 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              Cancel Session
+            </button>
+            <button
+              @click="forceStartExam"
+              :disabled="actionLoading"
+              class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50"
+            >
+              Force Start Exam
+            </button>
+          </div>
         </div>
-        <div class="flex flex-wrap gap-2">
+
+        <!-- Reschedule inline form -->
+        <div v-if="showReschedule" class="mt-4 pt-4 border-t border-gray-200 flex flex-col sm:flex-row sm:items-end gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">New start date &amp; time</label>
+            <input
+              v-model="rescheduleForm.startTime"
+              type="datetime-local"
+              class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Duration (minutes)</label>
+            <input
+              v-model.number="rescheduleForm.durationMinutes"
+              type="number"
+              min="30" max="300"
+              class="w-28 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
+            />
+          </div>
           <button
-            @click="cancelSession"
-            :disabled="actionLoading"
-            class="px-4 py-2 bg-white border border-red-300 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
-          >
-            Cancel Session
-          </button>
-          <button
-            @click="forceStartExam"
-            :disabled="actionLoading"
+            @click="submitReschedule"
+            :disabled="actionLoading || !rescheduleForm.startTime"
             class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-50"
           >
-            Force Start Exam
+            Confirm Reschedule
           </button>
         </div>
       </div>
       <div v-if="actionError" class="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm font-medium">
         {{ actionError }}
+      </div>
+      <div v-if="actionSuccess" class="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm font-medium">
+        {{ actionSuccess }}
       </div>
 
       <!-- Printable Area Start -->
@@ -176,12 +226,26 @@ const meta = ref({
   sessionCode: '',
   sessionName: '',
   credentials: [],
-  status: null
+  status: null,
+  scheduledStartTime: null,
+  durationMinutes: null
 })
 const actionLoading = ref(false)
 const actionError = ref('')
+const actionSuccess = ref('')
+const showReschedule = ref(false)
+const rescheduleForm = ref({ startTime: '', durationMinutes: null })
 
 const sessionId = parseInt(route.params.id)
+
+// Converts an ISO/timestamptz string to the local "YYYY-MM-DDTHH:mm" format <input
+// type="datetime-local"> expects, so the field prefills with the current scheduled time.
+function toDatetimeLocalValue(isoString) {
+  if (!isoString) return ''
+  const d = new Date(isoString)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 onMounted(async () => {
   // 1. Try sessionStorage first (fast path — just after creation)
@@ -215,10 +279,12 @@ const fetchStatus = async () => {
   try {
     const { data } = await supabase
       .from('live_exam_sessions')
-      .select('status')
+      .select('status, scheduled_start_time, duration_minutes')
       .eq('live_session_id', sessionId)
       .maybeSingle()
     meta.value.status = data?.status ?? null
+    meta.value.scheduledStartTime = data?.scheduled_start_time ?? null
+    meta.value.durationMinutes = data?.duration_minutes ?? null
   } catch (err) {
     console.warn('Could not fetch session status (non-fatal):', err)
   }
@@ -234,7 +300,7 @@ const fetchFromDatabase = async () => {
     // Fetch session metadata (session_code, session_name, admin_test_id, status)
     const { data: sessionData, error: sessionError } = await supabase
       .from('live_exam_sessions')
-      .select('session_code, session_name, admin_id, admin_test_id, status')
+      .select('session_code, session_name, admin_id, admin_test_id, status, scheduled_start_time, duration_minutes')
       .eq('live_session_id', sessionId)
       .single()
 
@@ -266,7 +332,9 @@ const fetchFromDatabase = async () => {
       sessionCode: sessionData.session_code,
       sessionName: sessionData.session_name,
       credentials: studentsData || [],
-      status: sessionData.status
+      status: sessionData.status,
+      scheduledStartTime: sessionData.scheduled_start_time,
+      durationMinutes: sessionData.duration_minutes
     }
 
   } catch (err) {
@@ -302,6 +370,82 @@ const cancelSession = async () => {
   } finally {
     actionLoading.value = false
   }
+}
+
+// Reschedule / nudge — see reschedule-live-exam-session-rpc.sql. Both RPCs return the
+// session's updated scheduled_start_time/duration so the Admin Controls bar reflects the
+// new time immediately without a full refetch. Students already in the lobby pick this up
+// live too — see ExamWaitingRoom.vue's checkStatusSafely(), which re-reads the current
+// scheduled time on every poll/Realtime tick rather than only reacting to status changes.
+function openReschedule() {
+  if (!showReschedule.value) {
+    rescheduleForm.value = {
+      startTime: toDatetimeLocalValue(meta.value.scheduledStartTime),
+      durationMinutes: meta.value.durationMinutes
+    }
+  }
+  showReschedule.value = !showReschedule.value
+}
+
+const nudgeStart = async (minutes) => {
+  actionLoading.value = true
+  actionError.value = ''
+  actionSuccess.value = ''
+  try {
+    const { data, error } = await supabase.rpc('nudge_live_exam_session_start', {
+      p_token: adminStore.getToken(),
+      input_live_session_id: sessionId,
+      input_minutes: minutes
+    })
+    if (error) throw error
+    const row = data?.[0]
+    if (row) {
+      meta.value.scheduledStartTime = row.scheduled_start_time
+      actionSuccess.value = `Start time pushed back ${minutes} minutes.`
+      setTimeout(() => { actionSuccess.value = '' }, 4000)
+    }
+  } catch (err) {
+    console.error('Failed to nudge session start:', err)
+    actionError.value = err.message || 'Failed to adjust start time'
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+const submitReschedule = async () => {
+  if (!rescheduleForm.value.startTime) return
+  actionLoading.value = true
+  actionError.value = ''
+  actionSuccess.value = ''
+  try {
+    const { data, error } = await supabase.rpc('reschedule_live_exam_session', {
+      p_token: adminStore.getToken(),
+      input_live_session_id: sessionId,
+      input_new_start_time: new Date(rescheduleForm.value.startTime).toISOString(),
+      input_duration_minutes: rescheduleForm.value.durationMinutes || null
+    })
+    if (error) throw error
+    const row = data?.[0]
+    if (row) {
+      meta.value.scheduledStartTime = row.scheduled_start_time
+      meta.value.durationMinutes = row.duration_minutes
+      actionSuccess.value = 'Session rescheduled.'
+      showReschedule.value = false
+      setTimeout(() => { actionSuccess.value = '' }, 4000)
+    }
+  } catch (err) {
+    console.error('Failed to reschedule session:', err)
+    actionError.value = err.message || 'Failed to reschedule session'
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+function formatDateTime(isoString) {
+  if (!isoString) return '—'
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
+  }).format(new Date(isoString))
 }
 
 const forceStartExam = async () => {
