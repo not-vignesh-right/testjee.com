@@ -57,9 +57,20 @@
          <span class="font-mono bg-blue-700/50 px-3 py-1 rounded text-sm text-blue-100 border border-blue-500">CODE: {{ route.params.sessionCode }}</span>
        </div>
 
+       <!-- Institution branding, if this session's admin has a logo/college name on file -->
+       <div v-if="branding.logoUrl || branding.instituteName" class="flex items-center justify-center gap-3 py-4 border-b border-gray-100 bg-gray-50/60">
+         <img
+           v-if="branding.logoUrl"
+           :src="branding.logoUrl"
+           :alt="branding.instituteName || 'Institution logo'"
+           class="h-10 w-10 rounded-xl object-cover border border-gray-200 shadow-sm"
+         />
+         <span v-if="branding.instituteName" class="font-bold text-gray-800">{{ branding.instituteName }}</span>
+       </div>
+
        <!-- Body -->
        <div class="p-8 md:p-12">
-          
+
           <div class="text-center mb-10">
              <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">{{ store.sessionDetails.sessionName }}</h1>
              <p class="text-lg text-gray-600 font-medium">
@@ -196,6 +207,18 @@ const checkDevice = () => {
 
 const canStartExam = computed(() => store.sessionDetails?.sessionStatus === 'live' || store.sessionDetails?.canStart)
 
+// Institution branding (logo + college name) — see college-branding-migration.sql
+const branding = ref({ instituteName: '', logoUrl: '' })
+async function fetchBranding() {
+  try {
+    const { data } = await supabase.rpc('get_session_branding', { input_session_code: route.params.sessionCode })
+    const row = data?.[0]
+    if (row) branding.value = { instituteName: row.institute_name || '', logoUrl: row.logo_url || '' }
+  } catch (err) {
+    console.warn('Could not load institution branding (non-fatal):', err)
+  }
+}
+
 const isTimeReached = computed(() => {
   if (!store.sessionDetails?.scheduledStartTime) return false
   return new Date(store.sessionDetails.scheduledStartTime).getTime() <= currentTime.value
@@ -205,6 +228,7 @@ onMounted(async () => {
   // Run device check here so window is guaranteed available
   checkDevice()
   window.addEventListener('resize', checkDevice)
+  fetchBranding()
 
   if (!store.studentSessionId) {
     router.push(`/live-exam/${route.params.sessionCode}`)

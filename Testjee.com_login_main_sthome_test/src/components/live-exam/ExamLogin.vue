@@ -21,13 +21,28 @@
     </Teleport>
     <div class="sm:mx-auto sm:w-full sm:max-w-md">
        <div class="flex justify-center flex-col items-center">
-         <!-- Brand -->
-          <img
-            :src="logo"
-            alt="TestJEE"
-            class="h-16 w-auto object-contain mb-2"
-          />
-          <p class="text-gray-500 font-medium text-sm">Secure Examination Portal</p>
+         <!-- Institution branding, if this session's admin has a logo/college name on file -->
+         <template v-if="branding.logoUrl || branding.instituteName">
+           <img
+             v-if="branding.logoUrl"
+             :src="branding.logoUrl"
+             :alt="branding.instituteName || 'Institution logo'"
+             class="h-16 w-16 rounded-2xl object-cover mb-2 border border-gray-200 shadow-sm"
+           />
+           <p v-if="branding.instituteName" class="text-gray-900 font-bold text-lg text-center">{{ branding.instituteName }}</p>
+           <p class="text-gray-400 font-medium text-xs mt-0.5 flex items-center gap-1">
+             Powered by <img :src="logo" alt="TestJEE" class="h-4 w-auto object-contain inline-block" />
+           </p>
+         </template>
+         <!-- Fallback: plain TestJEE brand (no session code yet, or admin has no branding on file) -->
+         <template v-else>
+           <img
+             :src="logo"
+             alt="TestJEE"
+             class="h-16 w-auto object-contain mb-2"
+           />
+           <p class="text-gray-500 font-medium text-sm">Secure Examination Portal</p>
+         </template>
        </div>
     </div>
 
@@ -207,7 +222,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useExamSessionStore } from '../../stores/examSessionStore'
 import { supabase } from '../../lib/supabase'
@@ -293,6 +308,29 @@ const loginForm = ref({
   sessionCode: route.params.sessionCode || '',
   username: ''
 })
+
+// Institution branding (logo + college name), looked up by session code — manually set by
+// us in the admins table (logo_url column, college-branding-migration.sql). Public RPC since
+// no admin/student session exists yet on this page.
+const branding = ref({ instituteName: '', logoUrl: '' })
+let brandingDebounce = null
+async function fetchBranding(code) {
+  if (!code || code.trim().length < 4) {
+    branding.value = { instituteName: '', logoUrl: '' }
+    return
+  }
+  try {
+    const { data } = await supabase.rpc('get_session_branding', { input_session_code: code.trim().toUpperCase() })
+    const row = data?.[0]
+    branding.value = row ? { instituteName: row.institute_name || '', logoUrl: row.logo_url || '' } : { instituteName: '', logoUrl: '' }
+  } catch (err) {
+    console.warn('Could not load institution branding (non-fatal):', err)
+  }
+}
+watch(() => loginForm.value.sessionCode, (code) => {
+  clearTimeout(brandingDebounce)
+  brandingDebounce = setTimeout(() => fetchBranding(code), 400)
+}, { immediate: true })
 
 const detailsForm = ref({
   fullName: '',

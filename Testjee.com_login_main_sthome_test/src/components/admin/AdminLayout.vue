@@ -6,7 +6,7 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center h-16">
 
-          <!-- Left: Brand + current page breadcrumb -->
+          <!-- Left: Brand + institution branding + current page breadcrumb -->
           <div class="flex items-center gap-3 min-w-0">
             <button
               @click="router.push('/admin/home')"
@@ -19,6 +19,22 @@
                 class="h-9 w-auto object-contain"
               />
             </button>
+
+            <!-- Institution branding (logo + college name), if the admin has one on file -->
+            <template v-if="branding.instituteName || branding.logoUrl">
+              <span class="w-px h-6 bg-slate-200 shrink-0"></span>
+              <div class="flex items-center gap-2 min-w-0">
+                <img
+                  v-if="branding.logoUrl"
+                  :src="branding.logoUrl"
+                  :alt="branding.instituteName || 'Institution logo'"
+                  class="h-8 w-8 rounded-lg object-cover shrink-0 border border-slate-200"
+                />
+                <span v-if="branding.instituteName" class="text-sm font-semibold text-ink-700 truncate max-w-[10rem] sm:max-w-xs">
+                  {{ branding.instituteName }}
+                </span>
+              </div>
+            </template>
 
             <!-- Breadcrumb separator + page title -->
             <template v-if="pageTitle">
@@ -161,6 +177,24 @@ const routeTitles = {
 
 const pageTitle = computed(() => routeTitles[route.name] ?? null)
 
+// Institution branding (logo + college name) — manually set by us in the admins table
+// (logo_url column, college-branding-migration.sql). Fetched via a token-verified RPC so
+// the admins table itself never needs a public SELECT policy.
+const branding = ref({ instituteName: '', logoUrl: '' })
+async function fetchBranding() {
+  const token = adminStore.getToken()
+  if (!token) return
+  try {
+    const { data } = await supabase.rpc('get_admin_branding', { p_token: token })
+    const row = data?.[0]
+    if (row) {
+      branding.value = { instituteName: row.institute_name || '', logoUrl: row.logo_url || '' }
+    }
+  } catch (err) {
+    console.warn('Could not load institution branding (non-fatal):', err)
+  }
+}
+
 // Active state — handles nested routes under /admin/sessions
 const isActive = (path) => {
   if (path === '/admin/sessions/new') return route.path === '/admin/sessions/new'
@@ -193,6 +227,7 @@ async function fetchPendingCount() {
 
 onMounted(async () => {
   await fetchPendingCount()
+  fetchBranding()
 
   // NEW-07: Realtime subscription instead of 30s polling. Postgres_changes can't filter on
   // the deep join needed to scope this to one admin, so every event just triggers a refetch

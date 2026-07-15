@@ -5,6 +5,23 @@
 
 ---
 
+# ✅ PHASE 8: Institution-Specific Branding (Complete)
+
+**Goal:** Show each admin's (college's) own logo + name in the admin dashboard and on the student-facing live-exam login/lobby screens, without building any admin-facing upload UI — logos are set manually by us in Supabase.
+
+**What shipped (`college-branding-migration.sql`):**
+- `admins.logo_url text` column added. Logos live in a manually-created Storage bucket (`Admins/College_Logos/`, set **public** so the URL works directly as an `<img src>` with no signed-URL logic needed). We contact each admin, get their logo + college name, and set `institute_name`/`logo_url` via the Table Editor — no code path writes these columns.
+- Two new RPCs — the `admins` table itself is deliberately never given a public SELECT policy (it holds `password`/`session_token`):
+  - `get_admin_branding(p_token)` — token-verified (same `verify_admin_session` pattern as every other hardened admin RPC), returns only `institute_name`/`logo_url` for the calling admin.
+  - `get_session_branding(input_session_code)` — public (no admin/student session exists yet on the login/lobby pages), joins `live_exam_sessions.admin_id → admins`, same trust level as the existing `student_exam_login` RPC (gated by knowing a real session code, nothing more sensitive exposed).
+- **`AdminLayout.vue`**: fetches its own branding on mount via `get_admin_branding`, shows the college's logo (8x8 rounded) + name next to the TestJEE logo in the header, only when set.
+- **`ExamLogin.vue`**: debounce-watches the session-code input (`get_session_branding`, 400ms), swaps the top-of-page brand block to the college's logo/name + a small "Powered by TestJEE" caption once a valid code resolves branding; falls back to the plain TestJEE brand block otherwise (no code yet, or that admin has none set).
+- **`ExamWaitingRoom.vue`**: fetches branding by `route.params.sessionCode` on mount, shows it in a strip between the header bar and the main lobby card.
+
+**Not done (checked, doesn't exist):** there's no "reschedule an already-scheduled live session" feature — `AdminLiveSessions.vue`'s only options for a `scheduled` session are Cancel (kills it) or Duplicate (prefills a brand-new session form with a different time, doesn't edit the existing one in place).
+
+---
+
 # ✅ PHASE 7: Topic-Wise Live Exam Scheduling & Shared Question Engine (Complete)
 
 **Goal:** Give admins the same "Full Mock Test vs Topic Wise" choice students already have on the practice dashboard, and stop `ScheduleExam.vue` from being a separate, weaker reimplementation of the question-selection logic.
