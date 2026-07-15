@@ -474,4 +474,5 @@ Closes the gap noted in Section 13 — admins can now edit an already-scheduled 
   - The "Admin Controls" bordered box replaced with a plain top-rule + inline action row; the reschedule form reveals inline in a soft `canvas`-tinted panel instead of a second bordered box.
   - Credential grid cards lost their dashed-border hover-color-flip gimmick in favor of plain, consistent `canvas`-tinted rows.
   - Print stylesheet, Copy Link/WhatsApp share, and all reschedule/nudge/cancel/force-start logic preserved exactly — this was a visual pass only, no behavior changes beyond the new presence indicator.
+* **Follow-up**: the same Enrolled/Submitted/In Progress/Waiting mini-progress-bar stats shown per row on `AdminLiveSessions.vue` were pulled onto this page too (same `get_admin_live_sessions` RPC, same 10s poll), so the admin never has to bounce back to the sessions list mid-exam to check overall progress — everything about one session now lives on its own Credentials page.
 

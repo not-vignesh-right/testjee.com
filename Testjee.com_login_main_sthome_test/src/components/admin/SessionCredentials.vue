@@ -70,6 +70,24 @@
           </div>
         </div>
 
+        <!-- Live progress stats — same data/cadence as the sessions list (get_admin_live_sessions),
+             pulled here too so the admin never has to leave this page to check on things. -->
+        <div v-if="meta.status !== 'cancelled' && liveStats.enrolled > 0" class="mt-5 bg-canvas rounded-xl px-4 py-3.5">
+          <div class="flex justify-between text-xs font-medium text-ink-500 mb-1.5">
+            <span>Enrolled: <strong class="text-ink-700">{{ liveStats.enrolled }}</strong></span>
+            <span class="text-gta-success">Submitted: {{ liveStats.submitted }}</span>
+          </div>
+          <div class="w-full h-1.5 flex rounded-full overflow-hidden bg-slate-200">
+            <div class="bg-gta-success h-full" :style="`width: ${(liveStats.submitted / liveStats.enrolled) * 100}%`"></div>
+            <div class="bg-gta-primary h-full" :style="`width: ${(liveStats.inProgress / liveStats.enrolled) * 100}%`"></div>
+            <div class="bg-slate-300 h-full" :style="`width: ${(liveStats.notStarted / liveStats.enrolled) * 100}%`"></div>
+          </div>
+          <div class="flex justify-between text-xs font-medium text-ink-500 mt-1.5">
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gta-primary block"></span> In Progress: {{ liveStats.inProgress }}</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-300 block"></span> Waiting: {{ liveStats.notStarted }}</span>
+          </div>
+        </div>
+
         <!-- Session controls: a quiet rule + inline row, not a boxed panel — Force Start Exam
              is the one confident primary action here; everything else is secondary/ghost. -->
         <div v-if="meta.status === 'scheduled'" class="mt-6 pt-5 border-t border-slate-200">
@@ -275,8 +293,42 @@ function startPresenceWatch() {
   })
 }
 
+// Live progress stats (Enrolled/Submitted/In Progress/Waiting) — same source and cadence as
+// AdminLiveSessions.vue's list (get_admin_live_sessions, 10s poll), pulled here too so the
+// admin doesn't have to leave this page to check on things.
+const liveStats = ref({ enrolled: 0, submitted: 0, inProgress: 0, notStarted: 0 })
+let liveStatsPoll = null
+
+async function fetchLiveStats() {
+  try {
+    if (!adminStore.adminProfile?.admin_id) return
+    const { data, error } = await supabase.rpc('get_admin_live_sessions', {
+      input_admin_id: adminStore.adminProfile.admin_id
+    })
+    if (error) throw error
+    const row = (data || []).find(s => s.live_session_id === sessionId)
+    if (row) {
+      liveStats.value = {
+        enrolled: row.total_students_enrolled || 0,
+        submitted: row.students_submitted || 0,
+        inProgress: row.students_in_progress || 0,
+        notStarted: row.students_not_started || 0
+      }
+    }
+  } catch (err) {
+    console.warn('Could not load live stats (non-fatal):', err)
+  }
+}
+
+function startLiveStatsPoll() {
+  if (liveStatsPoll) return
+  fetchLiveStats()
+  liveStatsPoll = setInterval(fetchLiveStats, 10000)
+}
+
 onUnmounted(() => {
   if (presenceChannel) supabase.removeChannel(presenceChannel)
+  if (liveStatsPoll) clearInterval(liveStatsPoll)
 })
 
 onMounted(async () => {
@@ -294,6 +346,7 @@ onMounted(async () => {
         sessionStorage.removeItem('newSessionCredentials')
         await fetchStatus()
         startPresenceWatch()
+        startLiveStatsPoll()
         return
       }
     } catch {
@@ -304,6 +357,7 @@ onMounted(async () => {
   // 2. Fallback: fetch from Supabase using the session ID
   await fetchFromDatabase()
   startPresenceWatch()
+  startLiveStatsPoll()
 })
 
 // Fetched separately (and always, regardless of which path populated `meta`) so the Admin
