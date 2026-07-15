@@ -39,9 +39,13 @@ BEGIN
     RAISE EXCEPTION 'Invalid or expired admin session';
   END IF;
 
-  SELECT admin_id, status, duration_minutes INTO v_owner_id, v_status, v_duration
-  FROM public.live_exam_sessions
-  WHERE live_session_id = input_live_session_id;
+  -- Qualified with the `les` alias throughout — RETURNS TABLE(...) implicitly declares
+  -- scheduled_start_time/scheduled_end_time/duration_minutes as PL/pgSQL variables in this
+  -- function's scope, which collide with the real table columns of the same name if
+  -- referenced bare (error 42702 "column reference is ambiguous").
+  SELECT les.admin_id, les.status, les.duration_minutes INTO v_owner_id, v_status, v_duration
+  FROM public.live_exam_sessions les
+  WHERE les.live_session_id = input_live_session_id;
 
   IF v_owner_id IS NULL THEN
     RAISE EXCEPTION 'Session not found';
@@ -55,12 +59,12 @@ BEGIN
 
   v_duration := COALESCE(input_duration_minutes, v_duration);
 
-  UPDATE public.live_exam_sessions
+  UPDATE public.live_exam_sessions AS les
   SET
     scheduled_start_time = input_new_start_time,
     scheduled_end_time = input_new_start_time + (v_duration || ' minutes')::interval,
     duration_minutes = v_duration
-  WHERE live_session_id = input_live_session_id;
+  WHERE les.live_session_id = input_live_session_id;
 
   RETURN QUERY
   SELECT les.scheduled_start_time, les.scheduled_end_time, les.duration_minutes
@@ -96,9 +100,11 @@ BEGIN
     RAISE EXCEPTION 'Invalid or expired admin session';
   END IF;
 
-  SELECT admin_id, status INTO v_owner_id, v_status
-  FROM public.live_exam_sessions
-  WHERE live_session_id = input_live_session_id;
+  -- Qualified with the `les` alias throughout — see the matching comment in
+  -- reschedule_live_exam_session above for why (RETURNS TABLE column-name collision, 42702).
+  SELECT les.admin_id, les.status INTO v_owner_id, v_status
+  FROM public.live_exam_sessions les
+  WHERE les.live_session_id = input_live_session_id;
 
   IF v_owner_id IS NULL THEN
     RAISE EXCEPTION 'Session not found';
@@ -110,11 +116,11 @@ BEGIN
     RAISE EXCEPTION 'Cannot adjust timing on a session that is already % (only scheduled sessions can be adjusted)', v_status;
   END IF;
 
-  UPDATE public.live_exam_sessions
+  UPDATE public.live_exam_sessions AS les
   SET
-    scheduled_start_time = scheduled_start_time + (input_minutes || ' minutes')::interval,
-    scheduled_end_time = scheduled_end_time + (input_minutes || ' minutes')::interval
-  WHERE live_session_id = input_live_session_id;
+    scheduled_start_time = les.scheduled_start_time + (input_minutes || ' minutes')::interval,
+    scheduled_end_time = les.scheduled_end_time + (input_minutes || ' minutes')::interval
+  WHERE les.live_session_id = input_live_session_id;
 
   RETURN QUERY
   SELECT les.scheduled_start_time, les.scheduled_end_time
