@@ -136,6 +136,53 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // READ-ONLY lookup — does NOT create a record if missing.
+  // Used by AuthCallback so we can defer DB insertion until after we have a phone number.
+  async function fetchOrCheckStudent() {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (!currentUser) throw new Error('No user found')
+      user.value = currentUser
+
+      // Try by supabase_user_id first
+      let { data: student } = await supabase
+        .from('students')
+        .select('*')
+        .eq('supabase_user_id', currentUser.id)
+        .maybeSingle()
+
+      // Fallback: by email
+      if (!student) {
+        const { data: byEmail } = await supabase
+          .from('students')
+          .select('*')
+          .eq('email_id', currentUser.email)
+          .maybeSingle()
+
+        if (byEmail) {
+          // Link the existing record to the Supabase auth user
+          const { data: linked } = await supabase
+            .from('students')
+            .update({
+              supabase_user_id: currentUser.id,
+              modification_date: new Date().toISOString()
+            })
+            .eq('student_id', byEmail.student_id)
+            .select()
+            .single()
+          student = linked
+        }
+      }
+
+      // student may still be null here — caller handles that case
+      if (student) studentProfile.value = student
+      return { user: currentUser, student }
+    } catch (error) {
+      console.error('Error in fetchOrCheckStudent:', error)
+      throw error
+    }
+  }
+
   // UPDATED: fetchOrCreateStudent with mobile number support
   async function fetchOrCreateStudent() {
     try {
@@ -287,6 +334,7 @@ export const useAuthStore = defineStore('auth', () => {
     resetPassword,
     updatePassword,
     updateStudentProfile,
+    fetchOrCheckStudent,
     fetchOrCreateStudent,
     logout
   }

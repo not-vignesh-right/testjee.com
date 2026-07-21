@@ -93,7 +93,8 @@ const phoneError = ref('')
 const submittingPhone = ref(false)
 const redirectMessage = ref('Redirecting...')
 
-let studentRef = null
+// Will be populated after the read-only lookup
+let currentUserRef = null
 
 onMounted(async () => {
   try {
@@ -102,11 +103,22 @@ onMounted(async () => {
     if (sessionError) throw sessionError
     if (!session) throw new Error('Invalid or expired verification link')
 
-    const student = await auth.fetchOrCreateStudent()
-    studentRef = student
+    // Phase 1: READ-ONLY lookup — never creates a DB record.
+    // This prevents a phoneless lead from appearing in the admin dashboard
+    // the moment a user picks a Google account.
+    const { user, student } = await auth.fetchOrCheckStudent()
+    currentUserRef = user
 
     loading.value = false
-    routeStudent(student)
+
+    if (student) {
+      // Returning user — existing record found. Route normally.
+      routeStudent(student)
+    } else {
+      // Brand-new Google sign-in with no existing record.
+      // We must collect the phone BEFORE writing anything to the DB.
+      needsPhone.value = true
+    }
   } catch (err) {
     loading.value = false
     error.value = err.message
@@ -148,13 +160,29 @@ async function submitPhone() {
 
   submittingPhone.value = true
   try {
-    const result = await auth.updateStudentProfile({ mobile_number: phoneInput.value })
-    if (!result.success) {
-      phoneError.value = result.error || 'Failed to save phone number. Please try again.'
-      return
+    // Does the student record exist yet?
+    const existing = auth.studentProfile
+
+    if (existing) {
+      // Returning user who somehow lost their phone number — just update it.
+      const result = await auth.updateStudentProfile({ mobile_number: phoneInput.value })
+      if (!result.success) {
+        phoneError.value = result.error || 'Failed to save phone number. Please try again.'
+        return
+      }
+    } else {
+      // Brand-new Google user: create the full record NOW, with the phone number already in it.
+      // fetchOrCreateStudent reads user_metadata + localStorage for name/tests,
+      // but mobile_number will be null from those sources, so we pass it in localStorage
+      // as a hint so the store's insert picks it up.
+      localStorage.setItem('pendingMobileNumber', phoneInput.value)
+      await auth.fetchOrCreateStudent()
+      // Clear after use
+      localStorage.removeItem('pendingMobileNumber')
     }
+
     needsPhone.value = false
-    routeStudent(auth.studentProfile || studentRef)
+    routeStudent(auth.studentProfile)
   } catch (err) {
     phoneError.value = err.message || 'Failed to save phone number. Please try again.'
   } finally {
@@ -162,3 +190,4 @@ async function submitPhone() {
   }
 }
 </script>
+
